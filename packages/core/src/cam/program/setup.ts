@@ -75,16 +75,29 @@ const Sense = Schema.Literals([1, -1])
 
 /**
  * What the probe measures on every workpiece to find its datum, in the part's own frame (each part's zero is where its cycle expects it;
- * the register of each part receives the deviation). The same kinds as the probing cycles without an angle: a Z surface, an edge, an outside
- * or inside corner, a bore, a boss.
+ * the register of each part receives the deviation): a Z surface, an edge, an outside or inside corner (two touches per edge also measure
+ * the part's rotation), a bore, a boss, a web or a slot at an `angle` (radians from +X), a rectangle, and the angle of a straight face
+ * (`edge-angle`: two touches `pitch` apart). A part on an indexed face (`Workpiece.index`) is probed after its table turn.
  */
 export const PartProbeCycleSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("z-surface"), at: Vec2, expectedZ: Schema.Finite }),
   Schema.Struct({ kind: Schema.Literal("edge"), at: Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite }), normal: Unit2 }),
   Schema.Struct({ kind: Schema.Literal("corner"), corner: Vec2, inside: Schema.Boolean, xSense: Sense, ySense: Sense, ...Depth, inset: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))), touchesPerEdge: Schema.optionalKey(Schema.Literals([1, 2])) }),
-  Schema.Struct({ kind: Schema.Literals(["bore", "boss"]), centre: Vec2, diameter: Schema.Finite.check(Schema.isGreaterThan(0)), ...Depth })
+  Schema.Struct({ kind: Schema.Literals(["bore", "boss"]), centre: Vec2, diameter: Schema.Finite.check(Schema.isGreaterThan(0)), ...Depth }),
+  Schema.Struct({ kind: Schema.Literals(["web", "pocket"]), centre: Vec2, width: Schema.Finite.check(Schema.isGreaterThan(0)), angle: Schema.Finite, ...Depth }),
+  Schema.Struct({ kind: Schema.Literal("rectangle"), inside: Schema.Boolean, centre: Vec2, size: Schema.Struct({ x: Schema.Finite.check(Schema.isGreaterThan(0)), y: Schema.Finite.check(Schema.isGreaterThan(0)) }), ...Depth }),
+  Schema.Struct({ kind: Schema.Literal("edge-angle"), start: Vec2, along: Unit2, pitch: Schema.Finite.check(Schema.isGreaterThan(0)), normal: Unit2, ...Depth })
 ])
 export type PartProbeCycle = typeof PartProbeCycleSchema.Type
+
+/** How far a part is taken to sit from where the setup believes it, for the replay of the probe program: mm in the part's frame, rotation in degrees about its datum. */
+export const PartDisplacementSchema = Schema.Struct({
+  /** The workpiece it applies to; absent = every workpiece. */
+  workpieceId: Schema.optionalKey(Schema.String),
+  x: Schema.optionalKey(Schema.Finite), y: Schema.optionalKey(Schema.Finite), z: Schema.optionalKey(Schema.Finite),
+  rotation: Schema.optionalKey(Schema.Finite)
+})
+export type PartDisplacement = typeof PartDisplacementSchema.Type
 
 /** The probe run on each workpiece before it is cut (`probePart` on generate): one program of the probe tool that reads every part's datum into that part's register. */
 export const PartProbeSchema = Schema.Struct({
@@ -100,7 +113,19 @@ export const PartProbeSchema = Schema.Struct({
   /** Travel height above the datum; absent = 15 above the stock's top (25 without a stock). */
   safeZ: Schema.optionalKey(Schema.Finite),
   /** A correction larger than this is a wrong datum or a clamped part, never written: the control alarms. Default 5 mm. */
-  limit: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0)))
+  limit: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))),
+  /**
+   * Where a measured rotation (a corner with two touches per edge, an `edge-angle`) goes: the register's own rotation (`offset-r`), the
+   * control's coordinate rotation turned about the measured point (`g68`, which stays on for what follows), or the rotary table (`table-c`).
+   * Absent = a rotation is measured but not written.
+   */
+  rotation: Schema.optionalKey(Schema.Literals(["g68", "offset-r", "table-c"])),
+  /**
+   * The replay of the probe program against blanks displaced from where the setup believes them (`plan.probe.parts[].replay`): the
+   * displacements to try (default 0.8, -0.6, 0.3 mm on every part, and 0.5 degrees when a rotation is written) and how close the corrected
+   * register must put the blank's corners to where they really are (default 0.05 mm).
+   */
+  replay: Schema.optionalKey(Schema.Struct({ displacements: Schema.optionalKey(Schema.Array(PartDisplacementSchema).check(Schema.isMaxLength(48))), tolerance: Schema.optionalKey(Schema.Finite.check(Schema.isGreaterThan(0))) }))
 })
 export type PartProbe = typeof PartProbeSchema.Type
 

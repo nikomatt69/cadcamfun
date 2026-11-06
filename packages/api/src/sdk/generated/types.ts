@@ -4948,6 +4948,31 @@ export type CamSetupPlanPayload = {
             readonly depth: number
             readonly top?: number
           }
+        | {
+            readonly kind: "web" | "pocket"
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly width: number
+            readonly angle: number
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "rectangle"
+            readonly inside: boolean
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly size: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "edge-angle"
+            readonly start: { readonly x: number; readonly y: number }
+            readonly along: { readonly x: number; readonly y: number }
+            readonly pitch: number
+            readonly normal: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
       >
       readonly toolNumber?: number
       readonly stylusDiameter?: number
@@ -4956,6 +4981,17 @@ export type CamSetupPlanPayload = {
       readonly clearance?: number
       readonly safeZ?: number
       readonly limit?: number
+      readonly rotation?: "g68" | "offset-r" | "table-c"
+      readonly replay?: {
+        readonly displacements?: ReadonlyArray<{
+          readonly workpieceId?: string
+          readonly x?: number
+          readonly y?: number
+          readonly z?: number
+          readonly rotation?: number
+        }>
+        readonly tolerance?: number
+      }
     }
   }
 }
@@ -5424,6 +5460,31 @@ export type CamSetupValidatePayload = {
             readonly depth: number
             readonly top?: number
           }
+        | {
+            readonly kind: "web" | "pocket"
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly width: number
+            readonly angle: number
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "rectangle"
+            readonly inside: boolean
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly size: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "edge-angle"
+            readonly start: { readonly x: number; readonly y: number }
+            readonly along: { readonly x: number; readonly y: number }
+            readonly pitch: number
+            readonly normal: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
       >
       readonly toolNumber?: number
       readonly stylusDiameter?: number
@@ -5432,6 +5493,17 @@ export type CamSetupValidatePayload = {
       readonly clearance?: number
       readonly safeZ?: number
       readonly limit?: number
+      readonly rotation?: "g68" | "offset-r" | "table-c"
+      readonly replay?: {
+        readonly displacements?: ReadonlyArray<{
+          readonly workpieceId?: string
+          readonly x?: number
+          readonly y?: number
+          readonly z?: number
+          readonly rotation?: number
+        }>
+        readonly tolerance?: number
+      }
     }
   }
 }
@@ -5900,6 +5972,31 @@ export type CamSetupGeneratePayload = {
             readonly depth: number
             readonly top?: number
           }
+        | {
+            readonly kind: "web" | "pocket"
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly width: number
+            readonly angle: number
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "rectangle"
+            readonly inside: boolean
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly size: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "edge-angle"
+            readonly start: { readonly x: number; readonly y: number }
+            readonly along: { readonly x: number; readonly y: number }
+            readonly pitch: number
+            readonly normal: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
       >
       readonly toolNumber?: number
       readonly stylusDiameter?: number
@@ -5908,6 +6005,17 @@ export type CamSetupGeneratePayload = {
       readonly clearance?: number
       readonly safeZ?: number
       readonly limit?: number
+      readonly rotation?: "g68" | "offset-r" | "table-c"
+      readonly replay?: {
+        readonly displacements?: ReadonlyArray<{
+          readonly workpieceId?: string
+          readonly x?: number
+          readonly y?: number
+          readonly z?: number
+          readonly rotation?: number
+        }>
+        readonly tolerance?: number
+      }
     }
   }
   readonly elements: { readonly [x: string]: { readonly [x: string]: JsonValue } }
@@ -6687,6 +6795,31 @@ export type CamSetupSavePayload = {
             readonly depth: number
             readonly top?: number
           }
+        | {
+            readonly kind: "web" | "pocket"
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly width: number
+            readonly angle: number
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "rectangle"
+            readonly inside: boolean
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly size: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "edge-angle"
+            readonly start: { readonly x: number; readonly y: number }
+            readonly along: { readonly x: number; readonly y: number }
+            readonly pitch: number
+            readonly normal: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
       >
       readonly toolNumber?: number
       readonly stylusDiameter?: number
@@ -6695,6 +6828,17 @@ export type CamSetupSavePayload = {
       readonly clearance?: number
       readonly safeZ?: number
       readonly limit?: number
+      readonly rotation?: "g68" | "offset-r" | "table-c"
+      readonly replay?: {
+        readonly displacements?: ReadonlyArray<{
+          readonly workpieceId?: string
+          readonly x?: number
+          readonly y?: number
+          readonly z?: number
+          readonly rotation?: number
+        }>
+        readonly tolerance?: number
+      }
     }
   }
 }
@@ -7164,6 +7308,31 @@ export type CamSetupUpdatePayload = {
             readonly depth: number
             readonly top?: number
           }
+        | {
+            readonly kind: "web" | "pocket"
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly width: number
+            readonly angle: number
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "rectangle"
+            readonly inside: boolean
+            readonly centre: { readonly x: number; readonly y: number }
+            readonly size: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
+        | {
+            readonly kind: "edge-angle"
+            readonly start: { readonly x: number; readonly y: number }
+            readonly along: { readonly x: number; readonly y: number }
+            readonly pitch: number
+            readonly normal: { readonly x: number; readonly y: number }
+            readonly depth: number
+            readonly top?: number
+          }
       >
       readonly toolNumber?: number
       readonly stylusDiameter?: number
@@ -7172,6 +7341,17 @@ export type CamSetupUpdatePayload = {
       readonly clearance?: number
       readonly safeZ?: number
       readonly limit?: number
+      readonly rotation?: "g68" | "offset-r" | "table-c"
+      readonly replay?: {
+        readonly displacements?: ReadonlyArray<{
+          readonly workpieceId?: string
+          readonly x?: number
+          readonly y?: number
+          readonly z?: number
+          readonly rotation?: number
+        }>
+        readonly tolerance?: number
+      }
     }
   }
   readonly baseUpdatedAt?: string
@@ -15403,6 +15583,31 @@ export type CamSetupListOutput = Array<{
             touchesPerEdge?: 1 | 2
           }
         | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
+        | {
+            kind: "web" | "pocket"
+            centre: { x: number; y: number }
+            width: number
+            angle: number
+            depth: number
+            top?: number
+          }
+        | {
+            kind: "rectangle"
+            inside: boolean
+            centre: { x: number; y: number }
+            size: { x: number; y: number }
+            depth: number
+            top?: number
+          }
+        | {
+            kind: "edge-angle"
+            start: { x: number; y: number }
+            along: { x: number; y: number }
+            pitch: number
+            normal: { x: number; y: number }
+            depth: number
+            top?: number
+          }
       >
       toolNumber?: number
       stylusDiameter?: number
@@ -15411,6 +15616,11 @@ export type CamSetupListOutput = Array<{
       clearance?: number
       safeZ?: number
       limit?: number
+      rotation?: "g68" | "offset-r" | "table-c"
+      replay?: {
+        displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
+        tolerance?: number
+      }
     }
   }
   createdAt: string
@@ -15856,6 +16066,31 @@ export type CamSetupSaveOutput = {
             touchesPerEdge?: 1 | 2
           }
         | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
+        | {
+            kind: "web" | "pocket"
+            centre: { x: number; y: number }
+            width: number
+            angle: number
+            depth: number
+            top?: number
+          }
+        | {
+            kind: "rectangle"
+            inside: boolean
+            centre: { x: number; y: number }
+            size: { x: number; y: number }
+            depth: number
+            top?: number
+          }
+        | {
+            kind: "edge-angle"
+            start: { x: number; y: number }
+            along: { x: number; y: number }
+            pitch: number
+            normal: { x: number; y: number }
+            depth: number
+            top?: number
+          }
       >
       toolNumber?: number
       stylusDiameter?: number
@@ -15864,6 +16099,11 @@ export type CamSetupSaveOutput = {
       clearance?: number
       safeZ?: number
       limit?: number
+      rotation?: "g68" | "offset-r" | "table-c"
+      replay?: {
+        displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
+        tolerance?: number
+      }
     }
   }
   createdAt: string
@@ -16308,6 +16548,31 @@ export type CamSetupGetOutput = {
             touchesPerEdge?: 1 | 2
           }
         | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
+        | {
+            kind: "web" | "pocket"
+            centre: { x: number; y: number }
+            width: number
+            angle: number
+            depth: number
+            top?: number
+          }
+        | {
+            kind: "rectangle"
+            inside: boolean
+            centre: { x: number; y: number }
+            size: { x: number; y: number }
+            depth: number
+            top?: number
+          }
+        | {
+            kind: "edge-angle"
+            start: { x: number; y: number }
+            along: { x: number; y: number }
+            pitch: number
+            normal: { x: number; y: number }
+            depth: number
+            top?: number
+          }
       >
       toolNumber?: number
       stylusDiameter?: number
@@ -16316,6 +16581,11 @@ export type CamSetupGetOutput = {
       clearance?: number
       safeZ?: number
       limit?: number
+      rotation?: "g68" | "offset-r" | "table-c"
+      replay?: {
+        displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
+        tolerance?: number
+      }
     }
   }
   createdAt: string
@@ -16763,6 +17033,31 @@ export type CamSetupUpdateOutput = {
             touchesPerEdge?: 1 | 2
           }
         | { kind: "bore" | "boss"; centre: { x: number; y: number }; diameter: number; depth: number; top?: number }
+        | {
+            kind: "web" | "pocket"
+            centre: { x: number; y: number }
+            width: number
+            angle: number
+            depth: number
+            top?: number
+          }
+        | {
+            kind: "rectangle"
+            inside: boolean
+            centre: { x: number; y: number }
+            size: { x: number; y: number }
+            depth: number
+            top?: number
+          }
+        | {
+            kind: "edge-angle"
+            start: { x: number; y: number }
+            along: { x: number; y: number }
+            pitch: number
+            normal: { x: number; y: number }
+            depth: number
+            top?: number
+          }
       >
       toolNumber?: number
       stylusDiameter?: number
@@ -16771,6 +17066,11 @@ export type CamSetupUpdateOutput = {
       clearance?: number
       safeZ?: number
       limit?: number
+      rotation?: "g68" | "offset-r" | "table-c"
+      replay?: {
+        displacements?: Array<{ workpieceId?: string; x?: number; y?: number; z?: number; rotation?: number }>
+        tolerance?: number
+      }
     }
   }
   createdAt: string

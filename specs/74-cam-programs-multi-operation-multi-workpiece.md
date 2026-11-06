@@ -73,8 +73,11 @@ Built on top of §2:
   `unresolved` with the old `carryLimitsOf` sentence when a replay stopped (budget) or a carried solid was too large to sample. The setup that cuts the
   undercut itself is judged on its own tri-dexel (the replay exists whenever the program has a back-boring operation, carried or not): its
   `no-rapid-in-stock`, `holder-clearance`, `no-gouge` and `material-removed` are decided there, with the error declared. While the bar passes the
-  pilot it is oriented and shifted by -Q (`backBoreShift`), and that pass is judged as the envelope the planner's own pilot rule assumes (the insert
-  is one tooth towards +X: reach R - Q, body Q + body radius, about the hole axis), not as an insert all round; the shifts between the bar on the
+  pilot it is oriented and shifted by -Q (`backBoreShift`), and that pass is judged as the envelope the planner's own pilot rule assumes (`backBoreReach`: the
+  farthest corner of any insert about the hole axis, or the body at Q + body radius; the bar has `flutes` inserts evenly spaced, the first towards +X, each
+  `Cutter.insertWidth` wide, a point when absent, so a wider insert reaches farther with its corners and the shift is searched; two opposite inserts
+  cannot pass a pilot narrower than the bar), not as an insert all round. The replay finds the hole's moves by position to 2 microns, since the NC
+  carries three decimals (a non-round shift used to fall out of the envelope); the shifts between the bar on the
   axis and the bar shifted judge the body only (the insert moves away from the wall it cut). Declared removal the mesh does not carry (drill
   points, chamfers, threads) is named in the claim: a replay that found no cut below the part beyond its error passes whatever is declared, one
   that found a cut cannot be told from the declared removal and stays `unresolved`. With the tri-dexel incomplete (budget) the claims stay
@@ -92,13 +95,17 @@ Built on top of §2:
   part's datum frame, carries the program's moves into that frame (`interpretGcode` with `frame: "machine"` and the placements as the
   offset table) and lists, per part, the blank there, the volume removed, the volume left (from that part's own replay) and where its
   feed moves reached. `crossings` are cuts of one register inside another part's blank (a wrong register or placement): they block the
-  release. It needs a placement on every part after the first (else a note says so). The contacts are judged on a tri-dexel of what a register's
-  own moves must not touch (the other parts' blanks and the setup's `fixtures` clamps, as one solid in that frame), with the tool as it is: the
-  flutes and shank, and the holder when it is described, so the tool radius counts (a part whose blank the tool edge reaches while the axis is still
-  outside it is a crossing). Rapids count too. Only moves whose tool comes near an obstacle are replayed, the holder separately (wide but high). A
-  contact shallower than `errorBoundMm` is below the lattice's noise and is not reported; a replay that could not finish (`complete: false`,
-  `reasons`) claims nothing and keeps the release at `preview`. A single part with clamps gets the view as well (`clamps`, crossings named by the
-  clamp). The remaining volume is still the per-part figure of each part's own replay.
+  release. It needs a placement on every part after the first (else a note says so). ONE tri-dexel holds the whole fixture in that frame (every blank and every
+  clamp as one solid), and every register's feed moves are cut into it in program order, so each part's remaining stock (`bodyRemovedMm3`,
+  `bodyRemainingMm3`, next to the per-part replay's own figures) and every contact are read from the same body in the state it is in when the move runs
+  (`body`: its cell and declared error). A move of a register is checked against the rest of the body (its own blank is no obstacle to its own tool,
+  except where another part's blank overlaps it): another part's blank on the lattice, with the tool as it is (flutes and shank, the holder when it is
+  described, so the tool radius counts; rapids count too; a contact shallower than `errorBoundMm` is below the lattice's noise), the clamps EXACTLY, as
+  boxes against the swept tool (`boxPenetration`, the tool sampled every 0.05 mm along the move, only where it can reach the box), so a graze of 0.3 mm
+  into a clamp is a crossing although the lattice cell is 0.25 mm or more (`clampMethod: "exact-box"`, `clampErrorMm: 0.05`: a penetration of that
+  much is never missed, one below 0.01 mm is the NC's own rounding). A replay that could not finish (`complete: false`, `reasons`: the cell grows until
+  the solid can be sampled, the work budget is per register, the clamp check has its own) claims nothing and keeps the release at `preview`. A single
+  part with clamps gets the view as well (`clamps`, crossings named by the clamp).
 
 - **Operation templates.** `Setup.templates` (a named cycle of steps: tool, settings, `dependsOn`, `fromPreviousStock`) and `Setup.uses` (a
   template applied to elements: `perElement` one instance per element, `order` `perStep` or `perFeature`, `workpieceIds`, `position`
@@ -109,23 +116,36 @@ Built on top of §2:
   geometry (the legacy operation names elements, the caller owns the geometry, so a pattern is a use over several elements); the
   desktop's setup panel does not edit templates (it reads the expanded operations where `validateSetup` is called, but `planPrograms` and
   `generateSetup` in the core still expect an expanded setup: a caller must call `expandSetup` first).
-- **Datum probe of every part.** `Setup.partProbe` (cycles in the part's own frame: z-surface, edge, corner, bore, boss; probe pocket,
-  stylus, feed, correction `limit`) and `partProbeProgram` write one program of the probe tool that, for each workpiece in fixture order,
-  runs the cycles under that part's register (`G54..G59`, `G54.1 Pn`, the part's rotary index first) and adds the measured deviation to that
-  register with the kernel's own cycles and actions (an alarm beyond `limit`, default 5 mm). `cam setup_plan` returns `probe` (tool
-  number, register / touches / axes per part, or `refused`); `setup_generate` and the HTTP generate routes take `probePart: true` and put
-  that program FIRST (`kind: "probe"`). It is a program of its own run before the cuts, not inline in each part's toolpaths (inline would
-  put the probe in the cutting programs' tool table and magazine: `generateSetup` would have to place it). It has no material-removal
-  replay (the kernel's `simulateProbing` is not run for it) and the touches of a part that is not where its placement says are the
-  operator's to check.
+- **Datum probe of every part.** `Setup.partProbe` (cycles in the part's own frame: z-surface, edge, corner, bore, boss, web, pocket (an `angle` in
+  radians from +X), rectangle, edge-angle; probe pocket, stylus, feed, correction `limit`, `rotation`) and `partProbeProgram` write one program of the
+  probe tool that, for each workpiece in fixture order, runs the cycles under that part's register (`G54..G59`, `G54.1 Pn`, the part's rotary index
+  first: the table turns so the part's frame is the machine's and its register was set at that pose) and adds the measured deviation to that register
+  with the kernel's own cycles and actions (an alarm beyond `limit`, default 5 mm). A measured rotation (a corner with `touchesPerEdge: 2`, an
+  `edge-angle`) is written when `rotation` says where: the register's own rotation (`offset-r`, which turns about the register's zero, so the datum
+  belongs on the measured corner; the post must be able to write it: LinuxCNC and Siemens, not Fanuc), the control's coordinate rotation about the
+  measured point (`g68`, right for any datum, stays on for what follows) or the table's C. `cam setup_plan` returns `probe` (tool number, register /
+  touches / axes / `measured` axes per part, or `refused`); `setup_generate` and the HTTP generate routes take `probePart: true` and put that program
+  FIRST (`kind: "probe"`). It is a program of its own run before the cuts, not inline in each part's toolpaths (inline would put the probe in the
+  cutting programs' tool table and magazine: `generateSetup` would have to place it).
+  **Replay.** Each part's probe moves are run on the simulator (`runProbeMoves`) against its blank (the part's own, else the setup's) placed with a
+  displacement from where the setup believes it: default 0.8 / -0.6 / 0.3 mm on every part and 0.5 degrees when a rotation is written;
+  `partProbe.replay.displacements` (per workpiece or for all) and `tolerance` (default 0.05 mm) say otherwise. A part on an indexed face runs with
+  the table's pose (the blank is placed in the table's frame through `tablePose`, the pivot at the part's datum). `plan.probe.parts[].replay` says
+  `within` (the corrected register puts the eight corners of the blank within the tolerance of where they are: `residualMm`, `beforeMm`, the
+  corrected register, a G68 left on), `outside` (with the reason: an axis no touch measures, a rotation written to the register about the wrong
+  point), `missed` (a touch found nothing), `stopped` (an alarm: the correction beyond `limit`, a contact on a protected move) or `unreplayed`
+  (the blank is a plain block: a bore, boss, slot or inside corner needs its feature; a write to the table's C axis is not modelled; no blank).
+  A failed replay is a warning on the probe program. It has no material-removal replay and no tilted-plane (G68.2 / CYCLE800) frame: an index is
+  the table turn.
 
 Still not done:
 
 1. Templates in the desktop panel, copy / mirror of a template over a symmetric fixture, templates from the tool library.
-2. The remaining stock of ALL parts as one tri-dexel of the whole fixture: the figures per part still come from each part's own replay, and the
-   contacts between parts and clamps are on a tri-dexel per register, not one solid carved by every register in program order.
-3. The viewer does not draw the combined fixture view (the data is in the evidence).
-4. The part probe inline in each part's toolpaths, simulated with `simulateProbing` against a misplaced blank, probing more than one
-   cycle kind with angles (web, pocket, rotation correction) and a tilted-plane or rotary index probe.
-5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids (boxes only), holder collision against
-   the machine; no controller qualification (a pass is the reference interpreter's, not a machine's).
+2. The viewer does not draw the combined fixture view's clamps (the data is in the evidence); the desktop does not send `fixtures` / `envelope` to the sidecar.
+3. The probe inline in each part's toolpaths (the probe tool in the cutting programs' tool table and magazine); the probe replay on a blank with
+   features (bore, boss, slot, inside corner), on a tilted plane with the work offset in the table's frame (G68.2 / CYCLE800), and a table-C write.
+4. The insert of a back-boring bar is modelled as a body of revolution about the hole axis (its envelope), not as the oriented insert; the one
+   tri-dexel of the fixture carves every register in one pass and its lattice (not the exact clamp test) limits the blank-to-blank contacts.
+5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids in the carving (they are exact boxes in the contact
+   test, but the body's remaining stock does not subtract what a clamp occupies of the blank); holder collision against the machine; no controller
+   qualification (a pass is the reference interpreter's, not a machine's).

@@ -242,6 +242,19 @@ const CLAMP_SAMPLES = 4e6
 type Box = { readonly min: Vec3; readonly max: Vec3 }
 const boxesTouch = (a: Box, b: Box): boolean => a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y && a.min.z < b.max.z && b.min.z < a.max.z
 const boxHas = (b: Box, p: Vec3, grow = 0): boolean => p.x >= b.min.x - grow && p.x <= b.max.x + grow && p.y >= b.min.y - grow && p.y <= b.max.y + grow && p.z >= b.min.z - grow && p.z <= b.max.z + grow
+/** The parameter range [t0, t1] of the segment from `a` to `b` that lies inside `box`, or undefined (slab test). */
+const clipLine = (a: Vec3, b: Vec3, box: Box): readonly [number, number] | undefined => {
+  let t0 = 0, t1 = 1
+  for (const axis of ["x", "y", "z"] as const) {
+    const d = b[axis] - a[axis]
+    if (Math.abs(d) < 1e-12) { if (a[axis] < box.min[axis] || a[axis] > box.max[axis]) return undefined; continue }
+    let near = (box.min[axis] - a[axis]) / d, far = (box.max[axis] - a[axis]) / d
+    if (near > far) [near, far] = [far, near]
+    t0 = Math.max(t0, near); t1 = Math.min(t1, far)
+    if (t0 > t1) return undefined
+  }
+  return [t0, t1]
+}
 /** `a` without the volume of `bs`, as boxes (at most six per subtracted box). */
 const boxMinus = (a: Box, bs: ReadonlyArray<Box>): ReadonlyArray<Box> => {
   let pieces: Box[] = [a]
@@ -375,6 +388,7 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
       }
     }
     // The clamps, exactly: the sampled penetration of the swept tool into the box, to within the sampling step.
+    let arcPoses: Vec3[] | undefined
     for (const clamp of clamps) {
       if (clampStopped) break
       for (const group of PARTS) {
@@ -382,14 +396,21 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
         if (box === undefined || !boxesTouch(box, clamp) || said.has(`${mine.register}>${clamp.id}`)) continue
         const solid = toolSolid(cutter, group)
         let deepest = 0
-        const poses = tipsOf(CLAMP_STEP)
         const consider = (tip: Vec3): void => { deepest = Math.max(deepest, boxPenetration(solid, tip, clamp)) }
-        if (seg.kind === "arc") { clampSamples += poses.length; for (const t of poses) consider(t) } else {
-          const length = Math.hypot(seg.to.x - seg.from.x, seg.to.y - seg.from.y, seg.to.z - seg.from.z)
-          const n = Math.max(1, Math.ceil(length / CLAMP_STEP))
-          clampSamples += n + 1
-          if (clampSamples > CLAMP_SAMPLES) { clampStopped = true; reasons.push(`the exact clamp check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the clamps`); break }
-          for (let k = 0; k <= n; k++) { const f = k / n; consider({ x: seg.from.x + (seg.to.x - seg.from.x) * f, y: seg.from.y + (seg.to.y - seg.from.y) * f, z: seg.from.z + (seg.to.z - seg.from.z) * f }) }
+        // Only where the tool can reach the clamp is the move sampled: the stretch of the line inside the clamp's box grown by the tool's reach.
+        const grown: Box = { min: { x: clamp.min.x - solid.maxRadius, y: clamp.min.y - solid.maxRadius, z: clamp.min.z - solid.top }, max: { x: clamp.max.x + solid.maxRadius, y: clamp.max.y + solid.maxRadius, z: clamp.max.z - solid.bottom } }
+        if (seg.kind === "arc") {
+          arcPoses ??= tipsOf(CLAMP_STEP)
+          for (const t of arcPoses) if (boxHas(grown, t)) { clampSamples++; consider(t) }
+        } else {
+          const span = clipLine(seg.from, seg.to, grown)
+          if (span !== undefined) {
+            const length = Math.hypot(seg.to.x - seg.from.x, seg.to.y - seg.from.y, seg.to.z - seg.from.z) * (span[1] - span[0])
+            const n = Math.max(1, Math.ceil(length / CLAMP_STEP))
+            clampSamples += n + 1
+            if (clampSamples > CLAMP_SAMPLES) { clampStopped = true; reasons.push(`the exact clamp check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the clamps`); break }
+            for (let k = 0; k <= n; k++) { const f = span[0] + (span[1] - span[0]) * (k / n); consider({ x: seg.from.x + (seg.to.x - seg.from.x) * f, y: seg.from.y + (seg.to.y - seg.from.y) * f, z: seg.from.z + (seg.to.z - seg.from.z) * f }) }
+          }
         }
         if (clampSamples > CLAMP_SAMPLES && !clampStopped) { clampStopped = true; reasons.push(`the exact clamp check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the clamps`) }
         if (deepest > CLAMP_THRESHOLD) {

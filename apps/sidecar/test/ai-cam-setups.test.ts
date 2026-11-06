@@ -263,6 +263,15 @@ test("probePart stores the datum probe of every workpiece as the first program, 
   expect(plan.probe.toolNumber).toBe(2)
   expect(plan.probe.parts.map((q: { register: string; touches: number }) => [q.register, q.touches])).toEqual([["G54", 5], ["G55", 5]])
   expect((await call("cam", { action: "setup_plan", setup: base })).probe).toBeUndefined()
+  // The plan also replays each probe on a blank displaced from where the setup puts it. These cycles stand inside the 60 x 50 blank (the corner at 0,0 is
+  // not its corner), so the probe does not find the blank where it believes it is; cycles that meet the blank find it, with a rotation written to the register.
+  expect(plan.probe.parts.map((q: { replay: { status: string } }) => q.replay.status)).toEqual(["stopped", "stopped"])
+  expect(plan.probe.parts[0].replay.reason).toMatch(/protected move/)
+  const matched = { cycles: [{ kind: "z-surface", at: { x: 0, y: 0 }, expectedZ: 0 }, { kind: "corner", corner: { x: -30, y: -25 }, inside: false, xSense: 1, ySense: 1, depth: 5, touchesPerEdge: 2 }], rotation: "g68" }
+  const found = await call("cam", { action: "setup_plan", setup: { ...base, partProbe: matched } })
+  expect(found.probe.parts.map((q: { replay: { status: string } }) => q.replay.status)).toEqual(["within", "within"])
+  expect(found.probe.parts[0].replay).toMatchObject({ displacement: { x: 0.8, y: -0.6, z: 0.3, rotation: 0.5 }, g68: 0.5 })
+  expect(found.probe.parts[0].replay.residualMm).toBeLessThan(0.05)
 
   const saved = await call("cam_edit", { action: "setup_save", name: "Probed", setup: { ...base, partProbe } })
   const generated = await call("cam_edit", { action: "setup_generate", setupId: saved.setupId, probePart: true })

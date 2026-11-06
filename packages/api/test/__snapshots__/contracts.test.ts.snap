@@ -40563,6 +40563,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   ],
                                   "type": "object",
                                 },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "angle": {
+                                      "type": "number",
+                                    },
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "web",
+                                        "pocket",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                    "width": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "centre",
+                                    "width",
+                                    "angle",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "inside": {
+                                      "type": "boolean",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "rectangle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "size": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "inside",
+                                    "centre",
+                                    "size",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "along": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "edge-angle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "normal": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "pitch": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "start": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "start",
+                                    "along",
+                                    "pitch",
+                                    "normal",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
                               ],
                             },
                             "maxItems": 4,
@@ -40576,6 +40776,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "limit": {
                             "exclusiveMinimum": 0,
                             "type": "number",
+                          },
+                          "replay": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "displacements": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rotation": {
+                                      "type": "number",
+                                    },
+                                    "workpieceId": {
+                                      "type": "string",
+                                    },
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "type": "object",
+                                },
+                                "maxItems": 48,
+                                "type": "array",
+                              },
+                              "tolerance": {
+                                "exclusiveMinimum": 0,
+                                "type": "number",
+                              },
+                            },
+                            "type": "object",
+                          },
+                          "rotation": {
+                            "enum": [
+                              "g68",
+                              "offset-r",
+                              "table-c",
+                            ],
+                            "type": "string",
                           },
                           "safeZ": {
                             "type": "number",
@@ -45113,6 +45356,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   ],
                                   "type": "object",
                                 },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "angle": {
+                                      "type": "number",
+                                    },
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "web",
+                                        "pocket",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                    "width": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "centre",
+                                    "width",
+                                    "angle",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "inside": {
+                                      "type": "boolean",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "rectangle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "size": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "inside",
+                                    "centre",
+                                    "size",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "along": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "edge-angle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "normal": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "pitch": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "start": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "start",
+                                    "along",
+                                    "pitch",
+                                    "normal",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
                               ],
                             },
                             "maxItems": 4,
@@ -45126,6 +45569,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "limit": {
                             "exclusiveMinimum": 0,
                             "type": "number",
+                          },
+                          "replay": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "displacements": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rotation": {
+                                      "type": "number",
+                                    },
+                                    "workpieceId": {
+                                      "type": "string",
+                                    },
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "type": "object",
+                                },
+                                "maxItems": 48,
+                                "type": "array",
+                              },
+                              "tolerance": {
+                                "exclusiveMinimum": 0,
+                                "type": "number",
+                              },
+                            },
+                            "type": "object",
+                          },
+                          "rotation": {
+                            "enum": [
+                              "g68",
+                              "offset-r",
+                              "table-c",
+                            ],
+                            "type": "string",
                           },
                           "safeZ": {
                             "type": "number",
@@ -47666,6 +48152,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   ],
                                   "type": "object",
                                 },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "angle": {
+                                      "type": "number",
+                                    },
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "web",
+                                        "pocket",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                    "width": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "centre",
+                                    "width",
+                                    "angle",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "inside": {
+                                      "type": "boolean",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "rectangle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "size": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "inside",
+                                    "centre",
+                                    "size",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "along": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "edge-angle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "normal": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "pitch": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "start": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "start",
+                                    "along",
+                                    "pitch",
+                                    "normal",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
                               ],
                             },
                             "maxItems": 4,
@@ -47679,6 +48365,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "limit": {
                             "exclusiveMinimum": 0,
                             "type": "number",
+                          },
+                          "replay": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "displacements": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rotation": {
+                                      "type": "number",
+                                    },
+                                    "workpieceId": {
+                                      "type": "string",
+                                    },
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "type": "object",
+                                },
+                                "maxItems": 48,
+                                "type": "array",
+                              },
+                              "tolerance": {
+                                "exclusiveMinimum": 0,
+                                "type": "number",
+                              },
+                            },
+                            "type": "object",
+                          },
+                          "rotation": {
+                            "enum": [
+                              "g68",
+                              "offset-r",
+                              "table-c",
+                            ],
+                            "type": "string",
                           },
                           "safeZ": {
                             "type": "number",
@@ -89501,6 +90230,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       ],
                                       "type": "object",
                                     },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "angle": {
+                                          "type": "number",
+                                        },
+                                        "centre": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "x": {
+                                              "type": "number",
+                                            },
+                                            "y": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "depth": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "kind": {
+                                          "enum": [
+                                            "web",
+                                            "pocket",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "top": {
+                                          "type": "number",
+                                        },
+                                        "width": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "centre",
+                                        "width",
+                                        "angle",
+                                        "depth",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "centre": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "x": {
+                                              "type": "number",
+                                            },
+                                            "y": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "depth": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "inside": {
+                                          "type": "boolean",
+                                        },
+                                        "kind": {
+                                          "enum": [
+                                            "rectangle",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "size": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "x": {
+                                              "exclusiveMinimum": 0,
+                                              "type": "number",
+                                            },
+                                            "y": {
+                                              "exclusiveMinimum": 0,
+                                              "type": "number",
+                                            },
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "top": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "inside",
+                                        "centre",
+                                        "size",
+                                        "depth",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "along": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "x": {
+                                              "maximum": 1,
+                                              "minimum": -1,
+                                              "type": "number",
+                                            },
+                                            "y": {
+                                              "maximum": 1,
+                                              "minimum": -1,
+                                              "type": "number",
+                                            },
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "depth": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "kind": {
+                                          "enum": [
+                                            "edge-angle",
+                                          ],
+                                          "type": "string",
+                                        },
+                                        "normal": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "x": {
+                                              "maximum": 1,
+                                              "minimum": -1,
+                                              "type": "number",
+                                            },
+                                            "y": {
+                                              "maximum": 1,
+                                              "minimum": -1,
+                                              "type": "number",
+                                            },
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "pitch": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "start": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "x": {
+                                              "type": "number",
+                                            },
+                                            "y": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "required": [
+                                            "x",
+                                            "y",
+                                          ],
+                                          "type": "object",
+                                        },
+                                        "top": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "start",
+                                        "along",
+                                        "pitch",
+                                        "normal",
+                                        "depth",
+                                      ],
+                                      "type": "object",
+                                    },
                                   ],
                                 },
                                 "maxItems": 4,
@@ -89514,6 +90443,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               "limit": {
                                 "exclusiveMinimum": 0,
                                 "type": "number",
+                              },
+                              "replay": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "displacements": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "rotation": {
+                                          "type": "number",
+                                        },
+                                        "workpieceId": {
+                                          "type": "string",
+                                        },
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                        "z": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "type": "object",
+                                    },
+                                    "maxItems": 48,
+                                    "type": "array",
+                                  },
+                                  "tolerance": {
+                                    "exclusiveMinimum": 0,
+                                    "type": "number",
+                                  },
+                                },
+                                "type": "object",
+                              },
+                              "rotation": {
+                                "enum": [
+                                  "g68",
+                                  "offset-r",
+                                  "table-c",
+                                ],
+                                "type": "string",
                               },
                               "safeZ": {
                                 "type": "number",
@@ -91897,6 +92869,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   ],
                                   "type": "object",
                                 },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "angle": {
+                                      "type": "number",
+                                    },
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "web",
+                                        "pocket",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                    "width": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "centre",
+                                    "width",
+                                    "angle",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "inside": {
+                                      "type": "boolean",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "rectangle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "size": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "inside",
+                                    "centre",
+                                    "size",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "along": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "edge-angle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "normal": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "pitch": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "start": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "start",
+                                    "along",
+                                    "pitch",
+                                    "normal",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
                               ],
                             },
                             "maxItems": 4,
@@ -91910,6 +93082,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "limit": {
                             "exclusiveMinimum": 0,
                             "type": "number",
+                          },
+                          "replay": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "displacements": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rotation": {
+                                      "type": "number",
+                                    },
+                                    "workpieceId": {
+                                      "type": "string",
+                                    },
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "type": "object",
+                                },
+                                "maxItems": 48,
+                                "type": "array",
+                              },
+                              "tolerance": {
+                                "exclusiveMinimum": 0,
+                                "type": "number",
+                              },
+                            },
+                            "type": "object",
+                          },
+                          "rotation": {
+                            "enum": [
+                              "g68",
+                              "offset-r",
+                              "table-c",
+                            ],
+                            "type": "string",
                           },
                           "safeZ": {
                             "type": "number",
@@ -94232,6 +95447,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     ],
                                     "type": "object",
                                   },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "angle": {
+                                        "type": "number",
+                                      },
+                                      "centre": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "web",
+                                          "pocket",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                      "width": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "centre",
+                                      "width",
+                                      "angle",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "centre": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "inside": {
+                                        "type": "boolean",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "rectangle",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "size": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "exclusiveMinimum": 0,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "exclusiveMinimum": 0,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "inside",
+                                      "centre",
+                                      "size",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "along": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "edge-angle",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "normal": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "pitch": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "start": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "start",
+                                      "along",
+                                      "pitch",
+                                      "normal",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
                                 ],
                               },
                               "maxItems": 4,
@@ -94245,6 +95660,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "limit": {
                               "exclusiveMinimum": 0,
                               "type": "number",
+                            },
+                            "replay": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "displacements": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "rotation": {
+                                        "type": "number",
+                                      },
+                                      "workpieceId": {
+                                        "type": "string",
+                                      },
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "type": "object",
+                                  },
+                                  "maxItems": 48,
+                                  "type": "array",
+                                },
+                                "tolerance": {
+                                  "exclusiveMinimum": 0,
+                                  "type": "number",
+                                },
+                              },
+                              "type": "object",
+                            },
+                            "rotation": {
+                              "enum": [
+                                "g68",
+                                "offset-r",
+                                "table-c",
+                              ],
+                              "type": "string",
                             },
                             "safeZ": {
                               "type": "number",
@@ -96736,6 +98194,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     ],
                                     "type": "object",
                                   },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "angle": {
+                                        "type": "number",
+                                      },
+                                      "centre": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "web",
+                                          "pocket",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                      "width": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "centre",
+                                      "width",
+                                      "angle",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "centre": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "inside": {
+                                        "type": "boolean",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "rectangle",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "size": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "exclusiveMinimum": 0,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "exclusiveMinimum": 0,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "inside",
+                                      "centre",
+                                      "size",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "along": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "edge-angle",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "normal": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "pitch": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "start": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "start",
+                                      "along",
+                                      "pitch",
+                                      "normal",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
                                 ],
                               },
                               "maxItems": 4,
@@ -96749,6 +98407,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "limit": {
                               "exclusiveMinimum": 0,
                               "type": "number",
+                            },
+                            "replay": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "displacements": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "rotation": {
+                                        "type": "number",
+                                      },
+                                      "workpieceId": {
+                                        "type": "string",
+                                      },
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "type": "object",
+                                  },
+                                  "maxItems": 48,
+                                  "type": "array",
+                                },
+                                "tolerance": {
+                                  "exclusiveMinimum": 0,
+                                  "type": "number",
+                                },
+                              },
+                              "type": "object",
+                            },
+                            "rotation": {
+                              "enum": [
+                                "g68",
+                                "offset-r",
+                                "table-c",
+                              ],
+                              "type": "string",
                             },
                             "safeZ": {
                               "type": "number",
@@ -99141,6 +100842,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   ],
                                   "type": "object",
                                 },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "angle": {
+                                      "type": "number",
+                                    },
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "web",
+                                        "pocket",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                    "width": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "centre",
+                                    "width",
+                                    "angle",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "centre": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "inside": {
+                                      "type": "boolean",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "rectangle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "size": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "exclusiveMinimum": 0,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "inside",
+                                    "centre",
+                                    "size",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "along": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "depth": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "edge-angle",
+                                      ],
+                                      "type": "string",
+                                    },
+                                    "normal": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "maximum": 1,
+                                          "minimum": -1,
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "pitch": {
+                                      "exclusiveMinimum": 0,
+                                      "type": "number",
+                                    },
+                                    "start": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "top": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "start",
+                                    "along",
+                                    "pitch",
+                                    "normal",
+                                    "depth",
+                                  ],
+                                  "type": "object",
+                                },
                               ],
                             },
                             "maxItems": 4,
@@ -99154,6 +101055,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "limit": {
                             "exclusiveMinimum": 0,
                             "type": "number",
+                          },
+                          "replay": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "displacements": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "rotation": {
+                                      "type": "number",
+                                    },
+                                    "workpieceId": {
+                                      "type": "string",
+                                    },
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "type": "object",
+                                },
+                                "maxItems": 48,
+                                "type": "array",
+                              },
+                              "tolerance": {
+                                "exclusiveMinimum": 0,
+                                "type": "number",
+                              },
+                            },
+                            "type": "object",
+                          },
+                          "rotation": {
+                            "enum": [
+                              "g68",
+                              "offset-r",
+                              "table-c",
+                            ],
+                            "type": "string",
                           },
                           "safeZ": {
                             "type": "number",
@@ -101472,6 +103416,206 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                     ],
                                     "type": "object",
                                   },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "angle": {
+                                        "type": "number",
+                                      },
+                                      "centre": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "web",
+                                          "pocket",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                      "width": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "centre",
+                                      "width",
+                                      "angle",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "centre": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "inside": {
+                                        "type": "boolean",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "rectangle",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "size": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "exclusiveMinimum": 0,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "exclusiveMinimum": 0,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "inside",
+                                      "centre",
+                                      "size",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "along": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "depth": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "kind": {
+                                        "enum": [
+                                          "edge-angle",
+                                        ],
+                                        "type": "string",
+                                      },
+                                      "normal": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "maximum": 1,
+                                            "minimum": -1,
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "pitch": {
+                                        "exclusiveMinimum": 0,
+                                        "type": "number",
+                                      },
+                                      "start": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "top": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "start",
+                                      "along",
+                                      "pitch",
+                                      "normal",
+                                      "depth",
+                                    ],
+                                    "type": "object",
+                                  },
                                 ],
                               },
                               "maxItems": 4,
@@ -101485,6 +103629,49 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "limit": {
                               "exclusiveMinimum": 0,
                               "type": "number",
+                            },
+                            "replay": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "displacements": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "rotation": {
+                                        "type": "number",
+                                      },
+                                      "workpieceId": {
+                                        "type": "string",
+                                      },
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "type": "object",
+                                  },
+                                  "maxItems": 48,
+                                  "type": "array",
+                                },
+                                "tolerance": {
+                                  "exclusiveMinimum": 0,
+                                  "type": "number",
+                                },
+                              },
+                              "type": "object",
+                            },
+                            "rotation": {
+                              "enum": [
+                                "g68",
+                                "offset-r",
+                                "table-c",
+                              ],
+                              "type": "string",
                             },
                             "safeZ": {
                               "type": "number",

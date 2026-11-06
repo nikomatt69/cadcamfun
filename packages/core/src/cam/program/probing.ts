@@ -12,15 +12,17 @@ import type { Vec2 } from "../../cad/vec.ts"
 import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { analyseGcode } from "../generator/analysis.ts"
 import { getPost, dialectOf } from "../post/index.ts"
-import { formatOffsetRef, type OffsetAxis } from "../work-offset.ts"
+import { formatOffsetRef, getOffset, offsetKey, withOffset, workToMachine, type OffsetAxis, type WorkOffsetRef, type WorkOffsetTable } from "../work-offset.ts"
 import type { GeneratedProgram } from "./programs.ts"
-import type { Setup } from "./setup.ts"
+import type { PartDisplacement, Setup, Workpiece } from "./setup.ts"
 import { enabledOperations, workpiecesOf } from "./setup.ts"
 import { assignPockets } from "./tooltable.ts"
 import { varKey, type Expr } from "../macro.ts"
 import { planProbeCycle } from "../probing/cycles.ts"
 import { compileActions } from "../probing/actions.ts"
-import { DEFAULT_PROBE_SETTINGS, deviceOfSettings } from "../probing/device.ts"
+import { DEFAULT_PROBE_SETTINGS, deviceOfSettings, type ProbeDevice } from "../probing/device.ts"
+import { runProbeMoves, tablePose, type SimKinematics } from "../probing/simulate.ts"
+import { meshWorld } from "../probing/world.ts"
 import type { ProbeAction, ProbeCycle as ProbeCycleSpec } from "../probing/types.ts"
 
 export type ProbeCycle = "z-surface" | "edge" | "corner" | "bore" | "boss"
@@ -229,14 +231,39 @@ export const kernelProbe = (op: ProbeOperation, s: ProbeSettings): { readonly cy
 
 /* ------------------------------------------------------------------------------------------------- the datum probe of every part */
 
+/**
+ * What the probe program does to a blank that is not where the setup believes it: the program is run on the simulator (`runProbeMoves`)
+ * against the part's blank placed with the displacement, and the register it ends with is compared with where the blank really is.
+ * `residualMm` is the worst distance, over the eight corners of the blank, between where the corrected register puts the corner and where it
+ * is; `beforeMm` is the same figure for the register as it stood. Inside `toleranceMm` the correction does what it is for.
+ */
+export interface PartProbeReplay {
+  /** `within`: the corrected register is inside the tolerance; `outside`: it is not (see `reason`); `missed`: a touch found nothing; `stopped`: the program alarmed or stopped; `unreplayed`: the replay does not cover this setup (see `reason`). */
+  readonly status: "within" | "outside" | "missed" | "stopped" | "unreplayed"
+  readonly reason?: string
+  /** The displacement the blank was given: mm in the part's frame, rotation in degrees about its datum. */
+  readonly displacement?: { readonly x: number; readonly y: number; readonly z: number; readonly rotation: number }
+  /** The register after the run: the machine position of the part's zero (mm) and the rotation written to it (degrees). */
+  readonly corrected?: { readonly X: number; readonly Y: number; readonly Z: number; readonly R: number }
+  readonly residualMm?: number
+  readonly beforeMm?: number
+  readonly toleranceMm?: number
+  /** A coordinate rotation the program left on (`g68`), degrees. */
+  readonly g68?: number
+}
+
 /** One part's probe: the register it writes, the touches it takes and the axes of the offset it corrects. */
 export interface PartProbeEntry {
   readonly workpieceId: string
   readonly name: string
   readonly register: string
   readonly touches: number
-  /** The axes whose offset the cycles correct, in order of the cycles. */
+  /** The axes whose offset the cycles correct, in order of the cycles (`R` when a measured rotation is written to the register). */
   readonly axes: ReadonlyArray<OffsetAxis>
+  /** The axes some touch of the cycles really pins down (a touch along X says nothing about Y, though the cycle reports a Y result): what the part's displacement can be found in. */
+  readonly measured: ReadonlyArray<"X" | "Y" | "Z">
+  /** The replay of this part's probe against a displaced blank. */
+  readonly replay?: PartProbeReplay
 }
 
 export interface PartProbePlan {
@@ -249,24 +276,30 @@ export interface PartProbePlan {
 
 const PART_PROBE_ID = "part-probe"
 const PART_PROBE_LIMIT = 5
+const DEG = Math.PI / 180
+const REPLAY_TOLERANCE = 0.05
+/** What the replay moves a blank by when the setup does not say: a few tenths of a millimetre, and half a degree when a rotation is written. */
+const DEFAULT_DISPLACEMENT = { x: 0.8, y: -0.6, z: 0.3 }
+const DEFAULT_ROTATION = 0.5
 
-/**
- * The probe program of a setup's workpieces: for every workpiece (in the fixture's order) the configured cycles run in that part's frame
- * and the deviation of each measured datum is added to that part's own register. The post must write probing words; the register is
- * the one the part's toolpaths run under, so the cut that follows starts from the measured datum. Pure: the replay of the touches is
- * the kernel's (`simulateProbing`), not this function's.
- */
-export const partProbeProgram = (setup: Setup, programNumber: number): { readonly plan: PartProbePlan; readonly generated?: GeneratedProgram } => {
+interface PartProbeBuild {
+  readonly refused?: string
+  readonly toolNumber: number
+  readonly device: ProbeDevice
+  readonly parts: ReadonlyArray<{ readonly wp: Workpiece; readonly register: string; readonly ref: WorkOffsetRef; readonly moves: ReadonlyArray<Move>; readonly entry: PartProbeEntry; readonly kinds: ReadonlyArray<string> }>
+  readonly notes: ReadonlyArray<string>
+}
+
+/** The moves of the probe of every workpiece (cycles in the part's frame after its table turn), with the entry each one reports. */
+const buildPartProbe = (setup: Setup): PartProbeBuild | { readonly refused: string; readonly toolNumber: number } => {
   const config = setup.partProbe
   const operations = enabledOperations(setup)
   const toolNumber = config?.toolNumber ?? Math.max(0, ...assignPockets(operations).values()) + (setup.sisters ?? []).length + 1
-  const refuse = (refused: string): { readonly plan: PartProbePlan } => ({ plan: { refused, toolNumber, parts: [], notes: [] } })
+  const refuse = (refused: string): { readonly refused: string; readonly toolNumber: number } => ({ refused, toolNumber })
   if (config === undefined) return refuse("The setup has no partProbe: give it the cycles to run on every workpiece")
   if (setup.machineType !== "mill") return refuse(`A part probe is a milling accessory: a ${setup.machineType} setup has none`)
   const dialect = dialectOf(setup.post.postId)
   if (dialect?.probing === undefined) return refuse(`Post ${setup.post.postId} writes no probing words: use a post that does (fanuc, haas, mazak, mitsubishi, brother, generic, okuma, linuxcnc, siemens, heidenhain)`)
-  const post = getPost(setup.post.postId)
-  if (post === undefined) return refuse(`Post ${setup.post.postId} is not implemented`)
   const used = new Set(assignPockets(operations).values())
   if (config.toolNumber !== undefined && used.has(config.toolNumber)) return refuse(`The probe's T${config.toolNumber} is a pocket of the operations' tools: give the probe a pocket of its own`)
   const top = setup.stock === undefined ? undefined : setup.stock.origin.z
@@ -276,39 +309,145 @@ export const partProbeProgram = (setup: Setup, programNumber: number): { readonl
   const clearance = config.clearance ?? DEFAULT_PROBE_SETTINGS.clearance
   const search = config.search ?? DEFAULT_PROBE_SETTINGS.search
   const fixture = workpiecesOf(setup)
-  const toolpaths: Toolpath[] = []
-  const parts: PartProbeEntry[] = []
+  const parts: PartProbeBuild["parts"][number][] = []
   const notes: string[] = [`T${toolNumber} measures ${fixture.length} workpiece${fixture.length === 1 ? "" : "s"}; each deviation goes into that part's register, so the toolpaths that follow start from the measured datum`]
   for (let w = 0; w < fixture.length; w++) {
     const wp = fixture[w]!
-    const ref = wp.workOffsetRef ?? ({ kind: "g5x", code: wp.workOffset } as const)
+    const ref: WorkOffsetRef = wp.workOffsetRef ?? ({ kind: "g5x", code: wp.workOffset } as const)
     const register = wp.workOffsetRef !== undefined ? formatOffsetRef(wp.workOffsetRef) : wp.workOffset
+    // An indexed face: the table turns first, so the cycles run in the part's own frame, the face up (its register was set at that pose).
     const moves: Move[] = wp.index === undefined ? [] : [{ _tag: "Orient", ...wp.index }]
     let touches = 0
     const axes: OffsetAxis[] = []
+    const measured = new Set<"X" | "Y" | "Z">()
+    const kinds: string[] = []
     for (let c = 0; c < config.cycles.length; c++) {
       const ctx = { probe: device, safeZ, clearance, search, prefix: `w${w + 1}c${c + 1}_` }
       const routine = planProbeCycle(config.cycles[c]! as ProbeCycleSpec, ctx)
       if ("refused" in routine) return refuse(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}): ${routine.refused}`)
       const cycleAxes = (["X", "Y", "Z"] as const).filter((axis) => routine.results[axis.toLowerCase()] !== undefined)
-      if (cycleAxes.length === 0) return refuse(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}) measures no X, Y or Z position: it cannot set a work offset`)
-      const action: ProbeAction = { kind: "set-offset", ref, axes: Object.fromEntries(cycleAxes.map((axis) => [axis, axis.toLowerCase()])), policy: { mode: "set", limit: config.limit ?? PART_PROBE_LIMIT } }
+      const angleResult = (["rotation", "angle"] as const).find((name) => routine.results[name] !== undefined && routine.units[name] === "deg")
+      const writesRotation = config.rotation !== undefined && angleResult !== undefined
+      if (cycleAxes.length === 0 && !writesRotation) return refuse(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}) measures no X, Y or Z position${angleResult !== undefined ? " and the setup's partProbe has no rotation to write its angle to" : ""}: it cannot set a work offset`)
+      const actions: ProbeAction[] = []
+      if (cycleAxes.length > 0) actions.push({ kind: "set-offset", ref, axes: Object.fromEntries(cycleAxes.map((axis) => [axis, axis.toLowerCase()])), policy: { mode: "set", limit: config.limit ?? PART_PROBE_LIMIT } })
+      if (writesRotation) {
+        // The part turns by at most as much as the limit would move a point 100 mm from the datum: a larger angle is a wrong face or a loose part.
+        actions.push({ kind: "rotation", result: angleResult!, via: config.rotation!, ref, policy: { mode: "set", limit: (config.limit ?? PART_PROBE_LIMIT) * DEG } })
+        axes.push("R")
+        notes.push(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}): the measured ${angleResult} goes into ${config.rotation === "g68" ? "the control's coordinate rotation (G68, about the measured point: it stays on for what follows)" : config.rotation === "table-c" ? "the C axis of the table" : "the register's own rotation"}`)
+      }
       let compiled: Move[]
-      try { compiled = compileActions(routine, [action], ctx) } catch (error) { return refuse(`${wp.name}, cycle ${c + 1}: ${error instanceof Error ? error.message : String(error)}`) }
+      try { compiled = compileActions(routine, actions, ctx) } catch (error) { return refuse(`${wp.name}, cycle ${c + 1}: ${error instanceof Error ? error.message : String(error)}`) }
       const first = compiled.find((m) => m._tag === "Probe")
       if (first !== undefined && first._tag === "Probe") moves.push({ _tag: "Rapid", to: { x: first.to.x, y: first.to.y, z: safeZ } })
       moves.push(...compiled)
       touches += routine.contacts.length
+      for (const contact of routine.contacts) for (const axis of ["X", "Y", "Z"] as const) if (Math.abs(contact.direction[axis.toLowerCase() as "x" | "y" | "z"]) > 1e-6) measured.add(axis)
       axes.push(...cycleAxes)
+      kinds.push(config.cycles[c]!.kind)
     }
-    parts.push({ workpieceId: wp.id, name: wp.name, register, touches, axes })
-    toolpaths.push({
-      id: `probe@${wp.id}`, name: `Probe - ${wp.name}`, toolId: device.id, spindleRpm: 0, coolant: "off", moves,
-      workOffset: wp.workOffset, ...(wp.workOffsetRef !== undefined ? { workOffsetRef: wp.workOffsetRef } : {}),
-      operation: { id: `probe@${wp.id}`, name: `Probe - ${wp.name}` }
-    })
+    parts.push({ wp, register, ref, moves, kinds, entry: { workpieceId: wp.id, name: wp.name, register, touches, axes, measured: (["X", "Y", "Z"] as const).filter((a) => measured.has(a)) } })
   }
-  const plan: PartProbePlan = { toolNumber, parts, notes }
+  return { toolNumber, device, parts, notes }
+}
+
+/** The replay of one part's probe moves against a blank that sits `d` away from nominal. */
+const replayPart = (setup: Setup, built: PartProbeBuild, part: PartProbeBuild["parts"][number], d: { readonly x: number; readonly y: number; readonly z: number; readonly rotation: number }, tolerance: number): PartProbeReplay => {
+  const unreplayed = (reason: string): PartProbeReplay => ({ status: "unreplayed", reason })
+  // The replay's blank is a plain block: a bore, a boss, a slot and an inside corner need a feature the block does not have.
+  const featured = part.kinds.filter((k) => k === "bore" || k === "boss" || k === "pocket" || (k === "rectangle" && (setup.partProbe!.cycles.find((c) => c.kind === "rectangle") as { inside?: boolean } | undefined)?.inside === true))
+  if (featured.length > 0) return unreplayed(`the replay's blank is a plain block: a ${featured[0]} cycle needs its feature (probed on the real part, not replayed)`)
+  if (setup.partProbe!.cycles.some((c) => c.kind === "corner" && c.inside)) return unreplayed("the replay's blank is a plain block: an inside corner needs its pocket (probed on the real part, not replayed)")
+  if (setup.partProbe!.rotation === "table-c" && part.entry.axes.includes("R")) return unreplayed("a rotation written to the table's C axis turns the part about the table's pivot: the replay does not model that write")
+  const block = part.wp.stock ?? setup.stock
+  if (block === undefined) return unreplayed("the setup and the workpiece give no blank to replay against")
+  const lo = { x: block.origin.x, y: block.origin.y, z: block.origin.z - block.z }, hi = { x: block.origin.x + block.x, y: block.origin.y + block.y, z: block.origin.z }
+  const corners = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ x: i & 1 ? hi.x : lo.x, y: i & 2 ? hi.y : lo.y, z: i & 4 ? hi.z : lo.z }))
+  const datum = part.wp.placement ?? { x: 0, y: 0, z: 0 }
+  const theta = d.rotation * DEG
+  const c = Math.cos(theta), s = Math.sin(theta)
+  // Where a corner of the blank really is in the part's frame (turned about the datum, then moved), and in machine coordinates.
+  const real = (p: { x: number; y: number; z: number }) => ({ x: c * p.x - s * p.y + d.x, y: s * p.x + c * p.y + d.y, z: p.z + d.z })
+  const machine = (p: { x: number; y: number; z: number }) => ({ x: datum.x + p.x, y: datum.y + p.y, z: datum.z + p.z })
+  // The register as it stands: the machine position of the part's zero, for every register of the fixture (the probe works under its own).
+  let table: WorkOffsetTable = { entries: {} }
+  for (const other of built.parts) table = withOffset(table, other.ref, { ...(other.wp.placement ?? { x: 0, y: 0, z: 0 }) })
+  const index = part.wp.index
+  const kinematics: SimKinematics | undefined = index === undefined ? undefined : { layout: index.a === undefined && index.b !== undefined ? "table-BC" : "table-AC", pivot: { ...datum } }
+  const pose = { a: (index?.a ?? 0) * DEG, b: (index?.b ?? 0) * DEG, c: (index?.c ?? 0) * DEG }
+  // The blank in the table's own frame: at the pose the program turns the table to, the part's frame is the machine's.
+  const toWorld = (p: { x: number; y: number; z: number }) => (kinematics === undefined ? machine(real(p)) : tablePose(kinematics, pose, true).toTable(machine(real(p))))
+  const v = corners.map(toWorld)
+  const tri = [0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5]
+  const world = meshWorld([{ positions: v.flatMap((p) => [p.x, p.y, p.z]), indices: tri }])
+  const outcome = runProbeMoves(part.moves, world, { offsets: table, active: part.ref, probe: built.device, ...(kinematics !== undefined ? { kinematics } : {}) })
+  const entry = outcome.offsets[offsetKey(part.ref)] ?? getOffset(table, part.ref)
+  const rotation = outcome.rotation
+  const turn = (p: { x: number; y: number; z: number }) => {
+    if (rotation === undefined) return p
+    const cr = Math.cos(rotation.angle), sr = Math.sin(rotation.angle)
+    const x = p.x - rotation.centre.x, y = p.y - rotation.centre.y
+    return { x: rotation.centre.x + cr * x - sr * y, y: rotation.centre.y + sr * x + cr * y, z: p.z }
+  }
+  const corrected = { X: entry.x, Y: entry.y, Z: entry.z, R: (entry.rotation ?? 0) / DEG }
+  const worst = (believe: (p: { x: number; y: number; z: number }) => { x: number; y: number; z: number }): number =>
+    Math.max(...corners.map((p) => { const t = machine(real(p)), b = believe(p); return Math.hypot(b.x - t.x, b.y - t.y, b.z - t.z) }))
+  const before = worst((p) => workToMachine(getOffset(table, part.ref), p))
+  const after = worst((p) => workToMachine(entry, turn(p)))
+  const base = { displacement: { ...d }, toleranceMm: tolerance, beforeMm: Math.round(before * 1e4) / 1e4 }
+  if (outcome.stopped !== undefined) {
+    const missed = outcome.alarms.some((a) => a.code === 991)
+    return { status: missed ? "missed" : "stopped", reason: missed ? `a touch found nothing on the displaced blank (${outcome.stopped}): the cycles do not meet the blank where the setup puts it` : outcome.stopped, ...base }
+  }
+  const unmeasured = (["X", "Y", "Z"] as const).filter((axis) => Math.abs(d[axis.toLowerCase() as "x" | "y" | "z"]) > 1e-9 && !part.entry.measured.includes(axis))
+  const why = (_: number): string =>
+    unmeasured.length > 0 ? `no cycle measures ${unmeasured.join(" and ")}, in which the blank is displaced`
+      : setup.partProbe!.rotation === "offset-r" && Math.abs(d.rotation) > 0 ? "a rotation written to the register turns the part about its zero, not about the point that was measured: put the datum on the measured corner or write the rotation with g68"
+        : "the touches do not pin the blank down well enough (a rotation the cycles do not measure, or a stylus that does not reach the face where it is)"
+  return {
+    status: after <= tolerance ? "within" : "outside",
+    ...(after <= tolerance ? {} : { reason: `the corrected register puts a corner of the blank ${after.toFixed(3)} mm from where it is: ${why(after)}` }),
+    ...base, corrected, residualMm: Math.round(after * 1e4) / 1e4,
+    ...(rotation !== undefined ? { g68: Math.round((rotation.angle / DEG) * 1e6) / 1e6 } : {})
+  }
+}
+
+/** The displacement the replay gives a part: the setup's for that workpiece (or for all), else the default. */
+const displacementOf = (setup: Setup, wp: Workpiece, writesRotation: boolean): { readonly x: number; readonly y: number; readonly z: number; readonly rotation: number } => {
+  const list = setup.partProbe?.replay?.displacements ?? []
+  const own = list.find((x) => x.workpieceId === wp.id) ?? list.find((x) => x.workpieceId === undefined)
+  return { x: own?.x ?? (own === undefined ? DEFAULT_DISPLACEMENT.x : 0), y: own?.y ?? (own === undefined ? DEFAULT_DISPLACEMENT.y : 0), z: own?.z ?? (own === undefined ? DEFAULT_DISPLACEMENT.z : 0), rotation: own?.rotation ?? (own === undefined && writesRotation ? DEFAULT_ROTATION : 0) }
+}
+
+/**
+ * The probe program of a setup's workpieces: for every workpiece (in the fixture's order) the configured cycles run in that part's frame
+ * and the deviation of each measured datum is added to that part's own register. The post must write probing words; the register is
+ * the one the part's toolpaths run under, so the cut that follows starts from the measured datum. The plan carries the replay of each
+ * part's probe against a displaced blank (`PartProbeReplay`): the program's touches run on the simulator, no cutting is replayed.
+ */
+export const partProbeProgram = (setup: Setup, programNumber: number): { readonly plan: PartProbePlan; readonly generated?: GeneratedProgram } => {
+  const built = buildPartProbe(setup)
+  if ("refused" in built && built.refused !== undefined) return { plan: { refused: built.refused, toolNumber: built.toolNumber, parts: [], notes: [] } }
+  const b = built as PartProbeBuild
+  const config = setup.partProbe!
+  const post = getPost(setup.post.postId)
+  const refuse = (refused: string): { readonly plan: PartProbePlan } => ({ plan: { refused, toolNumber: b.toolNumber, parts: [], notes: [] } })
+  if (post === undefined) return refuse(`Post ${setup.post.postId} is not implemented`)
+  const tolerance = config.replay?.tolerance ?? REPLAY_TOLERANCE
+  const writesRotation = config.rotation !== undefined && b.parts.some((p) => p.entry.axes.includes("R"))
+  const parts: PartProbeEntry[] = b.parts.map((p) => {
+    let replay: PartProbeReplay
+    try { replay = replayPart(setup, b, p, displacementOf(setup, p.wp, writesRotation), tolerance) } catch (error) { replay = { status: "unreplayed", reason: `the replay could not run: ${error instanceof Error ? error.message : String(error)}` } }
+    return { ...p.entry, replay }
+  })
+  const toolpaths: Toolpath[] = b.parts.map((p) => ({
+    id: `probe@${p.wp.id}`, name: `Probe - ${p.wp.name}`, toolId: b.device.id, spindleRpm: 0, coolant: "off", moves: [...p.moves],
+    workOffset: p.wp.workOffset, ...(p.wp.workOffsetRef !== undefined ? { workOffsetRef: p.wp.workOffsetRef } : {}),
+    operation: { id: `probe@${p.wp.id}`, name: `Probe - ${p.wp.name}` }
+  }))
+  const notes = [...b.notes]
+  const plan: PartProbePlan = { toolNumber: b.toolNumber, parts, notes }
   const name = `${setup.name} - probe parts`
   const program: Program = makeProgram(name, toolpaths, {
     workOffset: toolpaths[0]?.workOffset ?? setup.workOffset,
@@ -319,23 +458,27 @@ export const partProbeProgram = (setup: Setup, programNumber: number): { readonl
   try {
     gcode = post.emit(program, {
       decimals: setup.post.decimals, useCannedCycles: setup.post.useCannedCycles, arcMode: setup.post.arcMode, header: setup.post.header, tolerance: setup.post.tolerance,
-      toolNumbers: { [device.id]: toolNumber }, retractBeforeToolChange: setup.retractBeforeToolChange,
+      toolNumbers: { [b.device.id]: b.toolNumber }, retractBeforeToolChange: setup.retractBeforeToolChange,
       ...(setup.post.lineNumbers !== undefined ? { lineNumbers: setup.post.lineNumbers } : {}),
       ...(setup.post.stamp !== undefined ? { stamp: setup.post.stamp } : {})
     })
   } catch (error) { return refuse(`The ${setup.post.postId} post cannot write the probe program: ${error instanceof Error ? error.message : String(error)}`) }
   const stats = analyseGcode(gcode, name).stats
+  const bad = parts.filter((p) => p.replay !== undefined && p.replay.status !== "within" && p.replay.status !== "unreplayed")
   return {
     plan,
     generated: {
       name, programNumber, gcode, program, stats,
-      warnings: [`Run this program first: it reads ${parts.map((p) => p.register).join(", ")} from the parts as clamped. It has no cutting tool and replays no material removal`],
-      operationIds: toolpaths.map((t) => t.id), toolNumbers: [toolNumber], pockets: { [device.id]: toolNumber }, tools: []
+      warnings: [
+        `Run this program first: it reads ${parts.map((p) => p.register).join(", ")} from the parts as clamped. It has no cutting tool and replays no material removal`,
+        ...bad.map((p) => `Replay of ${p.name}'s probe on a displaced blank: ${p.replay!.status}${p.replay!.reason !== undefined ? ` - ${p.replay!.reason}` : ""}`)
+      ],
+      operationIds: toolpaths.map((t) => t.id), toolNumbers: [b.toolNumber], pockets: { [b.device.id]: b.toolNumber }, tools: []
     }
   }
 }
 
-/** The plan of the part probe without text: refused, or the register, touches and axes of each part. */
+/** The plan of the part probe without text: refused, or the register, touches, axes and replay of each part. */
 export const planPartProbe = (setup: Setup): PartProbePlan => partProbeProgram(setup, setup.post.programNumberBase).plan
 
 /** The probe program that goes with a generated setup, numbered after its programs: the program, or why there is none. Run it first. */

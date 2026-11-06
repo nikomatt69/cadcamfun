@@ -603,3 +603,116 @@ describe("the probe of every part before it is cut", () => {
     }
   })
 })
+
+describe("the probe program replayed against a blank that is not where the setup believes it", () => {
+  const block = { x: 60, y: 50, z: 10, origin: { x: 0, y: 0, z: 0 }, material: "aluminum" }
+  const zSurface = { kind: "z-surface" as const, at: { x: 30, y: 25 }, expectedZ: 0 }
+  const corner = (touchesPerEdge?: 1 | 2) => ({ kind: "corner" as const, corner: { x: 0, y: 0 }, inside: false, xSense: 1 as const, ySense: 1 as const, depth: 5, ...(touchesPerEdge !== undefined ? { touchesPerEdge } : {}) })
+  const probed = (partProbe: program.PartProbe, over: Partial<program.Setup> = {}): program.Setup => setup([op("a", t6)], { stock: block, partProbe, ...over })
+
+  const lcnc = { post: { ...DEFAULT_POST_CONFIG, postId: "linuxcnc" as const } }
+  const atCorner = { stock: { ...block, origin: { x: -30, y: -25, z: 0 } } }
+  const replayOf = (partProbe: program.PartProbe, over: Partial<program.Setup> = {}) => {
+    const plan = program.planPartProbe(probed(partProbe, over))
+    if (plan.refused !== undefined) throw new Error(plan.refused)
+    return plan.parts[0]!.replay!
+  }
+
+  test("a blank displaced by a few tenths is found by the program: the corrected register is where the blank is, to the tolerance", () => {
+    const r = replayOf({ cycles: [zSurface, corner()] })
+    expect(r.status).toBe("within")
+    expect(r.displacement).toEqual({ x: 0.8, y: -0.6, z: 0.3, rotation: 0 })
+    // Before the probe the register is 1.04 mm off at the far corner; after it, nothing.
+    expect(r.beforeMm!).toBeCloseTo(Math.hypot(0.8, 0.6, 0.3), 3)
+    expect(r.corrected!.X).toBeCloseTo(0.8, 6)
+    expect(r.corrected!.Y).toBeCloseTo(-0.6, 6)
+    expect(r.corrected!.Z).toBeCloseTo(0.3, 6)
+    expect(r.residualMm!).toBeLessThan(1e-6)
+    // The displacement is the setup's to choose, per part, and the tolerance too.
+    const big = replayOf({ cycles: [zSurface, corner()], replay: { displacements: [{ x: -2.5, y: 1.5, z: -0.4 }], tolerance: 0.01 } })
+    expect(big).toMatchObject({ status: "within", displacement: { x: -2.5, y: 1.5, z: -0.4, rotation: 0 }, toleranceMm: 0.01 })
+    expect(big.corrected!.X).toBeCloseTo(-2.5, 6)
+  })
+
+  test("a cycle that does not meet the blank where the setup puts it is a miss, named; a correction beyond the limit stops the program", () => {
+    const miss = replayOf({ cycles: [{ ...zSurface, at: { x: 300, y: 25 } }] })
+    expect(miss.status).toBe("missed")
+    expect(miss.reason).toMatch(/touch found nothing/)
+    // The search distance is 6 mm by default: a blank 8 mm toward the probe is met by the probe on its protected approach and stops it; 8 mm the other way
+    // is found, and its correction is beyond the limit of 5 mm: the program alarms instead of writing it. A face past the search is a miss.
+    expect(replayOf({ cycles: [zSurface, corner()], replay: { displacements: [{ x: -8, z: 0 }] } })).toMatchObject({ status: "stopped", reason: expect.stringMatching(/touched during a protected move/) })
+    expect(replayOf({ cycles: [zSurface, corner()], replay: { displacements: [{ x: 8, z: 0 }] } })).toMatchObject({ status: "stopped", reason: expect.stringMatching(/OFFSET CORRECTION OUT OF RANGE/) })
+    // A limit of 0.5 mm: a 0.8 mm correction is a wrong datum, the program alarms instead of writing.
+    const limited = replayOf({ cycles: [zSurface, corner()], limit: 0.5 })
+    expect(limited.status).toBe("stopped")
+    expect(limited.reason).toMatch(/OFFSET CORRECTION OUT OF RANGE/)
+  })
+
+  test("a web and an outside rectangle are measured on a block; a web gives its own direction only, and the replay says which axis nothing measured", () => {
+    const rectangle = replayOf({ cycles: [zSurface, { kind: "rectangle", inside: false, centre: { x: 30, y: 25 }, size: { x: 60, y: 50 }, depth: 5 }] })
+    expect(rectangle.status).toBe("within")
+    const web = { kind: "web" as const, centre: { x: 30, y: 25 }, width: 60, angle: 0, depth: 5 }
+    const both = replayOf({ cycles: [zSurface, web] })
+    expect(both.status).toBe("outside")
+    expect(both.reason).toMatch(/no cycle measures Y, in which the blank is displaced/)
+    expect(both.residualMm!).toBeCloseTo(0.6, 3)
+    expect(replayOf({ cycles: [zSurface, web], replay: { displacements: [{ x: 0.8, z: 0.3 }] } }).status).toBe("within")
+  })
+
+  test("a rotation: two touches per edge measure it, the register takes it about its zero (so the datum on the corner), g68 about the measured point (any datum)", () => {
+    const twice = { cycles: [zSurface, corner(2)] }
+    const r = replayOf({ ...twice, rotation: "offset-r" }, lcnc)
+    expect(r).toMatchObject({ status: "within", displacement: { rotation: 0.5 } })
+    expect(r.corrected!.R).toBeCloseTo(0.5, 6)
+    expect(r.corrected!.X).toBeCloseTo(0.8, 6)
+    // The datum in the middle of the blank: the register's rotation turns about the zero, the corner measured is 38 mm away from it.
+    const cornerOfCentred = { cycles: [zSurface, { ...corner(2), corner: { x: -30, y: -25 } }] }
+    const off = replayOf({ ...cornerOfCentred, rotation: "offset-r" }, { ...lcnc, ...atCorner })
+    expect(off.status).toBe("outside")
+    expect(off.reason).toMatch(/turns the part about its zero.*g68/)
+    expect(off.residualMm!).toBeGreaterThan(0.3)
+    // The same measurement written as a coordinate rotation about the measured corner is right for any datum.
+    const g68 = replayOf({ ...cornerOfCentred, rotation: "g68" }, atCorner)
+    expect(g68.status).toBe("within")
+    expect(g68.g68).toBeCloseTo(0.5, 6)
+    // Without a rotation to write, the angle is measured and dropped: the replay says what that leaves (a displacement without rotation here).
+    expect(replayOf(twice, lcnc).displacement!.rotation).toBe(0)
+    // A table's C axis is not replayed; a post that cannot write the register's rotation refuses the probe with the post's reason.
+    expect(replayOf({ ...twice, rotation: "table-c" }, lcnc)).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/C axis/) })
+    expect(program.planPartProbe(probed({ ...twice, rotation: "offset-r" })).refused).toMatch(/fanuc post cannot write a write to the R of G54/)
+  })
+
+  test("the angle of a face alone (edge-angle) is a rotation of the register; it needs a rotation to write to", () => {
+    const edge = { kind: "edge-angle" as const, start: { x: 10, y: 0 }, along: { x: 1, y: 0 }, pitch: 30, normal: { x: 0, y: -1 }, depth: 5 }
+    const r = replayOf({ cycles: [zSurface, edge], rotation: "offset-r", replay: { displacements: [{ z: 0.3, rotation: 0.5 }] } }, lcnc)
+    expect(r.status).toBe("within")
+    expect(r.corrected!.R).toBeCloseTo(0.5, 6)
+    // The face is touched along Y only: the default displacement in X is not found.
+    expect(replayOf({ cycles: [zSurface, edge], rotation: "offset-r" }, lcnc).reason).toMatch(/no cycle measures X, in which the blank is displaced/)
+    expect(program.planPartProbe(probed({ cycles: [zSurface, edge] }, lcnc)).refused).toMatch(/no rotation to write its angle to/)
+  })
+
+  test("a part on an indexed face is probed after its table turn, on the table's own pose, and found", () => {
+    const face = replayOf({ cycles: [zSurface, corner()] }, { workpieces: [{ id: "w1", name: "Face", workOffset: "G54", index: { a: 90 } }] })
+    expect(face.status).toBe("within")
+    expect(face.corrected!.X).toBeCloseTo(0.8, 6)
+    const b = replayOf({ cycles: [zSurface, corner()] }, { workpieces: [{ id: "w1", name: "Face", workOffset: "G54", index: { b: 90 } }] })
+    expect(b.status).toBe("within")
+    // A part on its own place in the fixture and a displaced blank on a turned face: the register of THAT part is the one that moves.
+    const two = program.planPartProbe(probed({ cycles: [zSurface, corner()] }, { workpieces: [{ id: "w1", name: "P1", workOffset: "G54", placement: { x: 0, y: 0, z: 0 } }, { id: "w2", name: "P2", workOffset: "G55", placement: { x: 100, y: 0, z: 0 }, index: { a: 90 } }] }))
+    expect(two.parts.map((q) => [q.register, q.replay!.status])).toEqual([["G54", "within"], ["G55", "within"]])
+    expect(two.parts[1]!.replay!.corrected!.X).toBeCloseTo(100.8, 6)
+  })
+
+  test("what the replay does not cover is said, never passed: a bore needs its feature; a failed replay is in the probe program's warnings", () => {
+    const bore = replayOf({ cycles: [zSurface, { kind: "bore", centre: { x: 30, y: 25 }, diameter: 20, depth: 5 }] })
+    expect(bore).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/plain block: a bore cycle needs its feature/) })
+    const noBlank = program.planPartProbe(setup([op("a", t6)], { partProbe: { cycles: [zSurface] } })).parts[0]!.replay!
+    expect(noBlank).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/no blank/) })
+    const web = { kind: "web" as const, centre: { x: 30, y: 25 }, width: 60, angle: 0, depth: 5 }
+    const made = program.partProbeProgram(probed({ cycles: [zSurface, web] }), 7)
+    expect(made.generated!.warnings.join(" ")).toMatch(/Replay of Workpiece 1's probe on a displaced blank: outside - .*no cycle measures Y/)
+    const fine = program.partProbeProgram(probed({ cycles: [zSurface, corner()] }), 7)
+    expect(fine.generated!.warnings.join(" ")).not.toMatch(/Replay of/)
+  })
+})
