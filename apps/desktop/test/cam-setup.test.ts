@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
 import { addJobSetup, jobRelease, patchJobSetup, removeJobSetup } from "../src/features/cam/lib/job.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, programFileName, toggleToolpathWorkpiece, toggleDependency, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, arcPoints, programFileName, toggleToolpathWorkpiece, toggleDependency, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -185,16 +185,36 @@ describe("several workpieces in the viewport", () => {
     expect(turned.toolpaths[0]!.moves).toEqual(moves)
     expect(turned.toolpaths[1]!.moves[1]).toMatchObject({ to: { x: -2, y: 3, z: -1 } })
     expect(turned.toolpaths[1]!.moves[2]).toMatchObject({ _tag: "Arc", to: { x: -4, y: 5 }, center: { x: -2, y: 4 } })
-    // A tilt takes the arc out of its plane: the viewport joins the end points; the program text is untouched.
-    const tilted = placedProgram(program, parts({ a: 90 }))
-    expect(tilted.toolpaths[1]!.moves[1]).toMatchObject({ to: { x: 3, y: 1, z: 2 } })
-    expect(tilted.toolpaths[1]!.moves[2]).toMatchObject({ _tag: "Linear", to: { x: 5, y: 1, z: 4 } })
-    expect(tilted.toolpaths[1]!.moves[4]).toEqual(moves[4])
+    // A tilt takes the arc out of its plane: the viewport draws it as short segments (the cycle as its motion); the program text is untouched.
+    const tilted = placedProgram(program, parts({ a: 90 })).toolpaths[1]!.moves
+    expect(tilted[1]).toMatchObject({ to: { x: 3, y: 1, z: 2 } })
+    expect(tilted.some((m) => m._tag === "Arc" || m._tag === "Cycle" || m._tag === "Spline")).toBe(false)
+    const arcEnd = tilted.findIndex((m) => m._tag === "Linear" && m.to.x === 5 && m.to.y === 1 && m.to.z === 4)
+    expect(arcEnd).toBeGreaterThan(3)
+    expect(tilted.at(-1)).toEqual(moves[4])
     // The index is measured from the first part: both on the same face is no turn at all.
     expect(placedProgram(program, [{ id: "w1", name: "P1", workOffset: "G54", index: { c: 90 } }, { id: "w2", name: "P2", workOffset: "G55", index: { c: 90 } }])).toBe(program)
     // The blank turns with its part: a quarter turn about Z swaps its sides.
     const box = { origin: { x: 0, y: 0, z: -5 }, size: { x: 20, y: 10, z: 5 } }
     expect(extraStocks(box, parts({ c: 90 }))).toEqual([{ origin: { x: -10, y: 0, z: -5 }, size: { x: 10, y: 20, z: 5 } }])
+  })
+
+  test("an arc of a tilted part is sampled within the tolerance: on its circle, helix included, ending exactly where it ends", () => {
+    const half = arcPoints({ x: 1, y: 0, z: 0 }, { _tag: "Arc", to: { x: -1, y: 0, z: -2 }, center: { x: 0, y: 0 }, clockwise: false, feed: 100 })
+    expect(half.length).toBeGreaterThanOrEqual(12)
+    expect(half.at(-1)).toEqual({ x: -1, y: 0, z: -2 })
+    for (const p of half) expect(Math.hypot(p.x, p.y)).toBeCloseTo(1, 9)
+    expect(half[0]!.y).toBeGreaterThan(0)
+    expect(half[0]!.z).toBeLessThan(0)
+    const clockwise = arcPoints({ x: 1, y: 0, z: 0 }, { _tag: "Arc", to: { x: -1, y: 0, z: 0 }, center: { x: 0, y: 0 }, clockwise: true, feed: 100 })
+    expect(clockwise[0]!.y).toBeLessThan(0)
+    const full = arcPoints({ x: 5, y: 0, z: 0 }, { _tag: "Arc", to: { x: 5, y: 0, z: 0 }, center: { x: 0, y: 0 }, clockwise: false, feed: 100 })
+    expect(full.length).toBeGreaterThan(30)
+    // Chord error stays under the tolerance: the midpoint of a chord is within 0.01 mm of the circle.
+    for (let i = 1; i < full.length; i++) {
+      const a = full[i - 1]!, b = full[i]!
+      expect(5 - Math.hypot((a.x + b.x) / 2, (a.y + b.y) / 2)).toBeLessThanOrEqual(0.0101)
+    }
   })
 
   test("the other parts' stock boxes sit at their placements, and the registers a program uses are listed in order", () => {

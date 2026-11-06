@@ -225,7 +225,7 @@ export const turnOf = (workpiece: Workpiece, first: Workpiece | undefined): Turn
 
 /**
  * A move turned about the datum. A turn about Z alone keeps the XY plane, so arcs and splines stay what they are; a tilt takes them
- * out of it, and the viewport draws their end points joined by straight lines (the NC keeps the arc).
+ * out of it. `placedProgram` samples those finely (`turnedMoves`); this alone, with no start point, joins their end points.
  */
 export const turnMove = (move: Move, t: Turn): Move => {
   if (isNoTurn(t)) return move
@@ -253,6 +253,46 @@ export const turnMove = (move: Move, t: Turn): Move => {
   }
 }
 
+/** Chordal tolerance, mm, of the segments an arc becomes when its part is tilted out of the XY plane. */
+export const TILT_ARC_TOLERANCE = 0.01
+
+/**
+ * The points after `from` of an arc, within `tolerance` of the curve, the last exactly `move.to`. The radius and the height change
+ * linearly from the start to the end, so a helix and an arc whose ends are not quite on one circle are followed, not snapped.
+ */
+export const arcPoints = (from: Vec3, move: Extract<Move, { readonly _tag: "Arc" }>, tolerance = TILT_ARC_TOLERANCE): ReadonlyArray<Vec3> => {
+  const r0 = Math.hypot(from.x - move.center.x, from.y - move.center.y), r1 = Math.hypot(move.to.x - move.center.x, move.to.y - move.center.y)
+  const sweep = cam.arcSweepBetween(from, move.to, move.center, move.clockwise)
+  const a0 = Math.atan2(from.y - move.center.y, from.x - move.center.x)
+  const r = Math.max(r0, r1)
+  const step = r <= tolerance ? Math.PI / 2 : 2 * Math.acos(Math.max(0, 1 - tolerance / r))
+  const n = Math.min(720, Math.max(2, Math.ceil(sweep / step)))
+  const sign = move.clockwise ? -1 : 1
+  const out: Vec3[] = []
+  for (let i = 1; i < n; i++) {
+    const k = i / n, angle = a0 + sign * sweep * k, radius = r0 + (r1 - r0) * k
+    out.push({ x: move.center.x + radius * Math.cos(angle), y: move.center.y + radius * Math.sin(angle), z: from.z + (move.to.z - from.z) * k })
+  }
+  out.push(move.to)
+  return out
+}
+
+/**
+ * The moves of a toolpath turned out of the XY plane by a tilt: cycles and splines are expanded to their motion and every arc becomes
+ * line segments within `TILT_ARC_TOLERANCE` (the viewport has no arc in a tilted plane), then each point is turned. `start` is where the
+ * tool stands when the toolpath begins, in the part's own frame.
+ */
+const tiltedMoves = (moves: ReadonlyArray<Move>, turn: Turn, start: Vec3): Move[] => {
+  const out: Move[] = []
+  let at = start
+  for (const move of cam.expandMoves(moves, start)) {
+    if (move._tag === "Arc") for (const to of arcPoints(at, move)) out.push({ _tag: "Linear", to: turnPoint(to, turn), feed: move.feed })
+    else out.push(turnMove(move, turn))
+    if (move._tag !== "Rapid" || move.machine !== true) at = cam.moveTarget(move) ?? at
+  }
+  return out
+}
+
 /**
  * The program as the viewport draws it: each toolpath turned to its part's index and moved to the place of the workpiece whose
  * register it runs under. A program with one workpiece (or none placed or indexed) is returned as it is.
@@ -261,12 +301,18 @@ export const placedProgram = (program: cam.Program, workpieces: ReadonlyArray<Wo
   if (workpieces.length < 2) return program
   const places = new Map(workpieces.map((wp) => [registerKey(wp), { shift: shiftOf(wp, workpieces[0]), turn: turnOf(wp, workpieces[0]) }] as const))
   if ([...places.values()].every((p) => isZero(p.shift) && isNoTurn(p.turn))) return program
+  // Where the tool stands as each toolpath begins, in the program's own coordinates: the sampled arcs of a tilted part start there.
+  let at: Vec3 = ZERO
   return {
     ...program,
     toolpaths: program.toolpaths.map((tp) => {
+      const start = at
+      for (const move of tp.moves) if (move._tag !== "Rapid" || move.machine !== true) at = cam.moveTarget(move) ?? at
       const place = places.get(registerOf(tp, program))
       if (place === undefined || (isZero(place.shift) && isNoTurn(place.turn))) return tp
-      return { ...tp, moves: tp.moves.map((move) => translateMove(turnMove(move, place.turn), place.shift)) }
+      const tilted = place.turn.a !== 0 || place.turn.b !== 0
+      const turned = tilted ? tiltedMoves(tp.moves, place.turn, start) : tp.moves.map((move) => turnMove(move, place.turn))
+      return { ...tp, moves: turned.map((move) => translateMove(move, place.shift)) }
     })
   }
 }
