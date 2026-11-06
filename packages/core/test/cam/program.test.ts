@@ -513,16 +513,52 @@ describe("the fixture as ONE body: every part's remaining stock from the same so
     expect(clear.fixture!.complete).toBe(true)
   })
 
-  test("a turned part meets the other blank where the table carries it: a neighbour that is grazed unturned is clear once the table turns it away, and the part is not carved into the lattice body", () => {
+  test("a turned part meets the other blank where the table carries it: a neighbour that is grazed unturned is clear once the table turns it away, and the part is carved into the one body", () => {
     const neighbor = { register: "G56", workpieceId: "w2", name: "Part 2", stock: { min: { x: 0, y: -20, z: -10 }, max: { x: 20, y: 20, z: 5 } }, datum: { x: 19.7, y: 0, z: 0 } }
     const grazed = program.setupEvidence(gcode, { ...one, registers: [one.registers[0]!, neighbor] }, [clean, clean], held)
     expect(grazed.fixture!.crossings).toHaveLength(1)
     const turned = program.setupEvidence(gcode, { ...one, registers: [{ ...one.registers[0]!, index: { c: 90 } }, neighbor] }, [clean, clean], held)
-    // A quarter turn about the datum carries the neighbour off the side the program cuts toward: the same program no longer reaches it, and the view says it is judged as boxes.
+    // A quarter turn about the datum carries the neighbour off the side the program cuts toward: the same program no longer reaches it.
     expect(turned.fixture!.crossings.filter((c) => c.register === "G54" && c.other === "G56")).toEqual([])
-    expect(turned.fixture!.notes!.join(" ")).toMatch(/Part 1 \(G54\) is turned by its index.*not carved into the lattice body/)
-    expect(turned.fixture!.parts[0]!.bodyRemainingMm3).toBeUndefined()
+    // The turned part is no longer left out of the body: its moves are carried back into the fixture's frame and carved there.
+    expect(turned.fixture!.notes).toBeUndefined()
+    expect(turned.fixture!.parts[0]!.bodyRemovedMm3).toBeGreaterThan(0)
+    expect(turned.fixture!.parts[0]!.bodyRemainingMm3).toBeGreaterThan(0)
     expect(grazed.fixture!.notes).toBeUndefined()
+  })
+
+  // A clamp far from everything: the fixture view exists once there is a clamp.
+  const away = { id: "far", name: "Far", min: { x: 900, y: 900, z: 900 }, max: { x: 910, y: 910, z: 910 } }
+
+  test("a part turned by a quarter turn about Z meets the clamp where the fixture puts it, to the same graze as the unturned part: 0.3 mm is a crossing, 0.05 mm clear is not, and the part is carved into the body", () => {
+    const turned = { ...one.registers[0]!, index: { c: 90 } }
+    // The unturned test's clamp (x from 19.7 or 20.05, y -20..20) is, in the fixture, the box the quarter turn carries there: x -20..20, y -(x from) -20.
+    const wall = (from: number) => ({ id: "c1", name: "Clamp 1", min: { x: -20, y: -(from + 20), z: -10 }, max: { x: 20, y: -from, z: 5 } })
+    const hit = program.setupEvidence(gcode, { ...one, registers: [turned], fixtures: [wall(19.7)] }, [clean], held).fixture!
+    expect(hit.crossings.map((c) => c.other)).toEqual(["c1"])
+    expect(hit.crossings[0]!.message).toMatch(/0\.3 mm into it by the exact box test/)
+    const clear = program.setupEvidence(gcode, { ...one, registers: [turned], fixtures: [wall(20.05)] }, [clean], held).fixture!
+    expect(clear.crossings).toEqual([])
+    expect(clear.complete).toBe(true)
+    expect(clear.parts[0]!.bodyRemovedMm3).toBeGreaterThan(0)
+    // A part turned by 30 degrees is carved too (its blank stays where the fixture puts it) and nothing about it is a bounding box.
+    const thirty = program.setupEvidence(gcode, { ...one, registers: [{ ...one.registers[0]!, index: { c: 30 } }], fixtures: [away] }, [clean], held).fixture!
+    expect(thirty.notes).toBeUndefined()
+    expect(thirty.parts[0]!.bodyRemovedMm3).toBeGreaterThan(0)
+  })
+
+  test("a part on a tilted table (A 90: the tool axis lies along the fixture's Y) is carved into the body, and its clamp graze is found on sampled points of the tool", () => {
+    const tilted = { ...one.registers[0]!, index: { a: 90 } }
+    // The unturned clamp (x from 19.7 or 20.05, y -20..20, z -10..5) is in the fixture the box the table's A turn carries there: (x, z, -y).
+    const wall = (from: number) => ({ id: "c1", name: "Clamp 1", min: { x: from, y: -10, z: -20 }, max: { x: from + 20, y: 5, z: 20 } })
+    const hit = program.setupEvidence(gcode, { ...one, registers: [tilted], fixtures: [wall(19.7)] }, [clean], held).fixture!
+    expect(hit.notes!.join(" ")).toMatch(/sampled points of the tool/)
+    expect(hit.parts[0]!.bodyRemovedMm3).toBeGreaterThan(0)
+    expect(hit.crossings.map((c) => c.other)).toEqual(["c1"])
+    expect(hit.crossings[0]!.message).toMatch(/0\.3 mm into it by the sampled tool/)
+    const clear = program.setupEvidence(gcode, { ...one, registers: [tilted], fixtures: [wall(20.05)] }, [clean], held).fixture!
+    expect(clear.crossings).toEqual([])
+    expect(clear.complete).toBe(true)
   })
 
   test("a table index carries the clamp into the part frame before the exact test; the same box with no index is clear", () => {

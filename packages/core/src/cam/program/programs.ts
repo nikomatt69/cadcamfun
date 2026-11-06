@@ -14,7 +14,7 @@ import type { ReleaseLevel } from "../kernel/contracts.ts"
 import type { VerifyNcResult } from "../kernel/verify-nc.ts"
 import { cutterOfTool, type Cutter } from "../kernel/cutters.ts"
 import { TriReplay, triCellFor } from "../kernel/tri-replay.ts"
-import { boxPenetration, toolSolid } from "../kernel/tridexel.ts"
+import { boxPenetration, toolBoxDepth, toolSolid } from "../kernel/tridexel.ts"
 import type { AssemblyPart } from "../kernel/assembly.ts"
 import { forEachSample } from "../verify/path.ts"
 import { DEFAULT_GEOMETRY, decodeGenerateRequest, generateToolpath, type GenerateOutcome, type GeometryInput, type GcodeStats } from "../generator/index.ts"
@@ -23,7 +23,7 @@ import { consumeLife, emptyLifeBook, pickSister, type ToolLifeBook } from "../ke
 import { formatOffsetRef } from "../work-offset.ts"
 import { dialectOf, getPost } from "../post/index.ts"
 import type { TiltedPlane } from "../post/types.ts"
-import { boxInPartFrame, indexPlane } from "../indexing.ts"
+import { boxInPartFrame, indexMatrix, indexPlane } from "../indexing.ts"
 import { inlinePartProbe, planeRefusal } from "./probing.ts"
 import type { Tool } from "../tool.ts"
 import type { Vec3 } from "../../cad/vec.ts"
@@ -312,20 +312,23 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
   const shifted = (b: Box, d: Vec3): Box => ({ min: { x: b.min.x + d.x, y: b.min.y + d.y, z: b.min.z + d.z }, max: { x: b.max.x + d.x, y: b.max.y + d.y, z: b.max.z + d.z } })
   const blanks = replay.registers.map((r) => shifted(r.stock, datumOf(r)))
   const clamps = (replay.fixtures ?? []).map((f) => ({ id: f.id, name: f.name, min: f.min, max: f.max }))
-  // A table index leaves the posted moves in the part frame, so the clamp is carried into that frame. A tilted plane is already applied by the interpreter.
-  const clampsByRegister = replay.registers.map((r) => clamps.map((f) => {
-    if (r.index === undefined || r.indexAs === "plane") return f
-    const seen = boxInPartFrame(f, datumOf(r), r.index)
-    return { id: f.id, name: f.name, min: seen.min, max: seen.max }
-  }))
-  // Where a register's moves are: a table turn leaves them in the part's own frame (the clamps and the other blanks are carried into it); a tilted plane is
-  // applied by the interpreter, so they are in the fixture's frame, but their tool axis is tilted when the plane is by A or B. The lattice body (a vertical tool) follows
-  // the registers whose moves are in the fixture's frame with a vertical axis only; the others are judged exactly, as boxes, in their own frame.
-  const turned = (r: SetupReplay["registers"][number]): boolean => r.index !== undefined && r.indexAs !== "plane" && ((r.index.a ?? 0) !== 0 || (r.index.b ?? 0) !== 0 || (r.index.c ?? 0) !== 0)
-  const tiltedPlane = (r: SetupReplay["registers"][number]): boolean => r.index !== undefined && r.indexAs === "plane" && ((r.index.a ?? 0) !== 0 || (r.index.b ?? 0) !== 0)
-  const onLattice = replay.registers.map((r) => !turned(r) && !tiltedPlane(r))
-  const blankSeenFrom = (i: number, j: number): Box => (turned(replay.registers[i]!) ? boxInPartFrame(blanks[j]!, datumOf(replay.registers[i]!), replay.registers[i]!.index) : blanks[j]!)
-  const fixtureNotes = replay.registers.flatMap((r, i) => (onLattice[i] ? [] : [`${r.name} (${r.register}) is ${turned(r) ? "turned" : "tilted"} by its index: its moves are judged exactly as boxes against the clamps and the other blanks in its own frame (a box turned by an angle that is not a quarter turn is its bounding box), and are not carved into the lattice body`]))
+  // Where a register's moves are. A table index leaves them in the machine, where the part stands turned about its datum: a machine point `t` is the
+  // fixture point `D + Rt (t - D)`, and the tool axis, vertical in the machine, is the third row of R in the fixture. A tilted-plane post has already put
+  // the moves in the fixture's frame, with the tool axis along the plane's z. So EVERY register is carried into the one frame of the body, and the
+  // clamps and the other blanks stay where the setup put them: nothing is turned into a bounding box, and no part is left out of the body.
+  const unit = (v: Vec3): Vec3 => ({ x: v.x, y: v.y, z: v.z })
+  const framed = replay.registers.map((r) => {
+    if (r.index === undefined) return { pose: (p: Vec3): Vec3 => p, axis: undefined as Vec3 | undefined }
+    const m = indexMatrix(r.index), d = datumOf(r)
+    const row3 = unit({ x: m[6], y: m[7], z: m[8] })
+    const vertical = Math.abs(row3.z) > 1 - 1e-9
+    const axis = vertical ? undefined : row3
+    if (r.indexAs === "plane") return { pose: (p: Vec3): Vec3 => p, axis }
+    // The table's rotation is orthogonal: its inverse is its transpose.
+    return { pose: (p: Vec3): Vec3 => { const q = { x: p.x - d.x, y: p.y - d.y, z: p.z - d.z }; return { x: m[0] * q.x + m[3] * q.y + m[6] * q.z + d.x, y: m[1] * q.x + m[4] * q.y + m[7] * q.z + d.y, z: m[2] * q.x + m[5] * q.y + m[8] * q.z + d.z } }, axis }
+  })
+  const tiltedAny = framed.some((f) => f.axis !== undefined)
+  const fixtureNotes = tiltedAny ? ["a part whose tool axis is not vertical in the fixture (a table index tilted by A or B, or a tilted work plane) is judged against the clamps and the other blanks on sampled points of the tool (rings every 0.1 mm along its axis, points about 0.25 mm apart round them): a contact thinner than that between samples can be missed"] : []
   const run = interpretGcode(gcode, { frame: "machine", workOffsets: table, track: true })
   const cutters = new Map(replay.tools.map((t) => [t.number, { ...t.cutter, ...(tools.find((x) => x.id === t.cutter.id)?.holder !== undefined ? { holder: tools.find((x) => x.id === t.cutter.id)!.holder! } : {}) } as Cutter]))
   const reach = new Map<string, { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }>()
@@ -341,7 +344,10 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
     if (own < 0) return
     seq.push({ seg, tool: state?.tool ?? -1, own })
     if (seg.kind === "rapid") return
-    for (const p of [seg.from, seg.to]) {
+    // The ends of the move and, for an arc, points along it (the bulge of an arc lies beyond its ends), in the fixture's frame.
+    const points = [framed[own]!.pose(seg.from), framed[own]!.pose(seg.to)]
+    if (seg.kind === "arc") forEachSample({ from: seg.from, to: seg.to, center: seg.center, clockwise: seg.clockwise }, 0.5, (x, y, z) => { points.push(framed[own]!.pose({ x, y, z })) })
+    for (const p of points) {
       const at = reach.get(register) ?? { min: { ...p }, max: { ...p } }
       at.min.x = Math.min(at.min.x, p.x); at.min.y = Math.min(at.min.y, p.y); at.min.z = Math.min(at.min.z, p.z)
       at.max.x = Math.max(at.max.x, p.x); at.max.y = Math.max(at.max.y, p.y); at.max.z = Math.max(at.max.z, p.z)
@@ -387,86 +393,118 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
   }
   let clampSamples = 0, clampStopped = false
   let blankSamples = 0, blankStopped = false
+  /** What one sampled pose of a tilted tool costs against the budget, next to a vertical one (rings of points instead of a closed form). */
+  const TILTED_COST = 20
   for (const { seg, tool, own: index } of seq) {
     const cutter = cutters.get(tool)
     if (cutter === undefined) continue
     const mine = replay.registers[index]!
+    const pose = framed[index]!.pose
+    const axis = framed[index]!.axis
+    const tilted = axis !== undefined
+    const axes = (n: number): ReadonlyArray<Vec3> | undefined => (tilted ? Array.from({ length: n }, () => axis) : undefined)
+    // The move in the fixture's frame: the one frame of the body, the clamps and the blanks.
+    const from = pose(seg.from), to = pose(seg.to)
     const arcR = seg.kind === "arc" ? Math.hypot(seg.from.x - seg.center.x, seg.from.y - seg.center.y) : 0
-    // Plan reach, before a solid exists: a move this far from a target cannot meet it, so the solid is never built.
+    const weight = tilted ? TILTED_COST : 1
+    // How far the solid reaches from its tip in any direction (a tilted tool).
+    const farthest = (solid: ReturnType<typeof toolSolid>): number => Math.hypot(solid.maxRadius, Math.max(Math.abs(solid.top), Math.abs(solid.bottom)))
+    // Plan reach, before a solid exists: a move this far from a target cannot meet it, so the solid is never built. A tilted tool reaches in every direction.
     const aside = (target: Box): boolean => {
       const pad = Math.max(cutter.diameter, cutter.holder?.diameter ?? 0) / 2 + arcR
-      const loX = Math.min(seg.from.x, seg.to.x) - pad, hiX = Math.max(seg.from.x, seg.to.x) + pad
-      const loY = Math.min(seg.from.y, seg.to.y) - pad, hiY = Math.max(seg.from.y, seg.to.y) + pad
+      if (tilted) {
+        const reach = arcR + Math.max(...PARTS.map((g) => farthest(solidOf(tool, cutter, g))))
+        return Math.max(from.x, to.x) + reach < target.min.x || Math.min(from.x, to.x) - reach > target.max.x
+          || Math.max(from.y, to.y) + reach < target.min.y || Math.min(from.y, to.y) - reach > target.max.y
+          || Math.max(from.z, to.z) + reach < target.min.z || Math.min(from.z, to.z) - reach > target.max.z
+      }
+      const loX = Math.min(from.x, to.x) - pad, hiX = Math.max(from.x, to.x) + pad
+      const loY = Math.min(from.y, to.y) - pad, hiY = Math.max(from.y, to.y) + pad
       return hiX < target.min.x || loX > target.max.x || hiY < target.min.y || loY > target.max.y
     }
-    // The tool's reach box over this move, per group of its parts; an arc's box is its chord's box grown by its radius.
     const reachBox = (group: ReadonlyArray<AssemblyPart>): Box | undefined => {
       const solid = solidOf(tool, cutter, group)
       if (solid.count === 0) return undefined
+      if (tilted) {
+        const r = farthest(solid) + arcR
+        return { min: { x: Math.min(from.x, to.x) - r, y: Math.min(from.y, to.y) - r, z: Math.min(from.z, to.z) - r }, max: { x: Math.max(from.x, to.x) + r, y: Math.max(from.y, to.y) + r, z: Math.max(from.z, to.z) + r } }
+      }
       const r = solid.maxRadius + arcR
       return {
-        min: { x: Math.min(seg.from.x, seg.to.x) - r, y: Math.min(seg.from.y, seg.to.y) - r, z: Math.min(seg.from.z, seg.to.z) + solid.bottom },
-        max: { x: Math.max(seg.from.x, seg.to.x) + r, y: Math.max(seg.from.y, seg.to.y) + r, z: Math.max(seg.from.z, seg.to.z) + solid.top }
+        min: { x: Math.min(from.x, to.x) - r, y: Math.min(from.y, to.y) - r, z: Math.min(from.z, to.z) + solid.bottom },
+        max: { x: Math.max(from.x, to.x) + r, y: Math.max(from.y, to.y) + r, z: Math.max(from.z, to.z) + solid.top }
       }
     }
+    /** The obstacle grown by what the tool can reach from a pose that is on the move's path: the stretch of the path worth sampling. */
+    const grownOf = (obstacle: Box, solid: ReturnType<typeof toolSolid>): Box => {
+      if (tilted) { const r = farthest(solid); return { min: { x: obstacle.min.x - r, y: obstacle.min.y - r, z: obstacle.min.z - r }, max: { x: obstacle.max.x + r, y: obstacle.max.y + r, z: obstacle.max.z + r } } }
+      return { min: { x: obstacle.min.x - solid.maxRadius, y: obstacle.min.y - solid.maxRadius, z: obstacle.min.z - solid.top }, max: { x: obstacle.max.x + solid.maxRadius, y: obstacle.max.y + solid.maxRadius, z: obstacle.max.z - solid.bottom } }
+    }
+    const depthIn = (solid: ReturnType<typeof toolSolid>, tip: Vec3, obstacle: Box): number => (tilted ? toolBoxDepth(solid, tip, axis, obstacle) : boxPenetration(solid, tip, obstacle))
     const rapid = seg.kind === "rapid"
     const depthOf = (overlap: number, how: string): string => `${Math.round(overlap * 100) / 100} mm into it ${how}, ${cutter.name} Ø${cutter.diameter} counted with its radius${cutter.holder !== undefined ? " and holder" : ""}`
     const tipsOf = (step: number): Vec3[] => {
-      // A line goes as its two ends (the contact test subdivides it); an arc as points a few cells apart.
-      const tips = [{ ...seg.from }]
-      if (seg.kind === "arc") forEachSample({ from: seg.from, to: seg.to, center: seg.center, clockwise: seg.clockwise }, step, (x, y, z) => { tips.push({ x, y, z }) })
-      else tips.push({ ...seg.to })
+      // A line goes as its two ends (the contact test subdivides it); an arc as points a few cells apart, each carried into the fixture's frame.
+      const tips = [{ ...from }]
+      if (seg.kind === "arc") forEachSample({ from: seg.from, to: seg.to, center: seg.center, clockwise: seg.clockwise }, step, (x, y, z) => { tips.push(pose({ x, y, z })) })
+      else tips.push({ ...to })
       return tips
     }
-    // Another part's blank, exactly: the same sampled box as a clamp, so a graze below the lattice cell is still a crossing.
+    /** The sampled depth of the swept tool into one obstacle, under the shared budget `used`: the deepest pose, or undefined when the budget stopped it. */
     let arcPoses: Vec3[] | undefined
+    const sweep = (obstacle: Box, group: ReadonlyArray<AssemblyPart>, spend: (n: number) => boolean): number | undefined => {
+      const solid = solidOf(tool, cutter, group)
+      let deepest = 0
+      const grown = grownOf(obstacle, solid)
+      if (seg.kind === "arc") {
+        arcPoses ??= tipsOf(CLAMP_STEP)
+        for (const t of arcPoses) if (boxHas(grown, t)) { if (!spend(1)) return undefined; deepest = Math.max(deepest, depthIn(solid, t, obstacle)) }
+        return deepest
+      }
+      const span = clipLine(from, to, grown)
+      if (span === undefined) return 0
+      const length = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) * (span[1] - span[0])
+      const n = Math.max(1, Math.ceil(length / CLAMP_STEP))
+      if (!spend(n + 1)) return undefined
+      for (let k = 0; k <= n; k++) { const f = span[0] + (span[1] - span[0]) * (k / n); deepest = Math.max(deepest, depthIn(solid, { x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f, z: from.z + (to.z - from.z) * f }, obstacle)) }
+      return deepest
+    }
+    // Another part's blank, exactly: the same sampled test as a clamp, so a graze below the lattice cell is still a crossing.
     if (!blankStopped && blanks.length > 1) {
       for (let j = 0; j < blanks.length; j++) {
         if (blankStopped) break
         if (j === index) continue
-        const otherBlank = blankSeenFrom(index, j)
+        const otherBlank = blanks[j]!
         const otherReg = replay.registers[j]!
         if (said.has(`${mine.register}>${otherReg.register}`) || aside(otherBlank)) continue
         for (const group of PARTS) {
           const box = reachBox(group)
           if (box === undefined || !boxesTouch(box, otherBlank)) continue
-          const solid = solidOf(tool, cutter, group)
-          let deepest = 0
-          const consider = (tip: Vec3): void => { deepest = Math.max(deepest, boxPenetration(solid, tip, otherBlank)) }
-          const grown: Box = { min: { x: otherBlank.min.x - solid.maxRadius, y: otherBlank.min.y - solid.maxRadius, z: otherBlank.min.z - solid.top }, max: { x: otherBlank.max.x + solid.maxRadius, y: otherBlank.max.y + solid.maxRadius, z: otherBlank.max.z - solid.bottom } }
-          if (seg.kind === "arc") {
-            arcPoses ??= tipsOf(CLAMP_STEP)
-            for (const t of arcPoses) if (boxHas(grown, t)) { blankSamples++; consider(t) }
-          } else {
-            const span = clipLine(seg.from, seg.to, grown)
-            if (span !== undefined) {
-              const length = Math.hypot(seg.to.x - seg.from.x, seg.to.y - seg.from.y, seg.to.z - seg.from.z) * (span[1] - span[0])
-              const n = Math.max(1, Math.ceil(length / CLAMP_STEP))
-              blankSamples += n + 1
-              if (blankSamples > CLAMP_SAMPLES) { blankStopped = true; reasons.push(`the exact blank check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the other blanks`); break }
-              for (let k = 0; k <= n; k++) { const f = span[0] + (span[1] - span[0]) * (k / n); consider({ x: seg.from.x + (seg.to.x - seg.from.x) * f, y: seg.from.y + (seg.to.y - seg.from.y) * f, z: seg.from.z + (seg.to.z - seg.from.z) * f }) }
-            }
-          }
-          if (blankSamples > CLAMP_SAMPLES && !blankStopped) { blankStopped = true; reasons.push(`the exact blank check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the other blanks`) }
+          const deepest = sweep(otherBlank, group, (n) => {
+            blankSamples += n * weight
+            if (blankSamples > CLAMP_SAMPLES) { blankStopped = true; reasons.push(`the exact blank check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the other blanks`); return false }
+            return true
+          })
+          if (blankStopped || deepest === undefined) break
           if (deepest > CLAMP_THRESHOLD) {
             said.add(`${mine.register}>${otherReg.register}`)
             crossings.push({
               register: mine.register, other: otherReg.register, line: seg.line,
-              message: `${mine.name} (${mine.register}) ${rapid ? "rapids through" : "cuts into"} the blank of ${otherReg.name} (${otherReg.register}) at NC line ${seg.line}: a wrong register or a wrong placement (${depthOf(deepest, `by the exact box test, within ${CLAMP_STEP} mm`)})`
+              message: `${mine.name} (${mine.register}) ${rapid ? "rapids through" : "cuts into"} the blank of ${otherReg.name} (${otherReg.register}) at NC line ${seg.line}: a wrong register or a wrong placement (${depthOf(deepest, tilted ? `by the sampled tool, within ${CLAMP_STEP} mm along the path` : `by the exact box test, within ${CLAMP_STEP} mm`)})`
             })
             break
           }
         }
       }
     }
-    if (tri !== undefined && onLattice[index]) {
+    if (tri !== undefined) {
       // Another part's blank, on the body as it stands: the lattice's noise is its declared error.
       const others = blanks.filter((_, j) => j !== index)
       const hitGroups = PARTS.filter((group) => { const box = reachBox(group); return box !== undefined && others.some((o) => boxesTouch(box, o)) })
       if (hitGroups.length > 0) {
         const tips = tipsOf(Math.max(2, 8 * tri.stock.cell))
         let found: ReturnType<typeof tri.contact>
-        for (const group of hitGroups) { found = tri.contact(cutter, group, tips, undefined, tri.stock.errorBound, [...own[index]!, ...clamps]); if (found !== undefined) break }
+        for (const group of hitGroups) { found = tri.contact(cutter, group, tips, axes(tips.length), tri.stock.errorBound, [...own[index]!, ...clamps]); if (found !== undefined) break }
         if (found !== undefined) {
           const j = found.at !== undefined ? replay.registers.findIndex((_, k) => k !== index && boxHas(blanks[k]!, found!.at!, 2 * tri.stock.cell)) : -1
           const other = replay.registers[j >= 0 ? j : replay.registers.findIndex((_, k) => k !== index && hitGroups.some((g) => { const b = reachBox(g); return b !== undefined && boxesTouch(b, blanks[k]!) }))]
@@ -480,44 +518,31 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
         }
       }
     }
-    // The clamps, exactly, in this part's frame: the sampled penetration of the swept tool into the box, to within the sampling step.
-    for (const clamp of clampsByRegister[index] ?? []) {
+    // The clamps, exactly, in the fixture's frame: the sampled penetration of the swept tool into the box, to within the sampling step.
+    for (const clamp of clamps) {
       if (clampStopped) break
       if (aside(clamp)) continue
       for (const group of PARTS) {
         const box = reachBox(group)
         if (box === undefined || !boxesTouch(box, clamp) || said.has(`${mine.register}>${clamp.id}`)) continue
-        const solid = solidOf(tool, cutter, group)
-        let deepest = 0
-        const consider = (tip: Vec3): void => { deepest = Math.max(deepest, boxPenetration(solid, tip, clamp)) }
-        // Only where the tool can reach the clamp is the move sampled: the stretch of the line inside the clamp's box grown by the tool's reach.
-        const grown: Box = { min: { x: clamp.min.x - solid.maxRadius, y: clamp.min.y - solid.maxRadius, z: clamp.min.z - solid.top }, max: { x: clamp.max.x + solid.maxRadius, y: clamp.max.y + solid.maxRadius, z: clamp.max.z - solid.bottom } }
-        if (seg.kind === "arc") {
-          arcPoses ??= tipsOf(CLAMP_STEP)
-          for (const t of arcPoses) if (boxHas(grown, t)) { clampSamples++; consider(t) }
-        } else {
-          const span = clipLine(seg.from, seg.to, grown)
-          if (span !== undefined) {
-            const length = Math.hypot(seg.to.x - seg.from.x, seg.to.y - seg.from.y, seg.to.z - seg.from.z) * (span[1] - span[0])
-            const n = Math.max(1, Math.ceil(length / CLAMP_STEP))
-            clampSamples += n + 1
-            if (clampSamples > CLAMP_SAMPLES) { clampStopped = true; reasons.push(`the exact clamp check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the clamps`); break }
-            for (let k = 0; k <= n; k++) { const f = span[0] + (span[1] - span[0]) * (k / n); consider({ x: seg.from.x + (seg.to.x - seg.from.x) * f, y: seg.from.y + (seg.to.y - seg.from.y) * f, z: seg.from.z + (seg.to.z - seg.from.z) * f }) }
-          }
-        }
-        if (clampSamples > CLAMP_SAMPLES && !clampStopped) { clampStopped = true; reasons.push(`the exact clamp check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the clamps`) }
+        const deepest = sweep(clamp, group, (n) => {
+          clampSamples += n * weight
+          if (clampSamples > CLAMP_SAMPLES) { clampStopped = true; reasons.push(`the exact clamp check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the clamps`); return false }
+          return true
+        })
+        if (clampStopped || deepest === undefined) break
         if (deepest > CLAMP_THRESHOLD) {
           said.add(`${mine.register}>${clamp.id}`)
           crossings.push({
             register: mine.register, other: clamp.id, line: seg.line,
-            message: `${mine.name} (${mine.register}) ${rapid ? "rapids through" : "reaches"} the clamp ${clamp.name} at NC line ${seg.line} (${depthOf(deepest, `by the exact box test, within ${CLAMP_STEP} mm`)})`
+            message: `${mine.name} (${mine.register}) ${rapid ? "rapids through" : "reaches"} the clamp ${clamp.name} at NC line ${seg.line} (${depthOf(deepest, tilted ? `by the sampled tool, within ${CLAMP_STEP} mm along the path` : `by the exact box test, within ${CLAMP_STEP} mm`)})`
           })
           break
         }
       }
     }
-    // The move cuts the body (feed moves only): what the parts have left is read from it at the end.
-    if (tri !== undefined && !rapid && onLattice[index]) tri.cut(cutter, tipsOf(tri.stock.cell))
+    // The move cuts the body (feed moves only), in the fixture's frame whatever the part's index: what the parts have left is read from it at the end.
+    if (tri !== undefined && !rapid) { const tips = tipsOf(tri.stock.cell); tri.cut(cutter, tips, axes(tips.length)) }
   }
   if (tri !== undefined) for (const reason of tri.reasonList) reasons.push(reason)
   const body = tri === undefined ? undefined : { cellMm: Math.round(tri.stock.cell * 1000) / 1000, errorBoundMm: Math.round(tri.stock.errorBound * 1000) / 1000, volumeMm3: Math.round(tri.stock.volume(2)) }
@@ -526,7 +551,7 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
     parts: replay.registers.map((r, i) => {
       const v = results[i]
       const seen = reach.get(r.register)
-      const left = tri === undefined || !onLattice[i] ? undefined : tri.stock.volumeWithin(blanks[i]!.min, blanks[i]!.max)
+      const left = tri === undefined ? undefined : tri.stock.volumeWithin(blanks[i]!.min, blanks[i]!.max)
       return {
         register: r.register, workpieceId: r.workpieceId, name: r.name, datum: datumOf(r), blank: blanks[i]!,
         removedMm3: Math.round(v?.removedVolume ?? 0), remainingMm3: Math.round((v?.stockVolume ?? 0) - (v?.removedVolume ?? 0)),

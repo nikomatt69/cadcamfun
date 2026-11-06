@@ -1,7 +1,7 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import type { Mesh64 } from "../model/element-mesh.ts"
-import type { Cutter } from "./cutters.ts"
-import { PartDexels, TriDexel, boxPenetration, comparePart, toolSolid } from "./tridexel.ts"
+import { DEFAULT_CUTTERS, findCutter, type Cutter } from "./cutters.ts"
+import { PartDexels, TriDexel, boxPenetration, comparePart, orientedBar, toolBoxDepth, toolSolid } from "./tridexel.ts"
 
 setDefaultTimeout(60_000)
 
@@ -247,6 +247,26 @@ describe("the probe skips the boxes it is told to, and a box meets a tool exactl
     // Above it, and far beside it: nothing.
     expect(boxPenetration(solid, { x: 20, y: 0, z: 5.1 }, box)).toBe(0)
     expect(boxPenetration(solid, { x: -40, y: 0, z: 0 }, box)).toBe(0)
+  })
+
+  test("toolBoxDepth: the same grazes for a vertical tool, and the same graze for a tool lying along any axis, by sampled points", () => {
+    const box = { min: { x: 10, y: -20, z: -10 }, max: { x: 30, y: 20, z: 5 } }
+    const solid = toolSolid(flat(6, 10), ["cutting"])
+    const up = { x: 0, y: 0, z: 1 }
+    // A vertical tool: the edge 0.1 and 1 mm into the wall at x = 10, nothing in the air.
+    expect(toolBoxDepth(solid, { x: 8, y: 0, z: -4 }, up, box)).toBeCloseTo(1, 6)
+    expect(toolBoxDepth(solid, { x: 7.1, y: 0, z: -4 }, up, box)).toBeCloseTo(0.1, 6)
+    expect(toolBoxDepth(solid, { x: 6.9, y: 0, z: -4 }, up, box)).toBe(0)
+    expect(toolBoxDepth(solid, { x: -40, y: 0, z: 0 }, up, box)).toBe(0)
+    // The tool lying along +Y at x = 7.1 touches the same wall by the same 0.1 mm (its edge is still 3 mm from its axis), and along +X it reaches in with its tip.
+    expect(toolBoxDepth(solid, { x: 7.1, y: -9, z: -2 }, { x: 0, y: 1, z: 0 }, box)).toBeCloseTo(0.1, 6)
+    expect(toolBoxDepth(solid, { x: 6.9, y: -9, z: -2 }, { x: 0, y: 1, z: 0 }, box)).toBe(0)
+    expect(toolBoxDepth(solid, { x: 9.5, y: 0, z: -2 }, { x: 1, y: 0, z: 0 }, box)).toBeGreaterThan(0.4)
+    expect(toolBoxDepth(solid, { x: 9.5, y: 0, z: -2 }, { x: -1, y: 0, z: 0 }, box)).toBe(0)
+    // Tilted 45 degrees in XZ the tool is a slanted cylinder: the depth is the one a rotated vertical tool would have at the same pose (rings, not a lattice).
+    const slant = { x: Math.SQRT1_2, y: 0, z: Math.SQRT1_2 }
+    expect(toolBoxDepth(solid, { x: 20, y: 0, z: 20 }, slant, box)).toBe(0)
+    expect(toolBoxDepth(solid, { x: 20, y: 0, z: 4.5 }, slant, box)).toBeGreaterThan(0.3)
   })
 })
 

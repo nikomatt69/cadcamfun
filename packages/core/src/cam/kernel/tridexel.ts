@@ -93,6 +93,44 @@ export const boxPenetration = (tool: ToolSolid, tip: Vec3, box: { readonly min: 
   return Math.min(side, zMax - zMin)
 }
 
+/**
+ * How deep a tool whose axis points along `axis` (any direction) through `tip` stands inside an axis-aligned box, mm: the tool is sampled,
+ * not carved into a lattice, so there is no cell to hide a graze in. Each cone of the solid is cut into rings every `step` along the axis
+ * (a ring that cannot reach the box is skipped), each ring is a polygon of points at most about 0.25 mm apart (16 to 256 of them) plus its
+ * centre, and the answer is the deepest of those points below the box's faces. It is a lower bound of the true depth: a contact thinner than
+ * the spacing of the samples can fall between them (a clamp 0.5 mm thick crossing a Ø30 flank is the thinnest this is meant for). The same
+ * graze that `boxPenetration` finds for a vertical tool is found here for a tilted one.
+ */
+export const toolBoxDepth = (tool: ToolSolid, tip: Vec3, axis: Vec3, box: { readonly min: Vec3; readonly max: Vec3 }, step = 0.1): number => {
+  const len = Math.hypot(axis.x, axis.y, axis.z) || 1
+  const a = { x: axis.x / len, y: axis.y / len, z: axis.z / len }
+  const h = Math.abs(a.z) < 0.9 ? { x: 0, y: 0, z: 1 } : { x: 1, y: 0, z: 0 }
+  let ux = a.y * h.z - a.z * h.y, uy = a.z * h.x - a.x * h.z, uz = a.x * h.y - a.y * h.x
+  const ul = Math.hypot(ux, uy, uz) || 1
+  ux /= ul; uy /= ul; uz /= ul
+  const vx = a.y * uz - a.z * uy, vy = a.z * ux - a.x * uz, vz = a.x * uy - a.y * ux
+  const inward = (x: number, y: number, z: number): number => Math.min(x - box.min.x, box.max.x - x, y - box.min.y, box.max.y - y, z - box.min.z, box.max.z - z)
+  const outside = (x: number, y: number, z: number): number => Math.hypot(Math.max(box.min.x - x, 0, x - box.max.x), Math.max(box.min.y - y, 0, y - box.max.y), Math.max(box.min.z - z, 0, z - box.max.z))
+  let deepest = 0
+  for (let q = 0; q < tool.count; q++) {
+    const z0 = tool.z0[q]!, z1 = tool.z1[q]!, span = z1 - z0
+    const n = Math.max(1, Math.ceil(span / step))
+    for (let k = 0; k <= n; k++) {
+      const f = k / n, z = z0 + span * f, r = tool.r0[q]! + (tool.r1[q]! - tool.r0[q]!) * f
+      const cx = tip.x + a.x * z, cy = tip.y + a.y * z, cz = tip.z + a.z * z
+      if (outside(cx, cy, cz) > r) continue
+      deepest = Math.max(deepest, inward(cx, cy, cz))
+      if (!(r > 0)) continue
+      const m = Math.max(16, Math.min(256, Math.ceil((2 * Math.PI * r) / 0.25)))
+      for (let j = 0; j < m; j++) {
+        const t = (2 * Math.PI * j) / m, c = Math.cos(t) * r, s = Math.sin(t) * r
+        deepest = Math.max(deepest, inward(cx + ux * c + vx * s, cy + uy * c + vy * s, cz + uz * c + vz * s))
+      }
+    }
+  }
+  return deepest > 0 ? deepest : 0
+}
+
 // ---------------------------------------------------------------- the stock
 
 interface Grid {
