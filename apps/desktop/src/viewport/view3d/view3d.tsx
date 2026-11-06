@@ -88,6 +88,14 @@ export interface View3DProps {
   readonly stock?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
   /** The raw pieces of the other workpieces on the fixture (the first is `stock`), drawn as outlines. */
   readonly extraStocks?: ReadonlyArray<{ readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }>
+  /** The parts of a multi-part program seen together (the replay's one frame): each blank, how far its cuts reached, a crossed part in red. */
+  readonly fixtureBoxes?: ReadonlyArray<{
+    readonly name: string
+    readonly origin: { readonly x: number; readonly y: number; readonly z: number }
+    readonly size: { readonly x: number; readonly y: number; readonly z: number }
+    readonly state: "part" | "crossed"
+    readonly reach?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
+  }>
   readonly showControls?: boolean
   /** Optional screen controls placed immediately before Fullscreen, including in fullscreen mode. */
   readonly controlsFooter?: JSX.Element
@@ -206,7 +214,7 @@ export function View3D(props: View3DProps) {
   const orthographicView = () => flat() || !["perspective", "four-view"].includes(preset())
   let playback: Playback = emptyPlayback()
   let seconds = 0
-  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.extraStocks; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
+  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.extraStocks; props.fixtureBoxes; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
   createEffect(() => { preset(); untrack(setPreset) })
   createEffect(() => { if (props.renderMode) updateMode(props.renderMode) })
@@ -532,6 +540,18 @@ export function View3D(props: View3DProps) {
           boxGeometry.dispose()
           outline.position.set(origin.x + size.x / 2, origin.y + size.y / 2, origin.z + size.z / 2); outline.visible = props.toolpathDisplay?.stockVisible ?? true; content.add(outline)
         }
+      }
+      // The parts of the program seen together: a blank each (red where a cut crossed into it), and a faint box for how far its own cuts reached.
+      for (const part of props.fixtureBoxes ?? []) {
+        const outline = (box: { readonly origin: Vec3; readonly size: Vec3 }, color: number, opacity: number): void => {
+          const geometry = new THREE.BoxGeometry(box.size.x, box.size.y, box.size.z)
+          const lines = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: false }))
+          geometry.dispose()
+          lines.position.set(box.origin.x + box.size.x / 2, box.origin.y + box.size.y / 2, box.origin.z + box.size.z / 2); lines.renderOrder = 8; lines.name = "fixture-view"; content.add(lines)
+        }
+        outline(part, part.state === "crossed" ? 0xef4444 : 0x2dd4bf, 0.9)
+        if (part.reach !== undefined) outline(part.reach, part.state === "crossed" ? 0xef4444 : 0x38bdf8, 0.35)
+        addPointLabel(part.name, { x: part.origin.x + part.size.x / 2, y: part.origin.y + part.size.y / 2, z: part.origin.z + part.size.z })
       }
       for (const raw of props.drawing?.entities ?? []) {
         if (!raw.visible || props.drawing?.layers.find(l => l.id === raw.layerId)?.visible === false) continue

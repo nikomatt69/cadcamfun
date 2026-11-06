@@ -107,3 +107,35 @@ test("operation navigation, active model and keyboard scrubbing share the simula
     expect([...root.querySelectorAll('[data-testid="operation-model"]')].map((row) => row.textContent)).toEqual([expect.stringContaining("drill Ø8.5"), expect.stringContaining("tap Ø10"), expect.stringContaining("touch probe")])
   } finally { dispose() }
 }, 60_000)
+
+test("the settings offer the combined view of the parts only for a program that has one, and Reset view brings it back", async () => {
+  installDom()
+  const { render } = await import("solid-js/web")
+  const { default: ToolpathVisualizer } = await import("../src/features/cam/components/ToolpathVisualizer.tsx")
+  const parsed = cam.generator.analyseGcode(code)
+  const mount = (fixtureView: ReadonlyArray<import("../src/features/cam/lib/setup.ts").FixtureBox> | undefined) => {
+    const root = document.createElement("div")
+    document.body.replaceChildren(root)
+    const dispose = render(() => ToolpathVisualizer({
+      program: parsed.program, motion: parsed.motion, gcode: code, workpiece: { x: 100, y: 60, z: 20 }, playbackRate: 1, playbackTime: 0, playing: false,
+      onPlaybackTimeChange: () => undefined, ...(fixtureView !== undefined ? { fixtureView } : {})
+    }), root)
+    root.querySelector<HTMLButtonElement>('[aria-label="Visualization settings"]')!.click()
+    const toggle = () => [...root.querySelectorAll("label")].find((label) => label.textContent?.includes("Show the parts together"))?.querySelector("input")
+    return { root, dispose, toggle }
+  }
+  const without = mount(undefined)
+  try { expect(without.toggle()).toBeUndefined() } finally { without.dispose() }
+  const boxes = [
+    { name: "P1", origin: { x: 0, y: 0, z: -5 }, size: { x: 20, y: 20, z: 5 }, state: "part" as const },
+    { name: "P2", origin: { x: 80, y: 0, z: -5 }, size: { x: 20, y: 20, z: 5 }, state: "crossed" as const }
+  ]
+  const shown = mount(boxes)
+  try {
+    expect(shown.toggle()?.checked).toBe(true)
+    shown.toggle()!.click()
+    expect(shown.toggle()?.checked).toBe(false)
+    shown.root.querySelector<HTMLButtonElement>('[aria-label="Reset view"]')!.click()
+    expect(shown.toggle()?.checked).toBe(true)
+  } finally { shown.dispose() }
+}, 60_000)

@@ -55,7 +55,7 @@ import { freshProgram, freshResult, useProbingStore } from "../store/probingStor
 import { useInspectionStore } from "../store/inspectionStore.ts"
 import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
 import { probeCycles } from "../lib/probing/cycles.ts"
-import { placedProgram } from "../lib/setup.ts"
+import { fixtureBoxes, placedProgram } from "../lib/setup.ts"
 import { overlayModelOf } from "../lib/probing/overlay-input.ts"
 import { partSolidsOf } from "../lib/probing/part-solids.ts"
 import { workOriginOf } from "../lib/probing/probe-targets.ts"
@@ -508,6 +508,7 @@ export default function CamPage(): JSX.Element {
                   {...(previewTools() !== undefined ? { tools: previewTools()! } : {})}
                   {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})}
                   {...(camStore.generatedProgram?.gcode === camStore.gcode ? { workpieces: camStore.generatedProgram.workpieces } : {})}
+                  {...(camStore.generatedProgram?.gcode === camStore.gcode && fixtureBoxes(camStore.generatedProgram.evidence).length > 0 ? { fixtureView: fixtureBoxes(camStore.generatedProgram.evidence) } : {})}
                   machine={previewMachine()} defaultToolModel={probeToolModel() ?? toolModel()} toolIssues={probePreview() !== undefined ? [] : toolIssues()}
                   operationTools={operationTools().length > 0 ? operationTools() : importedTools()}
                   {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})}
