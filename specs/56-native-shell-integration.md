@@ -289,8 +289,9 @@ Capability findings:
   `api/core` (`invoke`), `api/event` (`listen`) and `api/window` (`getCurrentWindow().onCloseRequested`, `destroy`), which suggests
   `core:event:default` plus `core:window:allow-destroy`. **Not changed:** that cannot be proven without running the packaged app (the
   close guard, the menu and the update prompt all depend on it); bisect in a real run, as for `'unsafe-eval'` in §3 E.
-- Three commands have no webview caller yet and are granted: `pick_file`, `secret_delete`, `set_recent_projects`. They are kept (each has a
-  planned caller, see the `PENDING_CALLER` table in the lint). The lint fails for a new command without a caller and for a stale entry.
+- Two commands have no webview caller yet and are granted: `pick_file`, `set_recent_projects`. They are kept (each has a
+  planned caller, see the `PENDING_CALLER` table in the lint). `secret_delete` left that list when account sign-out
+  (`apps/desktop/src/app/identity-session.ts`) started clearing the keyring entry. The lint fails for a new command without a caller and for a stale entry.
 - `shell:allow-open` is **not** removable: `app/external.ts` imports `open` from `@tauri-apps/plugin-shell`.
 - Every grant must have a rule in `CALLER_EVIDENCE` (webview code that justifies it); adding a permission without a caller now fails the
   Bun test with the permission name.
