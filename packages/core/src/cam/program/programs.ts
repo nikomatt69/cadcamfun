@@ -14,7 +14,7 @@ import type { ReleaseLevel } from "../kernel/contracts.ts"
 import type { VerifyNcResult } from "../kernel/verify-nc.ts"
 import { cutterOfTool, type Cutter } from "../kernel/cutters.ts"
 import { TriReplay, triCellFor } from "../kernel/tri-replay.ts"
-import { toolSolid } from "../kernel/tridexel.ts"
+import { boxPenetration, toolSolid } from "../kernel/tridexel.ts"
 import type { AssemblyPart } from "../kernel/assembly.ts"
 import { forEachSample } from "../verify/path.ts"
 import { DEFAULT_GEOMETRY, decodeGenerateRequest, generateToolpath, type GenerateOutcome, type GeometryInput, type GcodeStats } from "../generator/index.ts"
@@ -204,6 +204,9 @@ export interface FixtureSimulation {
     readonly blank: { readonly min: Vec3; readonly max: Vec3 }
     readonly removedMm3: number
     readonly remainingMm3: number
+    /** The same two figures read from the ONE body of the fixture after every register's moves (the lattice's error is `body.errorBoundMm`); absent when the body could not be built. */
+    readonly bodyRemovedMm3?: number
+    readonly bodyRemainingMm3?: number
     /** Where the program's moves of this register reached in the fixture frame (feed moves only), absent when it has none. */
     readonly reach?: { readonly min: Vec3; readonly max: Vec3 }
   }>
@@ -211,8 +214,13 @@ export interface FixtureSimulation {
   readonly clamps?: ReadonlyArray<{ readonly id: string; readonly name: string; readonly min: Vec3; readonly max: Vec3 }>
   /** `other` is the other part's register, or the clamp's id. */
   readonly crossings: ReadonlyArray<{ readonly register: string; readonly other: string; readonly line: number; readonly message: string }>
-  /** How the contacts were judged. */
+  /** How the contacts were judged: other parts' blanks on the tri-dexel of the whole fixture. */
   readonly method?: "tri-dexel"
+  /** How the clamps were judged: the box against the swept tool, exact; a penetration of `clampErrorMm` or more is never missed. */
+  readonly clampMethod?: "exact-box"
+  readonly clampErrorMm?: number
+  /** The one solid of the fixture (every blank and clamp) after the program: its lattice and total volume. */
+  readonly body?: { readonly cellMm: number; readonly errorBoundMm: number; readonly volumeMm3: number }
   /** Every move near an obstacle was replayed (no budget stop, no obstacle too large to sample). */
   readonly complete?: boolean
   readonly reasons?: ReadonlyArray<string>
@@ -223,14 +231,46 @@ export interface FixtureSimulation {
 
 const registerKeyOf = (table: Readonly<Record<string, unknown>>, key: string): string => (key in table ? key : "G54")
 
-/** Work the contact replay of one register may spend (cell visits): a program that needs more is not claimed, never guessed. */
+/** Work the one body of the fixture may spend per register (cell visits): a program that needs more is not claimed, never guessed. */
 const FIXTURE_BUDGET = 4e7
+/** The clamps are judged exactly (box against the swept tool): a path is sampled this far apart, and a penetration under the threshold is rounding of the NC's own decimals. */
+const CLAMP_STEP = 0.05
+const CLAMP_THRESHOLD = 0.01
+/** Sampled poses the exact clamp test may spend: over it the clamp check stops and the view is incomplete. */
+const CLAMP_SAMPLES = 4e6
 
 type Box = { readonly min: Vec3; readonly max: Vec3 }
 const boxesTouch = (a: Box, b: Box): boolean => a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y && a.min.z < b.max.z && b.min.z < a.max.z
 const boxHas = (b: Box, p: Vec3, grow = 0): boolean => p.x >= b.min.x - grow && p.x <= b.max.x + grow && p.y >= b.min.y - grow && p.y <= b.max.y + grow && p.z >= b.min.z - grow && p.z <= b.max.z + grow
+/** `a` without the volume of `bs`, as boxes (at most six per subtracted box). */
+const boxMinus = (a: Box, bs: ReadonlyArray<Box>): ReadonlyArray<Box> => {
+  let pieces: Box[] = [a]
+  for (const b of bs) {
+    const next: Box[] = []
+    for (const p of pieces) {
+      if (!boxesTouch(p, b)) { next.push(p); continue }
+      let rest = p
+      for (const axis of ["x", "y", "z"] as const) {
+        if (b.min[axis] > rest.min[axis]) next.push({ min: rest.min, max: { ...rest.max, [axis]: b.min[axis] } })
+        if (b.max[axis] < rest.max[axis]) next.push({ min: { ...rest.min, [axis]: b.max[axis] }, max: rest.max })
+        rest = { min: { ...rest.min, [axis]: Math.max(rest.min[axis], b.min[axis]) }, max: { ...rest.max, [axis]: Math.min(rest.max[axis], b.max[axis]) } }
+      }
+    }
+    pieces = next
+  }
+  return pieces
+}
 
-/** The parts of a program in one frame: see `FixtureSimulation`. `tools` (with their holders) refine the cutters the replay holds. */
+/**
+ * The parts of a program in one frame: see `FixtureSimulation`. `tools` (with their holders) refine the cutters the replay holds.
+ *
+ * ONE tri-dexel holds the whole fixture: every part's blank and every clamp in the first part's datum frame. The program's moves are
+ * replayed into it in the order the machine runs them, each register carried into the frame by its datum, so the body is what the fixture
+ * is after the program: every part's remaining stock from the same solid, and every collision judged on the state the body is in when the
+ * move runs. A move of a register is checked against the rest of the body (its own blank is not an obstacle to its own tool, unless
+ * another part's blank overlaps it): another part's blank on the lattice (the tool's radius, flutes, shank and holder counted), the
+ * clamps exactly, as boxes against the swept tool, so a graze far below the lattice's cell is still a crossing.
+ */
 export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: ReadonlyArray<VerifyNcResult>, tools: ReadonlyArray<Tool> = []): FixtureSimulation => {
   const zero = { x: 0, y: 0, z: 0 }
   const datumOf = (r: SetupReplay["registers"][number]): Vec3 => r.datum ?? zero
@@ -244,16 +284,15 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
   const reach = new Map<string, { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }>()
   const crossings: Array<{ register: string; other: string; line: number; message: string }> = []
   const reasons: string[] = []
-  let cellMm = 0, errorBoundMm = 0
-  // The moves of every register, in the fixture frame, with the tool they ran with.
-  const moves = replay.registers.map(() => [] as Array<{ readonly seg: (typeof run.segments)[number] & { readonly kind: "rapid" | "linear" | "arc" }; readonly tool: number }>)
+  // The moves in the order they run, with the register and the tool they ran with.
+  const seq: Array<{ readonly seg: (typeof run.segments)[number] & { readonly kind: "rapid" | "linear" | "arc" }; readonly tool: number; readonly own: number }> = []
   run.segments.forEach((seg, i) => {
     if (seg.kind === "dwell") return
     const state = run.states?.[i]
     const register = registerKeyOf(table, state?.workOffset ?? "G54")
     const own = replay.registers.findIndex((r) => r.register === register)
     if (own < 0) return
-    moves[own]!.push({ seg, tool: state?.tool ?? -1 })
+    seq.push({ seg, tool: state?.tool ?? -1, own })
     if (seg.kind === "rapid") return
     for (const p of [seg.from, seg.to]) {
       const at = reach.get(register) ?? { min: { ...p }, max: { ...p } }
@@ -262,92 +301,129 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
       reach.set(register, at)
     }
   })
-  // What a register's own moves must not touch: the other parts' blanks and the clamps, as one solid.
-  replay.registers.forEach((own, index) => {
-    const obstacles: Array<{ readonly id: string; readonly label: string; readonly box: Box; readonly kind: "blank" | "clamp" }> = [
-      ...replay.registers.flatMap((other, j) => (j === index ? [] : [{ id: other.register, label: `the blank of ${other.name} (${other.register})`, box: blanks[j]!, kind: "blank" as const }])),
-      ...clamps.map((c) => ({ id: c.id, label: c.name, box: c as Box, kind: "clamp" as const }))
-    ]
-    if (obstacles.length === 0) return
-    // Only the moves whose tool comes near an obstacle are replayed on the lattice, and per part of the tool (flutes and shank, holder):
-    // the holder is wide but high, so it is only probed where the move is high enough to bring it near an obstacle.
-    const PARTS: ReadonlyArray<ReadonlyArray<AssemblyPart>> = [["cutting", "shank"], ["holder"]]
-    const near = moves[index]!.flatMap((m) => {
-      const cutter = cutters.get(m.tool)
-      if (cutter === undefined) return []
-      // An arc's box is its chord's box grown by its radius.
-      const arcR = m.seg.kind === "arc" ? Math.hypot(m.seg.from.x - m.seg.center.x, m.seg.from.y - m.seg.center.y) : 0
-      const parts = PARTS.filter((group) => {
-        const solid = toolSolid(cutter, group)
-        if (solid.count === 0) return false
-        const r = solid.maxRadius + arcR
-        const box = {
-          min: { x: Math.min(m.seg.from.x, m.seg.to.x) - r, y: Math.min(m.seg.from.y, m.seg.to.y) - r, z: Math.min(m.seg.from.z, m.seg.to.z) + solid.bottom },
-          max: { x: Math.max(m.seg.from.x, m.seg.to.x) + r, y: Math.max(m.seg.from.y, m.seg.to.y) + r, z: Math.max(m.seg.from.z, m.seg.to.z) + solid.top }
-        }
-        return obstacles.some((o) => boxesTouch(box, o.box))
-      })
-      if (parts.length === 0) return []
-      const r = Math.max(...parts.map((g) => toolSolid(cutter, g).maxRadius)) + arcR
-      const box = {
-        min: { x: Math.min(m.seg.from.x, m.seg.to.x) - r, y: Math.min(m.seg.from.y, m.seg.to.y) - r, z: Math.min(m.seg.from.z, m.seg.to.z) },
-        max: { x: Math.max(m.seg.from.x, m.seg.to.x) + r, y: Math.max(m.seg.from.y, m.seg.to.y) + r, z: Math.max(m.seg.from.z, m.seg.to.z) + Math.max(...parts.map((g) => toolSolid(cutter, g).top)) }
-      }
-      const hit = obstacles.filter((o) => boxesTouch(box, o.box))
-      return hit.length === 0 ? [] : [{ m, cutter, box, hit, parts }]
-    })
-    if (near.length === 0) return
-    const used = [...new Set(near.flatMap((n) => n.hit))]
-    const lo = { x: Math.min(...used.map((o) => o.box.min.x)), y: Math.min(...used.map((o) => o.box.min.y)), z: Math.min(...used.map((o) => o.box.min.z)) }
-    const hi = { x: Math.max(...used.map((o) => o.box.max.x)), y: Math.max(...used.map((o) => o.box.max.y)), z: Math.max(...used.map((o) => o.box.max.z)) }
-    // Clip to where the moves can reach, so a long fixture is not sampled where no tool goes.
-    const reachLo = { x: Math.min(...near.map((n) => n.box.min.x)), y: Math.min(...near.map((n) => n.box.min.y)) }
-    const reachHi = { x: Math.max(...near.map((n) => n.box.max.x)), y: Math.max(...near.map((n) => n.box.max.y)) }
-    const min = { x: Math.max(lo.x, reachLo.x), y: Math.max(lo.y, reachLo.y), z: lo.z }
-    const max = { x: Math.min(hi.x, reachHi.x), y: Math.min(hi.y, reachHi.y), z: hi.z }
-    if (!(max.x > min.x && max.y > min.y && max.z > min.z)) return
-    const smallest = Math.min(...near.map((n) => n.cutter.diameter / 2))
-    const cell = triCellFor({ x: max.x - min.x, y: max.y - min.y, z: max.z - min.z }, Math.max(0.25, smallest / 10))
-    const tri = new TriReplay({ min, max, cell, budget: FIXTURE_BUDGET, seed: (p) => obstacles.some((o) => boxHas(o.box, p)) })
-    const said = new Set<string>()
-    for (const { m, cutter, hit, parts } of near) {
-      // A line goes as its two ends (the contact test subdivides it); an arc as points a few cells apart.
-      const tips = [{ ...m.seg.from }]
-      if (m.seg.kind === "arc") forEachSample({ from: m.seg.from, to: m.seg.to, center: m.seg.center, clockwise: m.seg.clockwise }, Math.max(2, 8 * tri.stock.cell), (x, y, z) => { tips.push({ x, y, z }) })
-      else tips.push({ ...m.seg.to })
-      let found: ReturnType<typeof tri.contact>
-      for (const group of parts) { found = tri.contact(cutter, group, tips, undefined, tri.stock.errorBound); if (found !== undefined) break }
-      if (found === undefined) continue
-      const what = (found.at !== undefined ? hit.find((o) => boxHas(o.box, found.at!, 2 * tri.stock.cell)) : undefined) ?? hit[0]!
-      const key = `${own.register}>${what.id}`
-      if (said.has(key)) continue
-      said.add(key)
-      const rapid = m.seg.kind === "rapid"
-      const depth = `${Math.round(found.overlap * 100) / 100} mm into it on the tri-dexel, ${cutter.name} Ø${cutter.diameter} counted with its radius${cutter.holder !== undefined ? " and holder" : ""}`
-      crossings.push({
-        register: own.register, other: what.id, line: m.seg.line,
-        message: what.kind === "blank"
-          ? `${own.name} (${own.register}) ${rapid ? "rapids through" : "cuts into"} ${what.label} at NC line ${m.seg.line}: a wrong register or a wrong placement (${depth})`
-          : `${own.name} (${own.register}) ${rapid ? "rapids through" : "reaches"} the clamp ${what.label} at NC line ${m.seg.line} (${depth})`
-      })
+
+  // The body: every blank and every clamp, one solid.
+  const everything: ReadonlyArray<Box> = [...blanks, ...clamps]
+  let tri: TriReplay | undefined
+  let before: ReadonlyArray<number> = []
+  if (everything.length > 0 && cutters.size > 0) {
+    const min = { x: Math.min(...everything.map((b) => b.min.x)), y: Math.min(...everything.map((b) => b.min.y)), z: Math.min(...everything.map((b) => b.min.z)) }
+    const max = { x: Math.max(...everything.map((b) => b.max.x)), y: Math.max(...everything.map((b) => b.max.y)), z: Math.max(...everything.map((b) => b.max.z)) }
+    const extent = { x: max.x - min.x, y: max.y - min.y, z: max.z - min.z }
+    const smallest = Math.min(...[...cutters.values()].map((c) => c.diameter / 2))
+    let cell = triCellFor(extent, Math.max(0.25, smallest / 10))
+    // Sampling the solid onto the lattice costs a few evaluations per ray of every direction: a cell that would not fit is made coarser (the declared error says so).
+    const evals = (c: number): number => {
+      const n = [extent.x, extent.y, extent.z].map((e) => Math.max(1, Math.ceil(e / c)))
+      return n[1]! * n[2]! * (n[0]! + 8) + n[0]! * n[2]! * (n[1]! + 8) + n[0]! * n[1]! * (n[2]! + 8)
     }
-    cellMm = Math.max(cellMm, tri.stock.cell); errorBoundMm = Math.max(errorBoundMm, tri.stock.errorBound)
-    for (const reason of tri.reasonList) reasons.push(`${own.name} (${own.register}): ${reason}`)
-  })
+    while (evals(cell) > 5e7) cell *= 1.25
+    tri = new TriReplay({ min, max, cell, budget: FIXTURE_BUDGET * Math.max(1, replay.registers.length), seed: (p) => everything.some((b) => boxHas(b, p)) })
+    for (const reason of tri.reasonList) reasons.push(reason)
+    if (tri.reasonList.length > 0) tri = undefined
+    else before = blanks.map((b) => tri!.stock.volumeWithin(b.min, b.max))
+  }
+
+  // What each register's own blank is, for the lattice probe: its blank minus the other blanks that overlap it, so a cut into an overlap is still seen.
+  const own = replay.registers.map((_, i) => boxMinus(blanks[i]!, blanks.filter((_, j) => j !== i)))
+  const PARTS: ReadonlyArray<ReadonlyArray<AssemblyPart>> = [["cutting", "shank"], ["holder"]]
+  const said = new Set<string>()
+  let clampSamples = 0, clampStopped = false
+  for (const { seg, tool, own: index } of seq) {
+    const cutter = cutters.get(tool)
+    if (cutter === undefined) continue
+    const mine = replay.registers[index]!
+    const arcR = seg.kind === "arc" ? Math.hypot(seg.from.x - seg.center.x, seg.from.y - seg.center.y) : 0
+    // The tool's reach box over this move, per group of its parts; an arc's box is its chord's box grown by its radius.
+    const reachBox = (group: ReadonlyArray<AssemblyPart>): Box | undefined => {
+      const solid = toolSolid(cutter, group)
+      if (solid.count === 0) return undefined
+      const r = solid.maxRadius + arcR
+      return {
+        min: { x: Math.min(seg.from.x, seg.to.x) - r, y: Math.min(seg.from.y, seg.to.y) - r, z: Math.min(seg.from.z, seg.to.z) + solid.bottom },
+        max: { x: Math.max(seg.from.x, seg.to.x) + r, y: Math.max(seg.from.y, seg.to.y) + r, z: Math.max(seg.from.z, seg.to.z) + solid.top }
+      }
+    }
+    const rapid = seg.kind === "rapid"
+    const depthOf = (overlap: number, how: string): string => `${Math.round(overlap * 100) / 100} mm into it ${how}, ${cutter.name} Ø${cutter.diameter} counted with its radius${cutter.holder !== undefined ? " and holder" : ""}`
+    const tipsOf = (step: number): Vec3[] => {
+      // A line goes as its two ends (the contact test subdivides it); an arc as points a few cells apart.
+      const tips = [{ ...seg.from }]
+      if (seg.kind === "arc") forEachSample({ from: seg.from, to: seg.to, center: seg.center, clockwise: seg.clockwise }, step, (x, y, z) => { tips.push({ x, y, z }) })
+      else tips.push({ ...seg.to })
+      return tips
+    }
+    if (tri !== undefined) {
+      // Another part's blank, on the body as it stands: the lattice's noise is its declared error.
+      const others = blanks.filter((_, j) => j !== index)
+      const hitGroups = PARTS.filter((group) => { const box = reachBox(group); return box !== undefined && others.some((o) => boxesTouch(box, o)) })
+      if (hitGroups.length > 0) {
+        const tips = tipsOf(Math.max(2, 8 * tri.stock.cell))
+        let found: ReturnType<typeof tri.contact>
+        for (const group of hitGroups) { found = tri.contact(cutter, group, tips, undefined, tri.stock.errorBound, [...own[index]!, ...clamps]); if (found !== undefined) break }
+        if (found !== undefined) {
+          const j = found.at !== undefined ? replay.registers.findIndex((_, k) => k !== index && boxHas(blanks[k]!, found!.at!, 2 * tri.stock.cell)) : -1
+          const other = replay.registers[j >= 0 ? j : replay.registers.findIndex((_, k) => k !== index && hitGroups.some((g) => { const b = reachBox(g); return b !== undefined && boxesTouch(b, blanks[k]!) }))]
+          if (other !== undefined && !said.has(`${mine.register}>${other.register}`)) {
+            said.add(`${mine.register}>${other.register}`)
+            crossings.push({
+              register: mine.register, other: other.register, line: seg.line,
+              message: `${mine.name} (${mine.register}) ${rapid ? "rapids through" : "cuts into"} the blank of ${other.name} (${other.register}) at NC line ${seg.line}: a wrong register or a wrong placement (${depthOf(found.overlap, "on the tri-dexel")})`
+            })
+          }
+        }
+      }
+    }
+    // The clamps, exactly: the sampled penetration of the swept tool into the box, to within the sampling step.
+    for (const clamp of clamps) {
+      if (clampStopped) break
+      for (const group of PARTS) {
+        const box = reachBox(group)
+        if (box === undefined || !boxesTouch(box, clamp) || said.has(`${mine.register}>${clamp.id}`)) continue
+        const solid = toolSolid(cutter, group)
+        let deepest = 0
+        const poses = tipsOf(CLAMP_STEP)
+        const consider = (tip: Vec3): void => { deepest = Math.max(deepest, boxPenetration(solid, tip, clamp)) }
+        if (seg.kind === "arc") { clampSamples += poses.length; for (const t of poses) consider(t) } else {
+          const length = Math.hypot(seg.to.x - seg.from.x, seg.to.y - seg.from.y, seg.to.z - seg.from.z)
+          const n = Math.max(1, Math.ceil(length / CLAMP_STEP))
+          clampSamples += n + 1
+          if (clampSamples > CLAMP_SAMPLES) { clampStopped = true; reasons.push(`the exact clamp check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the clamps`); break }
+          for (let k = 0; k <= n; k++) { const f = k / n; consider({ x: seg.from.x + (seg.to.x - seg.from.x) * f, y: seg.from.y + (seg.to.y - seg.from.y) * f, z: seg.from.z + (seg.to.z - seg.from.z) * f }) }
+        }
+        if (clampSamples > CLAMP_SAMPLES && !clampStopped) { clampStopped = true; reasons.push(`the exact clamp check stopped at its budget (${CLAMP_SAMPLES.toExponential(0)} poses) at NC line ${seg.line}: the rest of the program is not checked against the clamps`) }
+        if (deepest > CLAMP_THRESHOLD) {
+          said.add(`${mine.register}>${clamp.id}`)
+          crossings.push({
+            register: mine.register, other: clamp.id, line: seg.line,
+            message: `${mine.name} (${mine.register}) ${rapid ? "rapids through" : "reaches"} the clamp ${clamp.name} at NC line ${seg.line} (${depthOf(deepest, `by the exact box test, within ${CLAMP_STEP} mm`)})`
+          })
+          break
+        }
+      }
+    }
+    // The move cuts the body (feed moves only): what the parts have left is read from it at the end.
+    if (tri !== undefined && !rapid) tri.cut(cutter, tipsOf(tri.stock.cell))
+  }
+  if (tri !== undefined) for (const reason of tri.reasonList) reasons.push(reason)
+  const body = tri === undefined ? undefined : { cellMm: Math.round(tri.stock.cell * 1000) / 1000, errorBoundMm: Math.round(tri.stock.errorBound * 1000) / 1000, volumeMm3: Math.round(tri.stock.volume(2)) }
   return {
     frame: `the datum of ${replay.registers[0]?.name ?? "the first part"} (${replay.registers[0]?.register ?? "G54"})`,
     parts: replay.registers.map((r, i) => {
       const v = results[i]
       const seen = reach.get(r.register)
+      const left = tri === undefined ? undefined : tri.stock.volumeWithin(blanks[i]!.min, blanks[i]!.max)
       return {
         register: r.register, workpieceId: r.workpieceId, name: r.name, datum: datumOf(r), blank: blanks[i]!,
         removedMm3: Math.round(v?.removedVolume ?? 0), remainingMm3: Math.round((v?.stockVolume ?? 0) - (v?.removedVolume ?? 0)),
+        ...(left !== undefined ? { bodyRemovedMm3: Math.round(before[i]! - left), bodyRemainingMm3: Math.round(left) } : {}),
         ...(seen !== undefined ? { reach: seen } : {})
       }
     }),
     ...(clamps.length > 0 ? { clamps } : {}),
     crossings, method: "tri-dexel", complete: reasons.length === 0, reasons,
-    ...(cellMm > 0 ? { cellMm: Math.round(cellMm * 1000) / 1000, errorBoundMm: Math.round(errorBoundMm * 1000) / 1000 } : {})
+    ...(body !== undefined ? { body, cellMm: body.cellMm, errorBoundMm: body.errorBoundMm } : {}),
+    ...(clamps.length > 0 ? { clampMethod: "exact-box" as const, clampErrorMm: CLAMP_STEP } : {})
   }
 }
 

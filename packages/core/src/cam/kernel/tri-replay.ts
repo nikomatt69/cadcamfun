@@ -101,9 +101,10 @@ export class TriReplay {
   /**
    * The first pose along `tips` (axes up from each tip) where the `parts` of the cutter's assembly overlap the stock as it stands by
    * more than `threshold` mm, with how deep and where: a rapid through material, or a shank or holder in the wall. An overlap under
-   * the threshold is lattice noise and is not contact. The check spends the same work budget as the cuts.
+   * the threshold is lattice noise and is not contact. The check spends the same work budget as the cuts. The material inside the `skip`
+   * boxes is not counted (the blank the tool is meant to cut, when the question is what else it touches).
    */
-  contact(cutter: Cutter, parts: ReadonlyArray<AssemblyPart>, tips: ReadonlyArray<Vec3>, axes: ReadonlyArray<Vec3> | undefined, threshold: number): { readonly overlap: number; readonly at?: Vec3; readonly index: number } | undefined {
+  contact(cutter: Cutter, parts: ReadonlyArray<AssemblyPart>, tips: ReadonlyArray<Vec3>, axes: ReadonlyArray<Vec3> | undefined, threshold: number, skip?: ReadonlyArray<{ readonly min: Vec3; readonly max: Vec3 }>): { readonly overlap: number; readonly at?: Vec3; readonly index: number } | undefined {
     if (this.stopped || tips.length === 0) return undefined
     const key = parts.join("+")
     let byParts = this.contactSolids.get(cutter)
@@ -127,7 +128,7 @@ export class TriReplay {
         const f = k / n
         const tip = { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f }
         const axis = da === undefined || db === undefined ? da : { x: da.x + (db.x - da.x) * f, y: da.y + (db.y - da.y) * f, z: da.z + (db.z - da.z) * f }
-        const p = this.stock.probe(solid, tip, axis)
+        const p = this.stock.probe(solid, tip, axis, skip)
         if (p.overlap > threshold) return { overlap: p.overlap, ...(p.at !== undefined ? { at: p.at } : {}), index: i }
       }
     }

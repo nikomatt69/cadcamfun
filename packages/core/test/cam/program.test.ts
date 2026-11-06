@@ -433,6 +433,49 @@ describe("the fixture on one tri-dexel: the tool's radius counts, and the clamps
   })
 })
 
+describe("the fixture as ONE body: every part's remaining stock from the same solid, clamps judged exactly", () => {
+  const stock = { x: 60, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" }
+  const parts: program.Setup["workpieces"] = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", stock: { ...stock, x: 70, origin: { x: -35, y: -25, z: 0 } } }]
+  const fixture = setup([op("a", t6), op("b", t3)], { workpieces: parts, stock })
+  const made = generateSetup(fixture, geometryOf)
+  const replay = program.setupReplay(fixture, made.programs[0]!, geometryOf)
+  const gcode = made.programs[0]!.gcode
+  const held = made.programs[0]!.tools.map((t) => ({ ...t, holder: { diameter: 30, length: 40 } }))
+  const solid = { ...replay, part: [{ positions: new Float32Array(9), indices: new Uint32Array(3) }] }
+  const clean = { verdict: "clean" as const, complete: true, reasons: [], findings: [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 }, detached: 0, cell: 0.5, errorBound: 0.5, poses: 1, feedMoves: 10, removedVolume: 100, stockVolume: 1000 } as never
+  const apart = { ...solid, registers: solid.registers.map((r) => (r.register === "G55" ? { ...r, datum: { x: 120, y: 0, z: 0 } } : r)) }
+  const one = { ...solid, registers: [solid.registers[0]!] }
+  const clamp = (min: number) => ({ id: "c1", name: "Clamp 1", min: { x: min, y: -20, z: -10 }, max: { x: min + 20, y: 20, z: 5 } })
+
+  test("both parts are read from one lattice after the program: each lost material of its own blank, the lattice and its error are declared", () => {
+    const view = program.setupEvidence(gcode, apart, [clean, clean], held).fixture!
+    expect(view.complete).toBe(true)
+    expect(view.body).toBeDefined()
+    expect(view.body!.errorBoundMm).toBeGreaterThan(0)
+    for (const part of view.parts) {
+      expect(part.bodyRemovedMm3, part.register).toBeGreaterThan(0)
+      expect(part.bodyRemainingMm3!).toBeGreaterThan(0)
+    }
+    // Both parts run the same operations on blanks of 60 and 70 mm: the same cuts, so about the same material gone from each.
+    expect(Math.abs(view.parts[0]!.bodyRemovedMm3! - view.parts[1]!.bodyRemovedMm3!)).toBeLessThan(0.1 * view.parts[0]!.bodyRemovedMm3!)
+    // The body holds both blanks (60x50x10 and 70x50x10) less what was cut.
+    expect(view.body!.volumeMm3).toBe(view.parts[0]!.bodyRemainingMm3! + view.parts[1]!.bodyRemainingMm3!)
+  })
+
+  test("a graze of 0.3 mm into a clamp is a crossing (the lattice cell is 0.25+ and would not tell it); one 0.05 mm clear is not", () => {
+    // Part 1's moves reach x 17: a Ø6 edge at 20. A clamp from 19.7 is entered by 0.3 mm, one from 20.05 is clear by 0.05.
+    const grazed = program.setupEvidence(gcode, { ...one, fixtures: [clamp(19.7)] }, [clean], held)
+    expect(grazed.fixture!.crossings.map((c) => [c.register, c.other])).toEqual([["G54", "c1"]])
+    expect(grazed.fixture!.crossings[0]!.message).toMatch(/0\.3 mm into it by the exact box test, within 0\.05 mm/)
+    expect(grazed.fixture!.clampMethod).toBe("exact-box")
+    expect(grazed.fixture!.clampErrorMm).toBe(0.05)
+    expect(grazed.release).toBe("blocked")
+    const clear = program.setupEvidence(gcode, { ...one, fixtures: [clamp(20.05)] }, [clean], held)
+    expect(clear.fixture!.crossings).toEqual([])
+    expect(clear.fixture!.complete).toBe(true)
+  })
+})
+
 describe("operation templates: a cycle of operations applied to features", () => {
   const rough = { id: "rough", name: "Rough", tool: t6, params: { ...DEFAULT_SETTINGS, depth: 4, stepdown: 2, toolDiameter: 6, operationType: "pocket" as const } }
   const finish = { id: "finish", name: "Finish", tool: t3, params: { ...DEFAULT_SETTINGS, depth: 4, stepdown: 4, toolDiameter: 3, operationType: "contour" as const }, dependsOn: ["rough"] }

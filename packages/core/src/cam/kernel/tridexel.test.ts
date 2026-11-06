@@ -1,7 +1,7 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import type { Mesh64 } from "../model/element-mesh.ts"
 import type { Cutter } from "./cutters.ts"
-import { PartDexels, TriDexel, comparePart, toolSolid } from "./tridexel.ts"
+import { PartDexels, TriDexel, boxPenetration, comparePart, toolSolid } from "./tridexel.ts"
 
 setDefaultTimeout(60_000)
 
@@ -206,6 +206,47 @@ describe("probing the shank and holder against the stock", () => {
     expect(hit.at).toBeDefined()
     const air = s.probe(shank, { x: 0, y: 0, z: 10 })
     expect(air.overlap).toBe(0)
+  })
+})
+
+describe("the probe skips the boxes it is told to, and a box meets a tool exactly", () => {
+  test("material inside a skipped box is not touched, the rest of the same body is", () => {
+    // Two blocks that touch at x = 0: the tool stands in the left one with its edge 1 mm into the right one.
+    const s = TriDexel.box({ x: -20, y: -10, z: 0 }, { x: 20, y: 10, z: 10 }, 0.25)
+    const cutter = flat(6, 10)
+    const solid = toolSolid(cutter, ["cutting"])
+    const tip = { x: -2, y: 0, z: 2 }
+    const all = s.probe(solid, tip)
+    expect(all.overlap).toBeGreaterThan(5)
+    const left = { min: { x: -20, y: -10, z: 0 }, max: { x: 0, y: 10, z: 10 } }
+    const right = s.probe(solid, tip, undefined, [left])
+    // Only the 1 mm of the Ø6 edge past x = 0 is left of the body.
+    expect(right.overlap).toBeGreaterThan(0.5)
+    expect(right.overlap).toBeLessThan(1.5)
+    expect(s.probe(solid, { x: -5, y: 0, z: 2 }, undefined, [left]).overlap).toBe(0)
+  })
+
+  test("volumeWithin reads the material of a box out of the body", () => {
+    const s = TriDexel.box({ x: 0, y: 0, z: 0 }, { x: 40, y: 20, z: 10 }, 0.5)
+    expect(s.volumeWithin({ x: 0, y: 0, z: 0 }, { x: 20, y: 20, z: 10 })).toBeCloseTo(4000, 0)
+    s.cut(toolSolid(flat(6, 10)), { x: 10, y: 10, z: 4 })
+    const cut = s.volumeWithin({ x: 0, y: 0, z: 0 }, { x: 20, y: 20, z: 10 })
+    expect(4000 - cut).toBeGreaterThan(150)
+    expect(s.volumeWithin({ x: 20, y: 0, z: 0 }, { x: 40, y: 20, z: 10 })).toBeCloseTo(4000, 0)
+  })
+
+  test("boxPenetration: the radius past a side wall, the height of a tip touching the top, nothing in the air", () => {
+    const box = { min: { x: 10, y: -20, z: -10 }, max: { x: 30, y: 20, z: 5 } }
+    const solid = toolSolid(flat(6, 10), ["cutting"])
+    // Axis at x = 8: the edge (r 3) is 1 mm into the wall at x = 10.
+    expect(boxPenetration(solid, { x: 8, y: 0, z: -4 }, box)).toBeCloseTo(1, 9)
+    expect(boxPenetration(solid, { x: 7.1, y: 0, z: -4 }, box)).toBeCloseTo(0.1, 9)
+    expect(boxPenetration(solid, { x: 6.9, y: 0, z: -4 }, box)).toBe(0)
+    // Over the box's top (z 5) with the tip 0.4 mm below it and the axis inside the footprint: the way out is up, 0.4 mm.
+    expect(boxPenetration(solid, { x: 20, y: 0, z: 4.6 }, box)).toBeCloseTo(0.4, 9)
+    // Above it, and far beside it: nothing.
+    expect(boxPenetration(solid, { x: 20, y: 0, z: 5.1 }, box)).toBe(0)
+    expect(boxPenetration(solid, { x: -40, y: 0, z: 0 }, box)).toBe(0)
   })
 })
 

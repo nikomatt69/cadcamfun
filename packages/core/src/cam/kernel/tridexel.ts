@@ -60,6 +60,39 @@ export const toolSolid = (cutter: Cutter, parts: ReadonlyArray<AssemblyPart> = [
   }
 }
 
+/**
+ * How deep a tool whose axis is +Z through `tip` stands inside an axis-aligned box, mm: exact (the cones of the tool against the box, no
+ * lattice). It is the lesser of the two ways out that the tri-dexel's probe also uses: sideways (how far the widest radius that reaches
+ * the box's height range overlaps the box in plan, counting the axis's own distance to the nearest side when it is inside the footprint)
+ * and along the axis (the length of the tool's height that is inside the box's plan reach). 0 when they do not touch.
+ */
+export const boxPenetration = (tool: ToolSolid, tip: Vec3, box: { readonly min: Vec3; readonly max: Vec3 }): number => {
+  const lo = Math.max(tip.z + tool.bottom, box.min.z) - tip.z, hi = Math.min(tip.z + tool.top, box.max.z) - tip.z
+  if (!(hi > lo)) return 0
+  const dx = Math.max(box.min.x - tip.x, 0, tip.x - box.max.x), dy = Math.max(box.min.y - tip.y, 0, tip.y - box.max.y)
+  const d = Math.hypot(dx, dy)
+  const inside = dx === 0 && dy === 0
+  let rmax = 0, zMin = Infinity, zMax = -Infinity
+  for (let q = 0; q < tool.count; q++) {
+    const a = Math.max(tool.z0[q]!, lo), b = Math.min(tool.z1[q]!, hi)
+    if (!(b > a)) continue
+    const span = tool.z1[q]! - tool.z0[q]!
+    const radius = (z: number): number => tool.r0[q]! + (tool.r1[q]! - tool.r0[q]!) * ((z - tool.z0[q]!) / span)
+    const ra = radius(a), rb = radius(b)
+    rmax = Math.max(rmax, ra, rb)
+    // The part of this cone's height where its radius exceeds the distance to the box: a linear radius, so an interval.
+    if (ra > d || rb > d) {
+      let from = a, to = b
+      if (ra <= d) from = a + (b - a) * ((d - ra) / (rb - ra))
+      else if (rb <= d) to = a + (b - a) * ((d - ra) / (rb - ra))
+      zMin = Math.min(zMin, from); zMax = Math.max(zMax, to)
+    }
+  }
+  if (!(rmax > d) || !(zMax > zMin)) return 0
+  const side = inside ? rmax + Math.min(tip.x - box.min.x, box.max.x - tip.x, tip.y - box.min.y, box.max.y - tip.y) : rmax - d
+  return Math.min(side, zMax - zMin)
+}
+
 // ---------------------------------------------------------------- the stock
 
 interface Grid {
@@ -286,6 +319,33 @@ export class TriDexel {
   /** Mean of the three directions' volumes: the directions err on different faces, so the mean is steadier than any one. */
   volumeMean(): number { return (this.volume(0) + this.volume(1) + this.volume(2)) / 3 }
 
+  /**
+   * Material volume inside the box [min, max] (this stock's frame), mm³, from the Z rays whose centre lies in the box's footprint. The box's
+   * side faces cut the lattice cells: the figure is good to about one cell across the footprint's perimeter times the box's height.
+   */
+  volumeWithin(min: Vec3, max: Vec3): number {
+    const g = this.grids[2]
+    let sum = 0
+    for (let k = 0; k < g.nc; k++) {
+      const y = this.min.y + this.centre(1, k)
+      if (y < min.y || y > max.y) continue
+      const wc = this.width(g.c, k)
+      for (let m = 0; m < g.nb; m++) {
+        const x = this.min.x + this.centre(0, m)
+        if (x < min.x || x > max.x) continue
+        const r = k * g.nb + m
+        const h = g.head[r]!
+        let len = 0
+        for (let i = 0, n = g.count[r]!; i < n; i++) {
+          const lo = Math.max(g.pool[h + 2 * i]!, min.z - this.min.z), hi = Math.min(g.pool[h + 2 * i + 1]!, max.z - this.min.z)
+          if (hi > lo) len += hi - lo
+        }
+        sum += len * this.width(g.b, m) * wc
+      }
+    }
+    return sum
+  }
+
   /** Number of material intervals over all rays of all directions (a measure of how fragmented the stock is). */
   intervals(): number {
     let n = 0
@@ -370,9 +430,9 @@ export class TriDexel {
    * longest overlap of a ray's tool interval with a material interval, and the least of the three is the penetration, mm, with where
    * it was found. Overlaps shorter than the caller's tolerance are noise of the lattice, not contact.
    */
-  probe(tool: ToolSolid, tip: Vec3, axis: Vec3 = { x: 0, y: 0, z: 1 }): { readonly overlap: number; readonly at?: Vec3 } {
+  probe(tool: ToolSolid, tip: Vec3, axis: Vec3 = { x: 0, y: 0, z: 1 }, skip?: ReadonlyArray<{ readonly min: Vec3; readonly max: Vec3 }>): { readonly overlap: number; readonly at?: Vec3 } {
     const d = unit(axis)
-    const out: ProbeResult = { overlap: 0, x: 0, y: 0, z: 0, best: [0, 0, 0], px: [0, 0, 0], py: [0, 0, 0], pz: [0, 0, 0] }
+    const out: ProbeResult = { overlap: 0, x: 0, y: 0, z: 0, best: [0, 0, 0], px: [0, 0, 0], py: [0, 0, 0], pz: [0, 0, 0], ...(skip !== undefined && skip.length > 0 ? { skip } : {}) }
     sweepPose(this, tool, tip.x, tip.y, tip.z, d.x, d.y, d.z, 1, out)
     // The penetration is the least of the three directions' longest overlaps: a chord across a shank sunk into a wall is as long as
     // the shank is wide, the overlap along its axis is how deep it sank, and only the smallest of them is the depth.
@@ -395,7 +455,13 @@ const unit = (v: Vec3 | undefined): Vec3 => {
   return l < 1e-12 ? { x: 0, y: 0, z: 1 } : { x: v.x / l, y: v.y / l, z: v.z / l }
 }
 
-interface ProbeResult { overlap: number; x: number; y: number; z: number; best: [number, number, number]; px: [number, number, number]; py: [number, number, number]; pz: [number, number, number] }
+interface ProbeResult {
+  overlap: number; x: number; y: number; z: number; best: [number, number, number]; px: [number, number, number]; py: [number, number, number]; pz: [number, number, number]
+  /** Boxes (absolute) whose material the probe does not count: the part's own blank when it looks for what else the tool touches. */
+  skip?: ReadonlyArray<{ readonly min: Vec3; readonly max: Vec3 }>
+}
+const AXES = ["x", "y", "z"] as const
+const pieceLo = new Float64Array(16), pieceHi = new Float64Array(16)
 
 // Scratch for the intervals one tool makes on one ray (at most two per cone).
 const SCRATCH = 64
@@ -507,13 +573,37 @@ const sweepPose = (s: TriDexel, tool: ToolSolid, px: number, py: number, pz: num
         if (mode === 1) {
           // Longest overlap of the tool's intervals with the ray's material.
           let best = 0, bt = 0
-          for (let a = 0; a < merged; a++) {
-            const lo = loBuf[a]!, hi = hiBuf[a]!
-            for (let q = 0; q < cnt; q++) {
-              const ml = g.pool[h + 2 * q]!, mh = g.pool[h + 2 * q + 1]!
-              if (mh <= lo || ml >= hi) continue
-              const o = Math.min(hi, mh) - Math.max(lo, ml)
-              if (o > best) { best = o; bt = (Math.max(lo, ml) + Math.min(hi, mh)) / 2 }
+          // The ray's material minus the boxes to skip (only those the ray passes through): the pieces left are what the tool may touch.
+          const skipped: number[] = []
+          if (probe!.skip !== undefined) {
+            const ab = s.min[AXES[b]]! + vb, ac = s.min[AXES[c]]! + vc
+            for (const box of probe!.skip) {
+              if (ab > box.min[AXES[b]] && ab < box.max[AXES[b]] && ac > box.min[AXES[c]] && ac < box.max[AXES[c]]) skipped.push(box.min[AXES[axis]] - s.min[AXES[axis]], box.max[AXES[axis]] - s.min[AXES[axis]])
+            }
+          }
+          for (let q = 0; q < cnt; q++) {
+            let pieces = 1
+            pieceLo[0] = g.pool[h + 2 * q]!; pieceHi[0] = g.pool[h + 2 * q + 1]!
+            for (let k = 0; k < skipped.length && pieces < 7; k += 2) {
+              const sl = skipped[k]!, sh = skipped[k + 1]!
+              const n = pieces
+              pieces = 0
+              for (let i = 0; i < n; i++) {
+                const pl = pieceLo[i]!, ph = pieceHi[i]!
+                if (sh <= pl || sl >= ph) { pieceLo[8 + pieces] = pl; pieceHi[8 + pieces] = ph; pieces++; continue }
+                if (sl > pl) { pieceLo[8 + pieces] = pl; pieceHi[8 + pieces] = sl; pieces++ }
+                if (sh < ph) { pieceLo[8 + pieces] = sh; pieceHi[8 + pieces] = ph; pieces++ }
+              }
+              for (let i = 0; i < pieces; i++) { pieceLo[i] = pieceLo[8 + i]!; pieceHi[i] = pieceHi[8 + i]! }
+            }
+            for (let i = 0; i < pieces; i++) {
+              const ml = pieceLo[i]!, mh = pieceHi[i]!
+              for (let a = 0; a < merged; a++) {
+                const lo = loBuf[a]!, hi = hiBuf[a]!
+                if (mh <= lo || ml >= hi) continue
+                const o = Math.min(hi, mh) - Math.max(lo, ml)
+                if (o > best) { best = o; bt = (Math.max(lo, ml) + Math.min(hi, mh)) / 2 }
+              }
             }
           }
           if (best > probe!.best[axis]!) {
