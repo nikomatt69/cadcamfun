@@ -195,3 +195,106 @@ test("the HTTP generate routes of a setup replay each program per work offset wh
   const stateless = await app.call("/api/cam/setups/generate", { method: "POST", json: { setup: fixture, elements: { plate }, evidence: true } })
   expect(stateless.body.programs[0].evidence.registers).toHaveLength(2)
 })
+
+const cycleTemplate = (rough: ReturnType<typeof tool>, finish: ReturnType<typeof tool>) => ({
+  id: "pocket-cycle", name: "Pocket",
+  steps: [
+    { id: "rough", name: "Rough", tool: rough, params: { ...cam.generator.DEFAULT_SETTINGS, depth: 4, stepdown: 2, toolDiameter: rough.diameter, operationType: "pocket" } },
+    { id: "finish", name: "Finish", tool: finish, dependsOn: ["rough"], params: { ...cam.generator.DEFAULT_SETTINGS, depth: 4, stepdown: 4, toolDiameter: finish.diameter, operationType: "contour" } }
+  ]
+})
+
+test("a setup of operation templates is planned, saved, listed and generated as its expansion, and the plan says how many operations it has", async () => {
+  const id = (await app.call("/api/projects", { method: "POST", json: { name: "Templates" } })).body.id as string
+  const tools = buildTools(handlers, id)
+  const call = async (name: string, input: unknown) => JSON.parse(await tools.find((t) => t.id === name)!.execute(input, ctx))
+  const added = await call("cad_edit", { action: "add", elements: [{ type: "rectangle", x: 0, y: 0, width: 40, height: 30, depth: 5, name: "Plate" }, { type: "rectangle", x: 60, y: 0, width: 30, height: 30, depth: 5, name: "Second" }] })
+  const [plate, second] = added.ids as string[]
+  const fixture = setup([], {
+    templates: [cycleTemplate(tool("t6", 6), tool("t3", 3))],
+    uses: [{ id: "pk", templateId: "pocket-cycle", elementIds: [plate, second], perElement: true }],
+    stock: { x: 120, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" }
+  })
+  const plan = await call("cam", { action: "setup_plan", setup: fixture })
+  expect(plan).toMatchObject({ ok: true, valid: true, operations: 4, plan: { toolChanges: 1 } })
+  expect(plan.plan.programs[0].operations).toEqual(["pk[1]:rough", "pk[2]:rough", "pk[1]:finish", "pk[2]:finish"])
+  const bad = await call("cam", { action: "setup_plan", setup: setup([], { ...fixture, uses: [{ id: "pk", templateId: "nope", elementIds: [plate!] }] }) })
+  expect(bad.valid).toBe(false)
+  expect(bad.issues[0].message).toMatch(/template nope/)
+
+  const saved = await call("cam_edit", { action: "setup_save", name: "Two pockets", setup: fixture })
+  expect(saved.ok).toBe(true)
+  // The saved setup keeps the templates and the uses as written; the list counts the operations they make.
+  const http = await app.call(`/api/projects/${id}/cam-setups/${saved.setupId}`)
+  expect(http.body.setup.uses).toHaveLength(1)
+  expect(http.body.setup.operations).toEqual([])
+  expect((await call("cam", { action: "setup_list" })).setups.find((s: { id: string }) => s.id === saved.setupId)).toMatchObject({ operations: 4 })
+
+  const generated = await call("cam_edit", { action: "setup_generate", setupId: saved.setupId })
+  expect(generated).toMatchObject({ ok: true, totals: { programs: 1, toolChanges: 1 } })
+  expect(generated.programs[0]).toMatchObject({ operations: 4, toolNumbers: [1, 2] })
+  const row = (await app.call(`/api/toolpaths/${generated.programs[0].operationId}`)).body
+  expect(String(row.gcode).match(/T\d+\s*M6/g)).toHaveLength(2)
+
+  // The plan over HTTP and the HTTP generate route expand the same way.
+  const httpPlan = await app.call("/api/cam/setups/plan", { method: "POST", json: { setup: fixture } })
+  expect(httpPlan.body.programs[0].operations).toHaveLength(4)
+  const elements = Object.fromEntries((added.elements as Array<{ id: string }>).map((e) => [e.id, e]))
+  const stateless = await app.call("/api/cam/setups/generate", { method: "POST", json: { setup: fixture, elements } })
+  expect(stateless.status).toBe(200)
+  expect(stateless.body.programs[0].operationIds).toHaveLength(4)
+  const missing = await app.call("/api/cam/setups/generate", { method: "POST", json: { setup: fixture, elements: { [plate!]: elements[plate!] } } })
+  expect(missing.status).toBe(400)
+  expect(missing.body.message).toMatch(/no element for/)
+})
+
+test("probePart stores the datum probe of every workpiece as the first program, and a setup that cannot be probed says why", async () => {
+  const id = (await app.call("/api/projects", { method: "POST", json: { name: "Probe parts" } })).body.id as string
+  const tools = buildTools(handlers, id)
+  const call = async (name: string, input: unknown) => JSON.parse(await tools.find((t) => t.id === name)!.execute(input, ctx))
+  const added = await call("cad_edit", { action: "add", elements: [{ type: "rectangle", x: 0, y: 0, width: 40, height: 30, depth: 5, name: "Plate" }] })
+  const [plate] = added.ids as string[]
+  const parts = [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55" }]
+  const partProbe = { cycles: [{ kind: "z-surface", at: { x: 5, y: 5 }, expectedZ: 0 }, { kind: "corner", corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5 }] }
+  const base = setup([{ ...op("a", tool("t6", 6)), elementIds: [plate!] }], { workpieces: parts, stock: { x: 60, y: 50, z: 10, origin: { x: -30, y: -25, z: 0 }, material: "aluminum" } })
+
+  // The plan names what the probe would do on each part before anything is generated.
+  const plan = await call("cam", { action: "setup_plan", setup: { ...base, partProbe } })
+  expect(plan.probe.toolNumber).toBe(2)
+  expect(plan.probe.parts.map((q: { register: string; touches: number }) => [q.register, q.touches])).toEqual([["G54", 5], ["G55", 5]])
+  expect((await call("cam", { action: "setup_plan", setup: base })).probe).toBeUndefined()
+
+  const saved = await call("cam_edit", { action: "setup_save", name: "Probed", setup: { ...base, partProbe } })
+  const generated = await call("cam_edit", { action: "setup_generate", setupId: saved.setupId, probePart: true })
+  expect(generated.ok).toBe(true)
+  expect(generated.programs).toHaveLength(2)
+  expect(generated.programs[0]).toMatchObject({ kind: "probe", toolNumbers: [2] })
+  expect(generated.programs[1].kind).toBeUndefined()
+  expect(generated.programs[0].programNumber).not.toBe(generated.programs[1].programNumber)
+  expect(generated.probe.parts).toHaveLength(2)
+  const row = (await app.call(`/api/toolpaths/${generated.programs[0].operationId}`)).body
+  const lines = String(row.gcode).split("\n").map((l: string) => l.trim())
+  expect(lines.filter((l) => /^#5223=#5223\+/.test(l))).toHaveLength(1)
+  expect(lines.filter((l) => /^#5243=#5243\+/.test(l))).toHaveLength(1)
+  expect(row.data.probe.parts).toHaveLength(2)
+  // Without the flag nothing about the probe is stored.
+  const plain = await call("cam_edit", { action: "setup_generate", setupId: saved.setupId })
+  expect(plain.programs).toHaveLength(1)
+  expect(plain.probe).toBeUndefined()
+
+  // A setup with no part probe cannot be asked for one.
+  const unprobed = await call("cam_edit", { action: "setup_save", name: "Plain", setup: base })
+  const refused = await call("cam_edit", { action: "setup_generate", setupId: unprobed.setupId, probePart: true })
+  expect(refused.ok).toBe(false)
+  expect(refused.error).toMatch(/no partProbe/)
+
+  // The HTTP routes take the same flag: the probe comes first, marked, and a setup without one is a 400.
+  const element = (added.elements as Array<Record<string, unknown>>)[0]!
+  const url = `/api/projects/${id}/cam-setups/${saved.setupId}/generate`
+  const viaHttp = await app.call(url, { method: "POST", json: { elements: { [plate!]: element }, probePart: true } })
+  expect(viaHttp.status).toBe(200)
+  expect(viaHttp.body.programs.map((q: { kind?: string }) => q.kind)).toEqual(["probe", undefined])
+  const denied = await app.call("/api/cam/setups/generate", { method: "POST", json: { setup: base, elements: { [plate!]: element }, probePart: true } })
+  expect(denied.status).toBe(400)
+  expect(denied.body.message).toMatch(/no partProbe/)
+})

@@ -237,9 +237,15 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
     // Pure planning over the setup in the request (spec 14): the same core functions the sidecar's `camSetup` group answers with.
     id: "cam.setup_plan", kind: "read", parameters: CAM_ACTION_INPUTS["cam.setup_plan"],
-    run: ({ setup }) => {
-      const issues = cam.program.validateSetup(setup)
-      return { ok: true, mutated: false, valid: issues.length === 0, plan: cam.program.planPrograms(setup), issues }
+    run: ({ setup: given }) => {
+      // Template uses become operations first: the plan, the issues and the probe are those of the setup the generator would run.
+      const { setup } = cam.program.expandSetup(given)
+      const issues = cam.program.validateSetup(given)
+      const probe = setup.partProbe === undefined ? undefined : JSON.parse(JSON.stringify(cam.program.planPartProbe(setup))) as Record<string, unknown>
+      return {
+        ok: true, mutated: false, valid: issues.length === 0, plan: cam.program.planPrograms(setup), issues,
+        ...(given.uses !== undefined && given.uses.length > 0 ? { operations: setup.operations.length } : {}), ...(probe !== undefined ? { probe } : {})
+      }
     }
   }),
   defineWireAction({

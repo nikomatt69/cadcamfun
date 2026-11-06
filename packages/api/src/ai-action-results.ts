@@ -227,7 +227,13 @@ const manufactured = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.L
 const jobResult = CamJobResult
 const chainStatus = Schema.Struct({ ok: Schema.Literal(true), operationId: str, restFrom: nullable(str), generated: Schema.Boolean, warnings: strings })
 /** A setup plan is a verdict: `valid` is false when the issues list is not empty, and that is an answer, not a refusal. */
-const setupPlan = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), valid: Schema.Boolean, plan: CamSetupPlan, issues: Schema.Array(CamSetupIssue) })
+const setupPlan = Schema.Struct({
+  ok: Schema.Literal(true), mutated: Schema.Literal(false), valid: Schema.Boolean, plan: CamSetupPlan, issues: Schema.Array(CamSetupIssue),
+  /** Template uses expanded into operations: how many operations the setup has once they are. */
+  operations: Schema.optionalKey(int),
+  /** The part probe the setup would run: the tool number, the register, touches and offset axes of each workpiece, or why it cannot (`refused`). */
+  probe: Schema.optionalKey(record)
+})
 const setupList = Schema.Struct({
   ok: Schema.Literal(true), projectId: str,
   setups: Schema.Array(Schema.Struct({ id: str, name: str, updatedAt: str, operations: int, workpieces: int, grouping: str, machineType: str }))
@@ -241,11 +247,15 @@ const setupGenerated = Schema.Struct({
   programs: Schema.Array(Schema.Struct({
     operationId: str, name: str, programNumber: int, toolNumbers: Schema.Array(int), operations: int, toolpaths: int, lines: int,
     /** What the replay of the stored text found, per workpiece register; the release level it adds up to (`blocked` on a gouge, a rapid through material or a travel violation). */
-    release: Schema.optionalKey(str), evidence: Schema.optionalKey(record)
+    release: Schema.optionalKey(str), evidence: Schema.optionalKey(record),
+    /** `probe`: the datum probe of the parts (`probePart`): no cutting tool, no replay, to be run before the cuts. */
+    kind: Schema.optionalKey(Schema.Literal("probe"))
   })),
   totals: Schema.Struct({ programs: int, toolLoads: int, toolChanges: int, cutLength: num, rapidLength: num, estimatedSeconds: num }),
   /** Cutting minutes per tool against its life, with the sister tools that took over. */
   toolLife: Schema.optionalKey(Schema.Array(record)),
+  /** With `probePart`: the part probe stored as the first program (its tool number, and per workpiece the register, touches and offset axes). */
+  probe: Schema.optionalKey(record),
   warnings: strings
 })
 const setupSaved = Schema.Struct({ ok: Schema.Literal(true), projectId: str, setupId: str, name: str, updatedAt: str, created: Schema.Boolean })

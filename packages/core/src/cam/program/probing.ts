@@ -337,3 +337,9 @@ export const partProbeProgram = (setup: Setup, programNumber: number): { readonl
 
 /** The plan of the part probe without text: refused, or the register, touches and axes of each part. */
 export const planPartProbe = (setup: Setup): PartProbePlan => partProbeProgram(setup, setup.post.programNumberBase).plan
+
+/** The probe program that goes with a generated setup, numbered after its programs: the program, or why there is none. Run it first. */
+export const partProbeFor = (setup: Setup, generated: { readonly programs: ReadonlyArray<GeneratedProgram> }): { readonly program?: GeneratedProgram; readonly plan: PartProbePlan; readonly refused?: string } => {
+  const made = partProbeProgram(setup, setup.post.programNumberBase + generated.programs.length)
+  return made.generated === undefined ? { plan: made.plan, refused: made.plan.refused ?? "The part probe made no program" } : { plan: made.plan, program: made.generated }
+}

@@ -161,7 +161,11 @@ export const CamSetupSaveInput = Schema.Struct({
   baseUpdatedAt: Schema.optionalKey(revision)
 })
 /** Generates a saved setup's programs from the open drawing's elements and stores each as a program of the project. */
-export const CamSetupGenerateInput = Schema.Struct({ setupId: id, expectedRevision: Schema.optionalKey(revision) })
+export const CamSetupGenerateInput = Schema.Struct({
+  setupId: id, expectedRevision: Schema.optionalKey(revision),
+  /** Also store the setup's part probe (its `partProbe` cycles on every workpiece register) as the first program: run it before the cuts. */
+  probePart: Schema.optionalKey(Schema.Boolean)
+})
 export const CamStockSetInput = Schema.Struct({
   stock: Schema.Struct({
     ...cam.generator.StockSchema.fields,

@@ -13,14 +13,19 @@ const p = cam.program
  * What `generate` answers: the programs, each with its replay when the caller asked for evidence. The replay runs the same plan as the
  * assistant's `setup_generate` (a kernel job per work offset); nothing is stored here, the caller stores the program with its evidence.
  */
-const withEvidence = (setup: cam.program.Setup, elements: Record<string, Record<string, unknown>>, stock: cam.generator.Stock | undefined, evidence: boolean | undefined) =>
+const withEvidence = (given: cam.program.Setup, elements: Record<string, Record<string, unknown>>, stock: cam.generator.Stock | undefined, evidence: boolean | undefined, probePart: boolean | undefined) =>
   Effect.gen(function*() {
+    // Template uses are operations by the time the generator sees the setup.
+    const setup = p.expandSetup(given).setup
     const geometryOf = (op: cam.program.Operation) => p.geometryFor(op, elements, stock)
     const generated = yield* guarded("Failed to generate the setup", () => p.generateSetup(setup, geometryOf))
-    if (evidence !== true) return generated
-    const programs = yield* Effect.forEach(generated.programs, (program) =>
-      replaySetupEffect(setup, program, geometryOf, stock).pipe(Effect.map((replayed) => ({ ...program, evidence: JSON.parse(JSON.stringify(replayed)) as Record<string, never> }))))
-    return { ...generated, programs }
+    const replayed = evidence !== true ? generated.programs : yield* Effect.forEach(generated.programs, (program) =>
+      replaySetupEffect(setup, program, geometryOf, stock).pipe(Effect.map((result) => ({ ...program, evidence: JSON.parse(JSON.stringify(result)) as Record<string, never> }))))
+    if (probePart !== true) return { ...generated, programs: replayed }
+    // The datum probe of the parts goes first: it is run before the cuts, and has no cutting tool to replay.
+    const probe = p.partProbeFor(setup, generated)
+    if (probe.program === undefined) return yield* new BadRequest({ message: `probePart: ${probe.refused}` })
+    return { ...generated, programs: [{ ...probe.program, kind: "probe" as const }, ...replayed] }
   })
 
 /** Run a pure core function; a throw is a server fault (the request already passed its Schema). */
@@ -65,16 +70,16 @@ export const CamSetupHandlers = HttpApiBuilder.group(Api, "camSetup", Effect.fn(
   })
   return handlers
     .handle("plan", Effect.fn("http.camSetup.plan")(function*({ payload }) {
-      return yield* guarded("Failed to plan the setup", () => p.planPrograms(payload.setup))
+      return yield* guarded("Failed to plan the setup", () => p.planPrograms(p.expandSetup(payload.setup).setup))
     }))
     .handle("validate", Effect.fn("http.camSetup.validate")(function*({ payload }) {
       return yield* guarded("Failed to validate the setup", () => ({ issues: p.validateSetup(payload.setup) }))
     }))
     .handle("generate", Effect.fn("http.camSetup.generate")(function*({ payload }) {
       // An operation naming an element the request did not carry is the caller's mistake: say which, do not guess.
-      const missing = payload.setup.operations.filter((op) => op.enabled).flatMap((op) => op.elementIds.filter((id) => payload.elements[id] === undefined).map((id) => `${op.name}: ${id}`))
+      const missing = p.expandSetup(payload.setup).setup.operations.filter((op) => op.enabled).flatMap((op) => op.elementIds.filter((id) => payload.elements[id] === undefined).map((id) => `${op.name}: ${id}`))
       if (missing.length > 0) return yield* new BadRequest({ message: `The request carries no element for ${missing.join(", ")}` })
-      return yield* withEvidence(payload.setup, payload.elements, payload.stock, payload.evidence)
+      return yield* withEvidence(payload.setup, payload.elements, payload.stock, payload.evidence, payload.probePart)
     }))
     .handle("probePlan", Effect.fn("http.camSetup.probePlan")(function*({ payload }) {
       const legacy = yield* probing("Failed to plan the probing", payload.settings, () => ({ plan: p.planProbe(payload.operation, payload.settings), kernel: p.kernelProbe(payload.operation, payload.settings) }))
@@ -122,15 +127,15 @@ export const CamSetupHandlers = HttpApiBuilder.group(Api, "camSetup", Effect.fn(
       yield* projectAccess(params.id)
       const found = yield* setups.get(params.id, params.setupId)
       if (!found) return yield* new NotFound({ message: "Setup not found" })
-      return yield* guarded("Failed to plan the setup", () => p.planPrograms(found.setup))
+      return yield* guarded("Failed to plan the setup", () => p.planPrograms(p.expandSetup(found.setup).setup))
     }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch the setup"))))
     .handle("generateSaved", ({ params, payload }) => Effect.gen(function*() {
       yield* projectAccess(params.id)
       const found = yield* setups.get(params.id, params.setupId)
       if (!found) return yield* new NotFound({ message: "Setup not found" })
-      const missing = found.setup.operations.filter((op) => op.enabled).flatMap((op) => op.elementIds.filter((id) => payload.elements[id] === undefined).map((id) => `${op.name}: ${id}`))
+      const missing = p.expandSetup(found.setup).setup.operations.filter((op) => op.enabled).flatMap((op) => op.elementIds.filter((id) => payload.elements[id] === undefined).map((id) => `${op.name}: ${id}`))
       if (missing.length > 0) return yield* new BadRequest({ message: `The request carries no element for ${missing.join(", ")}` })
-      return yield* withEvidence(found.setup, payload.elements, payload.stock, payload.evidence)
+      return yield* withEvidence(found.setup, payload.elements, payload.stock, payload.evidence, payload.probePart)
     }).pipe(Effect.catchTag("DatabaseError", fail("Failed to fetch the setup"))))
     .handle("remove", ({ params }) => Effect.gen(function*() {
       yield* projectAccess(params.id)

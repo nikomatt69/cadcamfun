@@ -106,7 +106,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
     // +100: cam_edit setup_generate (the programs of a saved setup).
     // +100: cam / cam_edit manufacture setups, carryStock and the per-setup result.
     // +100: cam_edit setup_generate replays each work offset (release and evidence per program).
-    expect(total).toBeLessThan(36_750)
+    // +250: setup templates / uses and partProbe in the setup schema, cam_edit setup_generate probePart.
+    expect(total).toBeLessThan(37_000)
     const modelling = CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!
     for (const type of ELEMENT_TYPES) expect(`${modelling.body}\n${CADCAM_SKILLS.map((s) => s.body).join("\n")}`).toContain(`${type}:`)
   })

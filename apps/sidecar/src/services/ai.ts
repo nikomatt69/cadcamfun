@@ -690,7 +690,7 @@ const toolHandlers = Effect.gen(function*() {
     setupList: async (projectId) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const saved = await run(camSetups.list(projectId))
-      return { ok: true, projectId, setups: saved.map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, operations: doc.setup.operations.length, workpieces: doc.setup.workpieces?.length ?? 1, grouping: doc.setup.grouping, machineType: doc.setup.machineType })) }
+      return { ok: true, projectId, setups: saved.map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, operations: cam.program.expandSetup(doc.setup).setup.operations.length, workpieces: doc.setup.workpieces?.length ?? 1, grouping: doc.setup.grouping, machineType: doc.setup.machineType })) }
     },
     setupSave: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
@@ -712,7 +712,10 @@ const toolHandlers = Effect.gen(function*() {
       const loaded = await load(projectId, true)
       const revision = drawingRevision(loaded)
       if (input.expectedRevision !== undefined && input.expectedRevision !== revision) return { ok: false, status: "stale", revision, error: "The drawing or stock changed. Inspect the part before generating the setup." }
-      const setup = found.setup
+      // Template uses are operations by the time the setup is checked and generated.
+      const expansion = cam.program.expandSetup(found.setup)
+      const setup = expansion.setup
+      if (expansion.issues.length > 0) return { ok: false, error: `The setup's templates cannot be expanded: ${expansion.issues.map((issue) => issue.message).join("; ")}`, issues: expansion.issues }
       const byId: Record<string, Record<string, unknown>> = Object.fromEntries(loaded.elements.map((element) => [element.id, element]))
       const missing = setup.operations.filter((op) => op.enabled).flatMap((op) => op.elementIds.filter((id) => byId[id] === undefined).map((id) => `${op.name}: ${id}`))
       if (missing.length > 0) return { ok: false, error: `The drawing has no element for ${missing.join(", ")}. Update the setup's elementIds from cad inspect.` }
@@ -721,13 +724,25 @@ const toolHandlers = Effect.gen(function*() {
       if (stock === undefined) return { ok: false, error: "The programs are stored with a stock: set one with cam_edit stock_set or give the setup a stock block." }
       const generated = cam.program.generateSetup(setup, (op) => cam.program.geometryFor(op, byId, configured))
       if (generated.programs.length === 0) return { ok: false, error: "The setup generated no program.", issues: generated.issues, warnings: generated.warnings }
+      // The datum probe of the parts, when asked for: a program of the probe tool, run before the cuts; it has nothing to replay.
+      const probe = input.probePart === true ? cam.program.partProbeFor(setup, generated) : undefined
+      if (probe !== undefined && probe.program === undefined) return { ok: false, error: `probePart: ${probe.refused}` }
       // Each stored text is replayed once per workpiece register against that workpiece's own blank, in the kernel worker: the release level and the findings are stored with it.
       const evidences = new Map<cam.program.GeneratedProgram, cam.program.SetupEvidence>()
       for (const program of generated.programs) evidences.set(program, await replaySetupProgram(setup, program, (op) => cam.program.geometryFor(op, byId, configured), configured))
       // Recheck the drawing after the computation, right before the write, as the manufacture path does.
       const current = await run(drawings.find(acting().id, loaded.id))
       if (!current || drawingRevision({ id: current.id, data: record(current.data), elements: elementsOf(record(current.data)) }) !== revision) return { ok: false, status: "stale", error: "The drawing changed while the setup was generated. Generate again." }
-      const stored: Array<{ operationId: string; name: string; programNumber: number; toolNumbers: ReadonlyArray<number>; operations: number; toolpaths: number; lines: number; release: string; evidence: cam.program.SetupEvidence }> = []
+      const stored: Array<{ operationId: string; name: string; programNumber: number; toolNumbers: ReadonlyArray<number>; operations: number; toolpaths: number; lines: number; release?: string; evidence?: cam.program.SetupEvidence; kind?: "probe" }> = []
+      if (probe?.program !== undefined) {
+        const program = probe.program
+        const document = Schema.encodeSync(CamProgramDocument)(setupProgramDocument({ program, setup, stock }))
+        const row = await run(toolpaths.create(acting().id, {
+          name: program.name, description: `Datum probe of the parts of the saved setup "${found.name}": run it before the cuts`, projectId: loaded.projectId, drawingId: loaded.id,
+          type: "mill", operationType: "setup", gcode: program.gcode, data: { ...document, setupId: found.id, sourceRevision: revision, probe: probe.plan }
+        }))
+        stored.push({ operationId: row.id, name: program.name, programNumber: program.programNumber, toolNumbers: program.toolNumbers, operations: program.operationIds.length, toolpaths: program.program.toolpaths.length, lines: program.gcode.split("\n").length, kind: "probe" })
+      }
       for (const program of generated.programs) {
         const document = Schema.encodeSync(CamProgramDocument)(setupProgramDocument({ program, setup, stock }))
         const evidence = evidences.get(program)!
@@ -738,7 +753,7 @@ const toolHandlers = Effect.gen(function*() {
         stored.push({ operationId: row.id, name: program.name, programNumber: program.programNumber, toolNumbers: program.toolNumbers, operations: program.operationIds.length, toolpaths: program.program.toolpaths.length, lines: program.gcode.split("\n").length, release: evidence.release, evidence })
       }
       await audit(loaded.projectId, "ai.cam.setup_generated", { drawingId: loaded.id, setupId: found.id, programs: stored.map((p) => p.operationId), toolChanges: generated.totals.toolChanges })
-      return { ok: true, projectId: loaded.projectId, setupId: found.id, programs: stored, totals: generated.totals, ...(generated.toolLife.length > 0 ? { toolLife: generated.toolLife } : {}), warnings: generated.warnings }
+      return { ok: true, projectId: loaded.projectId, setupId: found.id, programs: stored, totals: generated.totals, ...(probe !== undefined ? { probe: probe.plan } : {}), ...(generated.toolLife.length > 0 ? { toolLife: generated.toolLife } : {}), warnings: generated.warnings }
     },
     stock: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
