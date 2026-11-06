@@ -23,8 +23,8 @@ import { varKey, type Expr } from "../macro.ts"
 import { planProbeCycle } from "../probing/cycles.ts"
 import { compileActions } from "../probing/actions.ts"
 import { DEFAULT_PROBE_SETTINGS, deviceOfSettings, type ProbeDevice } from "../probing/device.ts"
-import { runProbeMoves, tablePose, type SimKinematics } from "../probing/simulate.ts"
-import { boxWorld, cylinderWorld, meshWorld, plateWorld, pocketWorld, type Placement, type ProbeWorld3 } from "../probing/world.ts"
+import { frameToWork, runProbeMoves, tablePose, type SimKinematics } from "../probing/simulate.ts"
+import { featureProblem, featureWorld, meshWorld, type Placement, type PlateFeatures, type ProbeWorld3 } from "../probing/world.ts"
 import type { ProbeAction, ProbeCycle as ProbeCycleSpec } from "../probing/types.ts"
 
 export type ProbeCycle = "z-surface" | "edge" | "corner" | "bore" | "boss"
@@ -358,7 +358,8 @@ const buildPartProbe = (setup: Setup): PartProbeBuild | { readonly refused: stri
     const kinds: string[] = []
     let via: "g68" | "offset-r" | "table-c" | undefined
     for (let c = 0; c < config.cycles.length; c++) {
-      const ctx = { probe: device, safeZ, clearance, search, prefix: `w${w + 1}c${c + 1}_` }
+      // A part indexed as a tilted plane is probed in the plane: the deltas it measures are the plane's, and the register (the machine's axes) takes their sum along each axis.
+      const ctx = { probe: device, safeZ, clearance, search, prefix: `w${w + 1}c${c + 1}_`, ...(wp.index !== undefined && wp.indexAs === "plane" ? { frame: indexPlane(wp.index).frame } : {}) }
       const routine = planProbeCycle(config.cycles[c]! as ProbeCycleSpec, ctx)
       if ("refused" in routine) return refuse(`${wp.name}, cycle ${c + 1} (${config.cycles[c]!.kind}): ${routine.refused}`)
       const cycleAxes = (["X", "Y", "Z"] as const).filter((axis) => routine.results[axis.toLowerCase()] !== undefined)
@@ -397,90 +398,120 @@ type Corner3 = { readonly x: number; readonly y: number; readonly z: number }
 
 /**
  * The blank with the features the cycles measure, placed where the blank really is: `undefined` when every cycle works on the plain block,
- * a world when some cycle needs a feature (through bores in the plate, one rectangular pocket cut into its top, or the blank's outline
- * itself for a boss, an outside rectangle or a web), a reason when the combination is not modelled. A pocket is cut as deep as the cycle
- * touches plus a margin, a slot or web runs the whole blank across its width, an inside corner is a pocket 40 mm into the part.
+ * a world when some cycle needs a feature, a reason when the combination cannot be built. Through bores go through the plate; a pocket
+ * (a slot, an inside rectangle, an inside corner) is cut as deep as the cycle touches plus a margin, at any angle, and may run out through
+ * the plate's edge; a boss, a web or an outside rectangle that is not the blank itself is the outline of the body (a round boss, a strip
+ * across the plate at its angle (its walls stand across the direction the cycle measures along), a rectangle) and the other features are cut into the outline their centre is in. Any number of each;
+ * what overlaps is refused with the reason.
  */
 const featuredBlank = (cycles: ReadonlyArray<PartProbeCycleLike>, lo: Corner3, hi: Corner3, placement: Placement): ProbeWorld3 | string | undefined => {
-  const bores: { centre: { x: number; y: number }; radius: number }[] = []
-  const pockets: { min: { x: number; y: number }; max: { x: number; y: number }; depth: number }[] = []
-  const shapes: ProbeWorld3[] = []
   const thick = hi.z - lo.z
-  // An outline that is the blank's own (a web or an outside rectangle as wide as the part) is measured on the plain block.
-  const isBlank = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
-    Math.abs(a.x - lo.x) < 1e-6 && Math.abs(a.y - lo.y) < 1e-6 && Math.abs(b.x - hi.x) < 1e-6 && Math.abs(b.y - hi.y) < 1e-6
-  const rightAngle = (angle: number): "x" | "y" | undefined => {
-    const k = ((angle % Math.PI) + Math.PI) % Math.PI
-    return Math.abs(k) < 1e-6 || Math.abs(k - Math.PI) < 1e-6 ? "x" : Math.abs(k - Math.PI / 2) < 1e-6 ? "y" : undefined
+  const blank: ReadonlyArray<{ x: number; y: number }> = [{ x: lo.x, y: lo.y }, { x: hi.x, y: lo.y }, { x: hi.x, y: hi.y }, { x: lo.x, y: hi.y }]
+  const half = 2 * Math.hypot(hi.x - lo.x, hi.y - lo.y) + 100
+  const rect = (centre: { x: number; y: number }, hx: number, hy: number, angle: number): ReadonlyArray<{ x: number; y: number }> => {
+    const c = Math.cos(angle), s = Math.sin(angle)
+    return [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]].map(([x, y]) => ({ x: centre.x + c * x! - s * y!, y: centre.y + s * x! + c * y! }))
   }
+  const bores: PlateFeatures["bores"][number][] = []
+  const pockets: { polygon: ReadonlyArray<{ x: number; y: number }>; depth: number }[] = []
+  const islands: PlateFeatures["islands"][number][] = []
+  const deep = (d: number): number => Math.min(thick - 0.5, d + 6)
+  const same = (poly: ReadonlyArray<{ x: number; y: number }>): boolean => poly.length === 4 && poly.every((p) => blank.some((q) => Math.abs(p.x - q.x) < 1e-6 && Math.abs(p.y - q.y) < 1e-6))
   for (const c of cycles) {
     switch (c.kind) {
       case "bore": bores.push({ centre: c.centre, radius: c.diameter / 2 }); break
-      case "boss": shapes.push(cylinderWorld({ centre: c.centre, radius: c.diameter / 2, z0: lo.z, z1: hi.z, inside: false }, placement)); break
+      case "boss": islands.push({ circle: { centre: c.centre, radius: c.diameter / 2 } }); break
       case "rectangle": {
-        const a = { x: c.centre.x - c.size.x / 2, y: c.centre.y - c.size.y / 2 }, b = { x: c.centre.x + c.size.x / 2, y: c.centre.y + c.size.y / 2 }
-        if (c.inside) pockets.push({ min: a, max: b, depth: Math.min(thick - 0.5, c.depth + 6) })
-        else if (!isBlank(a, b)) shapes.push(boxWorld({ x: a.x, y: a.y, z: lo.z }, { x: b.x, y: b.y, z: hi.z }, placement))
+        const poly = rect(c.centre, c.size.x / 2, c.size.y / 2, 0)
+        if (c.inside) pockets.push({ polygon: poly, depth: deep(c.depth) })
+        else if (!same(poly)) islands.push({ polygon: poly })
         break
       }
       case "web": case "pocket": {
-        const across = rightAngle(c.angle)
-        if (across === undefined) return `a ${c.kind} at ${(c.angle * 180 / Math.PI).toFixed(1)} degrees: the replay models a ${c.kind} across X or across Y (probed on the real part, not replayed)`
-        const half = c.width / 2
-        const min = across === "x" ? { x: c.centre.x - half, y: lo.y } : { x: lo.x, y: c.centre.y - half }
-        const max = across === "x" ? { x: c.centre.x + half, y: hi.y } : { x: hi.x, y: c.centre.y + half }
-        if (c.kind === "pocket") pockets.push({ min, max, depth: Math.min(thick - 0.5, c.depth + 6) })
-        else if (!isBlank(min, max)) shapes.push(boxWorld({ x: min.x, y: min.y, z: lo.z }, { x: max.x, y: max.y, z: hi.z }, placement))
+        // The cycle's angle is the direction it measures along: the walls stand across it, the strip runs along the other way.
+        const strip = rect(c.centre, c.width / 2, half, c.angle)
+        if (c.kind === "pocket") pockets.push({ polygon: strip, depth: deep(c.depth) })
+        else {
+          const body = clipConvex(strip, blank)
+          if (body.length >= 3 && !same(body)) islands.push({ polygon: body })
+        }
         break
       }
       case "corner": if (c.inside) {
         const L = 40
         const xs = [c.corner.x, c.corner.x - c.xSense * L].sort((p, q) => p - q), ys = [c.corner.y, c.corner.y - c.ySense * L].sort((p, q) => p - q)
-        pockets.push({ min: { x: xs[0]!, y: ys[0]! }, max: { x: xs[1]!, y: ys[1]! }, depth: Math.min(thick - 0.5, c.depth + 6) })
+        pockets.push({ polygon: rect({ x: (xs[0]! + xs[1]!) / 2, y: (ys[0]! + ys[1]!) / 2 }, (xs[1]! - xs[0]!) / 2, (ys[1]! - ys[0]!) / 2, 0), depth: deep(c.depth) })
       } break
       default: break
     }
   }
-  if (bores.length === 0 && pockets.length === 0 && shapes.length === 0) return undefined
-  const kinds = [bores.length > 0, pockets.length > 0, shapes.length > 0].filter(Boolean).length
-  if (kinds > 1) return "bores, pockets and outlines in one probe: the replay models one kind of feature at a time (probed on the real part, not replayed)"
-  if (pockets.length > 1) return "more than one pocket in one probe: the replay cuts one pocket into the blank (probed on the real part, not replayed)"
-  if (shapes.length > 1) return "more than one boss, web or outside rectangle in one probe: the replay models one outline (probed on the real part, not replayed)"
-  if (bores.length > 0) return plateWorld({ min: lo, max: hi, bores }, placement)
-  if (pockets.length === 1) return pocketWorld(lo, hi, pockets[0]!, placement)
-  return shapes[0]
+  if (bores.length === 0 && pockets.length === 0 && islands.length === 0) return undefined
+  const features: PlateFeatures = { lo: lo.z, hi: hi.z, islands: islands.length > 0 ? islands : [{ polygon: blank }], bores, pockets }
+  const problem = featureProblem(features)
+  if (problem !== undefined) return `${problem} (probed on the real part, not replayed)`
+  return featureWorld(features, placement)
+}
+
+/** The part of a convex polygon inside another (both counter-clockwise). */
+const clipConvex = (subject: ReadonlyArray<{ x: number; y: number }>, clip: ReadonlyArray<{ x: number; y: number }>): ReadonlyArray<{ x: number; y: number }> => {
+  let out = [...subject]
+  for (let i = 0; i < clip.length && out.length > 0; i++) {
+    const a = clip[i]!, b = clip[(i + 1) % clip.length]!
+    const input = out
+    out = []
+    const side = (p: { x: number; y: number }): number => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
+    for (let j = 0; j < input.length; j++) {
+      const p = input[j]!, q = input[(j + 1) % input.length]!
+      const sp = side(p), sq = side(q)
+      if (sp >= 0) out.push(p)
+      if ((sp >= 0) !== (sq >= 0)) { const t = sp / (sp - sq); out.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t }) }
+    }
+  }
+  return out
 }
 
 /** The replay of one part's probe moves against a blank that sits `d` away from nominal. */
 const replayPart = (setup: Setup, built: PartProbeBuild, part: PartProbeBuild["parts"][number], d: { readonly x: number; readonly y: number; readonly z: number; readonly rotation: number }, tolerance: number): PartProbeReplay => {
   const unreplayed = (reason: string): PartProbeReplay => ({ status: "unreplayed", reason })
-  if (part.wp.index !== undefined && part.wp.indexAs === "plane") return unreplayed("a part probed in a tilted work plane: the replay turns the table to the part's angles, it does not model the control's plane word (probed on the real part, not replayed)")
   if (setup.partProbe!.rotation === "table-c" && part.entry.axes.includes("R")) return unreplayed("a rotation written to the table's C axis turns the part about the table's pivot: the replay does not model that write")
   const block = part.wp.stock ?? setup.stock
   if (block === undefined) return unreplayed("the setup and the workpiece give no blank to replay against")
+  const index = part.wp.index
+  // A part indexed as a tilted plane is probed in the control's plane (the simulator's `frame`); one on a turned table, with the table turned (`kinematics`).
+  const plane = index !== undefined && part.wp.indexAs === "plane"
+  const frame = plane ? indexPlane(index).frame : undefined
+  if (plane && part.via === "offset-r" && Math.abs(d.rotation) > 0) return unreplayed("a rotation written to the register turns the part about the work offset's Z, and the plane is tilted: it does not turn it about the plane's normal (write it with g68, which turns inside the plane)")
   const lo = { x: block.origin.x, y: block.origin.y, z: block.origin.z - block.z }, hi = { x: block.origin.x + block.x, y: block.origin.y + block.y, z: block.origin.z }
   const corners = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ x: i & 1 ? hi.x : lo.x, y: i & 2 ? hi.y : lo.y, z: i & 4 ? hi.z : lo.z }))
   const datum = part.wp.placement ?? { x: 0, y: 0, z: 0 }
   const theta = d.rotation * DEG
   const c = Math.cos(theta), s = Math.sin(theta)
-  // Where a corner of the blank really is in the part's frame (turned about the datum, then moved), and in machine coordinates.
+  // Where a corner of the blank really is in the part's frame (turned about the datum, then moved).
   const real = (p: { x: number; y: number; z: number }) => ({ x: c * p.x - s * p.y + d.x, y: s * p.x + c * p.y + d.y, z: p.z + d.z })
-  const machine = (p: { x: number; y: number; z: number }) => ({ x: datum.x + p.x, y: datum.y + p.y, z: datum.z + p.z })
+  // A point of the part's frame in the register's frame (the work offset's axes: the part's own, or the tilted plane's seen from them), and in machine coordinates.
+  const inWork = (p: { x: number; y: number; z: number }) => (frame === undefined ? p : frameToWork(frame, p))
+  const machine = (p: { x: number; y: number; z: number }) => { const w = inWork(p); return { x: datum.x + w.x, y: datum.y + w.y, z: datum.z + w.z } }
   // The register as it stands: the machine position of the part's zero, for every register of the fixture (the probe works under its own).
   let table: WorkOffsetTable = { entries: {} }
   for (const other of built.parts) table = withOffset(table, other.ref, { ...(other.wp.placement ?? { x: 0, y: 0, z: 0 }) })
-  const index = part.wp.index
-  const kinematics: SimKinematics | undefined = index === undefined ? undefined : { layout: index.a === undefined && index.b !== undefined ? "table-BC" : "table-AC", pivot: { ...datum } }
+  const kinematics: SimKinematics | undefined = index === undefined || plane ? undefined : { layout: index.a === undefined && index.b !== undefined ? "table-BC" : "table-AC", pivot: { ...datum } }
   const pose = { a: (index?.a ?? 0) * DEG, b: (index?.b ?? 0) * DEG, c: (index?.c ?? 0) * DEG }
-  // The blank in the table's own frame: at the pose the program turns the table to, the part's frame is the machine's.
+  // The blank in the world the simulator touches: the table's own frame at the pose the program turns the table to, else the machine's.
   const toWorld = (p: { x: number; y: number; z: number }) => (kinematics === undefined ? machine(real(p)) : tablePose(kinematics, pose, true).toTable(machine(real(p))))
+  const origin = toWorld({ x: 0, y: 0, z: 0 })
+  const axisX = toWorld({ x: 1, y: 0, z: 0 }), axisY = toWorld({ x: 0, y: 1, z: 0 }), axisZ = toWorld({ x: 0, y: 0, z: 1 })
+  // The part's frame in the world, as a rigid placement: the corners of any feature of the part go through it.
+  const placement: Placement = {
+    translate: origin,
+    matrix: [axisX.x - origin.x, axisY.x - origin.x, axisZ.x - origin.x, axisX.y - origin.y, axisY.y - origin.y, axisZ.y - origin.y, axisX.z - origin.z, axisY.z - origin.z, axisZ.z - origin.z]
+  }
   const v = corners.map(toWorld)
   const tri = [0, 2, 1, 1, 2, 3, 4, 5, 6, 5, 7, 6, 0, 1, 4, 1, 5, 4, 2, 6, 3, 3, 6, 7, 0, 4, 2, 2, 4, 6, 1, 3, 5, 3, 7, 5]
-  const featured = featuredBlank(setup.partProbe!.cycles, lo, hi, { translate: { x: datum.x + d.x, y: datum.y + d.y, z: datum.z + d.z }, rotate: theta })
+  // The features are given in the part's frame with the blank where the setup puts it: the displacement is in the placement.
+  const featured = featuredBlank(setup.partProbe!.cycles, lo, hi, placement)
   if (typeof featured === "string") return unreplayed(featured)
-  if (featured !== undefined && index !== undefined) return unreplayed("a part on an indexed face with a feature to probe: the replay places the feature on a flat table only (probed on the real part, not replayed)")
   const world = featured ?? meshWorld([{ positions: v.flatMap((p) => [p.x, p.y, p.z]), indices: tri }])
-  const outcome = runProbeMoves(part.moves, world, { offsets: table, active: part.ref, probe: built.device, ...(kinematics !== undefined ? { kinematics } : {}) })
+  const outcome = runProbeMoves(part.moves, world, { offsets: table, active: part.ref, probe: built.device, ...(kinematics !== undefined ? { kinematics } : {}), ...(frame !== undefined ? { frame } : {}) })
   const entry = outcome.offsets[offsetKey(part.ref)] ?? getOffset(table, part.ref)
   const rotation = outcome.rotation
   const turn = (p: { x: number; y: number; z: number }) => {
@@ -492,8 +523,8 @@ const replayPart = (setup: Setup, built: PartProbeBuild, part: PartProbeBuild["p
   const corrected = { X: entry.x, Y: entry.y, Z: entry.z, R: (entry.rotation ?? 0) / DEG }
   const worst = (believe: (p: { x: number; y: number; z: number }) => { x: number; y: number; z: number }): number =>
     Math.max(...corners.map((p) => { const t = machine(real(p)), b = believe(p); return Math.hypot(b.x - t.x, b.y - t.y, b.z - t.z) }))
-  const before = worst((p) => workToMachine(getOffset(table, part.ref), p))
-  const after = worst((p) => workToMachine(entry, turn(p)))
+  const before = worst((p) => workToMachine(getOffset(table, part.ref), inWork(p)))
+  const after = worst((p) => workToMachine(entry, inWork(turn(p))))
   const base = { displacement: { ...d }, toleranceMm: tolerance, beforeMm: Math.round(before * 1e4) / 1e4 }
   if (outcome.stopped !== undefined) {
     const missed = outcome.alarms.some((a) => a.code === 991)

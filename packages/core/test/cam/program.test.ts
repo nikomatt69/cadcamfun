@@ -843,10 +843,53 @@ describe("the probe program replayed against a blank that is not where the setup
     expect(bore.status, bore.reason).toBe("within")
     expect(bore.corrected!.X).toBeCloseTo(0.8, 3)
     expect(bore.corrected!.Y).toBeCloseTo(-0.6, 3)
-    // The combinations the replay does not model are named, never passed.
-    expect(replayOf({ cycles: [cases[0]![1], cases[1]![1]] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/one kind of feature at a time/) })
-    expect(replayOf({ cycles: [{ kind: "pocket", centre: { x: 30, y: 25 }, width: 14, angle: 0.3, depth: 5 }] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/across X or across Y/) })
-    expect(replayOf({ cycles: [cases[0]![1]] }, { workpieces: [{ id: "w1", name: "Face", workOffset: "G54", index: { a: 90 } }] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/indexed face with a feature/) })
+  })
+
+  test("several features in one probe: a bore and a slot at an angle, two pockets, a boss with a bore in it are all replayed, and the register lands on the blank", () => {
+    const flat = { kind: "z-surface" as const, at: { x: 8, y: 8 }, expectedZ: 0 }
+    const bore = { kind: "bore" as const, centre: { x: 16, y: 16 }, diameter: 14, depth: 5 }
+    // A slot at 0.3 rad across the plate: it measures the displacement across its own direction, the bore the other two.
+    const slot = { kind: "pocket" as const, centre: { x: 40, y: 42 }, width: 14, angle: 0.3, depth: 5 }
+    const mixed = replayOf({ cycles: [flat, bore, slot] })
+    expect(mixed.status, mixed.reason).toBe("within")
+    expect(mixed.corrected!.X).toBeCloseTo(0.8, 3)
+    expect(mixed.corrected!.Y).toBeCloseTo(-0.6, 3)
+    // Two inside rectangles and a bore: three pockets of the same plate.
+    const left = { kind: "rectangle" as const, inside: true, centre: { x: 15, y: 35 }, size: { x: 20, y: 14 }, depth: 5 }
+    const right = { kind: "rectangle" as const, inside: true, centre: { x: 45, y: 35 }, size: { x: 20, y: 14 }, depth: 5 }
+    const pockets = replayOf({ cycles: [flat, bore, left, right] })
+    expect(pockets.status, pockets.reason).toBe("within")
+    expect(pockets.residualMm!).toBeLessThan(0.05)
+    // A boss with a bore in it: the body is the boss, the bore is cut into it, the top is the boss's.
+    const boss = { kind: "boss" as const, centre: { x: 30, y: 25 }, diameter: 30, depth: 5 }
+    const inside = replayOf({ cycles: [{ kind: "z-surface" as const, at: { x: 40, y: 25 }, expectedZ: 0 }, boss, { kind: "bore" as const, centre: { x: 30, y: 25 }, diameter: 14, depth: 5 }] })
+    expect(inside.status, inside.reason).toBe("within")
+    expect(inside.corrected!.X).toBeCloseTo(0.8, 3)
+    // A slot at an angle alone pins the blank across itself only: the replay says the touches do not pin it down.
+    const alone = replayOf({ cycles: [flat, slot] })
+    expect(alone.status).toBe("outside")
+    expect(alone.reason).toMatch(/do not pin the blank down/)
+    expect(alone.residualMm!).toBeGreaterThan(0.5)
+    // What cannot be built is refused with the reason: two pockets on top of each other, two bosses overlapping, a pocket through a round boss.
+    expect(replayOf({ cycles: [left, { ...left, centre: { x: 18, y: 35 } }] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/two pockets overlap/) })
+    expect(replayOf({ cycles: [boss, { ...boss, centre: { x: 36, y: 25 } }] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/two outlines.*overlap/) })
+    expect(replayOf({ cycles: [boss, { kind: "pocket" as const, centre: { x: 30, y: 25 }, width: 12, angle: 0, depth: 5 }] })).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/round boss/) })
+  })
+
+  test("a feature on an indexed face is replayed on the turned table: the bore is found where the blank is, on A and on B", () => {
+    const flat = { kind: "z-surface" as const, at: { x: 8, y: 8 }, expectedZ: 0 }
+    const bore = { kind: "bore" as const, centre: { x: 30, y: 25 }, diameter: 20, depth: 5 }
+    const slot = { kind: "pocket" as const, centre: { x: 40, y: 42 }, width: 14, angle: 0.3, depth: 5 }
+    for (const index of [{ a: 90 }, { b: 90 }, { a: 90, c: 30 }]) {
+      const r = replayOf({ cycles: [flat, bore] }, { workpieces: [{ id: "w1", name: "Face", workOffset: "G54", index }] })
+      expect(r.status, `${JSON.stringify(index)}: ${r.reason}`).toBe("within")
+      expect(r.corrected!.X).toBeCloseTo(0.8, 3)
+      expect(r.corrected!.Y).toBeCloseTo(-0.6, 3)
+    }
+    // Several features at once, the part on its own place in the fixture.
+    const two = program.planPartProbe(probed({ cycles: [flat, { ...bore, centre: { x: 16, y: 16 }, diameter: 14 }, slot] }, { workpieces: [{ id: "w1", name: "P1", workOffset: "G54", placement: { x: 0, y: 0, z: 0 } }, { id: "w2", name: "P2", workOffset: "G55", placement: { x: 100, y: 0, z: 0 }, index: { a: 90 } }] }))
+    expect(two.parts.map((q) => [q.register, q.replay!.status])).toEqual([["G54", "within"], ["G55", "within"]])
+    expect(two.parts[1]!.replay!.corrected!.X).toBeCloseTo(100.8, 3)
   })
 
   test("a failed replay is in the probe program's warnings, and a setup without a blank has nothing to replay against", () => {
@@ -939,6 +982,39 @@ describe("a part indexed as a tilted work plane", () => {
     const c45 = boxInPartFrame(clamp, datum, { c: 45 })
     expect(c45.max.x - c45.min.x).toBeGreaterThan(30 * Math.SQRT1_2)
   })
+
+  test("the probe of a part in a tilted plane is replayed in the plane: the register takes the displacement along the machine's axes, features included, and a rotation under the plane is refused", () => {
+    const stock = { x: 60, y: 50, z: 10, origin: { x: 0, y: 0, z: 0 }, material: "aluminum" }
+    const flat = { kind: "z-surface" as const, at: { x: 8, y: 8 }, expectedZ: 0 }
+    const corner = (touchesPerEdge?: 1 | 2) => ({ kind: "corner" as const, corner: { x: 0, y: 0 }, inside: false, xSense: 1 as const, ySense: 1 as const, depth: 5, ...(touchesPerEdge !== undefined ? { touchesPerEdge } : {}) })
+    const bore = { kind: "bore" as const, centre: { x: 30, y: 25 }, diameter: 20, depth: 5 }
+    const partOf = (indexAs: "plane" | "table", cycles: program.PartProbe["cycles"], over: Partial<program.PartProbe> = {}) => {
+      const made = planeSetup("fanuc", { stock, partProbe: { cycles, ...over }, workpieces: [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", index: { a: 90 }, ...(indexAs === "plane" ? { indexAs } : {}) }] })
+      const plan = program.planPartProbe(made)
+      if (plan.refused !== undefined) throw new Error(plan.refused)
+      return plan.parts[1]!.replay!
+    }
+    // The displacement (0.8, -0.6, 0.3) is the part's; the plane A 90 has its Y along -Z and its Z along +Y: the register moves by (0.8, 0.3, 0.6).
+    const plane = partOf("plane", [flat, corner()])
+    expect(plane.status, plane.reason).toBe("within")
+    expect([plane.corrected!.X, plane.corrected!.Y, plane.corrected!.Z].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([0.8, 0.3, 0.6])
+    // The same part on the turned table is displaced in the machine's frame: the register moves by the displacement itself.
+    const table = partOf("table", [flat, corner()])
+    expect(table.status, table.reason).toBe("within")
+    expect([table.corrected!.X, table.corrected!.Y, table.corrected!.Z].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([0.8, -0.6, 0.3])
+    // A bore is found in the plane just as on a flat table.
+    const holed = partOf("plane", [flat, bore])
+    expect(holed.status, holed.reason).toBe("within")
+    expect(holed.residualMm!).toBeLessThan(0.05)
+    // The program writes what the replay found: under the plane the deltas it measures are the plane's, and each machine axis' register takes their sum along it
+    // (the part's Z goes to the register's Y, the part's Y to the register's Z with its sign turned), the part on the table is written as measured.
+    const text = (indexAs: "plane" | "table"): string[] => program.partProbeProgram(planeSetup("fanuc", { stock, partProbe: { cycles: [flat, corner()] }, workpieces: [{ id: "w1", name: "Part 1", workOffset: "G54" }, { id: "w2", name: "Part 2", workOffset: "G55", index: { a: 90 }, ...(indexAs === "plane" ? { indexAs } : {}) }] }), 7).generated!.gcode.split("\n").map((l) => l.trim())
+    expect(text("plane").filter((l) => /^#524[123]=#524[123]\+\[/.test(l))).toHaveLength(3)
+    expect(text("plane").some((l) => /^#5243=#5243\+\[\[-1\]\*#/.test(l))).toBe(true)
+    expect(text("table").some((l) => /^#5243=#5243\+\[/.test(l))).toBe(false)
+    // A rotation under the plane is not written at all (the control's two frames are not composed here): the probe is refused with that, not replayed.
+    expect(() => partOf("plane", [flat, corner(2)], { rotation: "g68" })).toThrow(/tilted plane under a coordinate rotation is refused/)
+  })
 })
 
 describe("the probe of every part placed inside the program that first cuts it", () => {
@@ -1009,6 +1085,6 @@ describe("the probe of every part placed inside the program that first cuts it",
     expect(text.filter((l) => /^G68\.2\b/.test(l))).toHaveLength(3)
     expect(text.findIndex((l) => /^G68\.2\b/.test(l))).toBeLessThan(text.findIndex((l) => /^T1\s*M6/.test(l)))
     expect(p.program.toolpaths.flatMap((t) => t.moves).some((m) => m._tag === "Orient")).toBe(false)
-    expect(program.planPartProbe(inline({ workpieces: tilted })).parts[1]!.replay).toMatchObject({ status: "unreplayed", reason: expect.stringMatching(/tilted work plane/) })
   })
+
 })

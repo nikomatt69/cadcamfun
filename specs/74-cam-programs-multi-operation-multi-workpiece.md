@@ -140,11 +140,18 @@ Built on top of §2:
   corrected register, a G68 left on), `outside` (with the reason: an axis no touch measures, a rotation written to the register about the wrong
   point), `missed` (a touch found nothing), `stopped` (an alarm: the correction beyond `limit`, a contact on a protected move) or `unreplayed`
   (a write to the table's C axis is not modelled; no blank; a combination of features the replay does not build, below).
-  **Features in the replayed blank.** The replay places the feature each cycle measures: through bores in the plate (`plateWorld`), one rectangular
-  pocket cut into its top (a slot across X or across Y, an inside rectangle, an inside corner 40 mm into the part: `pocketWorld`), or the blank's
-  own outline for a boss, a web or an outside rectangle that is not as wide as the part (a web or rectangle as wide as the part is the plain
-  block). Not built, and said as `unreplayed`: bores with pockets or outlines in one probe, more than one pocket or outline, a slot or web at an
-  angle that is not a quarter turn, and any feature on an indexed face (the feature is placed on a flat table only).
+  **Features in the replayed blank.** The replay places the features the cycles measure as one solid (`featureWorld`, in the part's own frame, then placed on
+  the table or in the plane by a full rotation, `Placement.matrix`): through bores, blind pockets at any angle (a slot, an inside rectangle, an inside corner 40 mm
+  into the part) that may run out through the plate's edge, and the outline of the body when a boss, a web or an outside rectangle that is not the blank itself
+  is measured (a round boss, a strip across the plate at its angle, a rectangle; any number of each). Each bore and pocket is cut into the outline its centre is in.
+  `featureProblem` names what cannot be one solid, and the replay says it as `unreplayed`: two outlines on top of each other, two bores or two pockets overlapping, a
+  bore and a pocket overlapping, a pocket running out through the wall of a round boss. A part on an indexed face (table turn) is replayed with its features, on the
+  turned table. A part indexed as a tilted plane is replayed in the plane: the simulator's `frame` is the part's plane (`indexPlane`), the blank sits in the machine's
+  frame displaced in the part's own frame, and the register is judged along the machine's axes (the displacement (x, y, z) of a part in the plane A 90 moves the register
+  by (x, z, -y)); the probe's register writes are the plane's deltas summed along each machine axis (`ctx.frame`), as the emitted `#524x` words show. A rotation written
+  as `offset-r` under a plane is `unreplayed` (the register turns about the work offset's Z, not the plane's normal); G68 under G68.2 is refused by the writer
+  ("the two frames are not composed here"), so it never reaches the replay. The text of a probe cannot be replayed by the G-code interpreter (its macros read `#506x`,
+  which the interpreter does not model): the replay is the IR run on the probe simulator, which models the plane word as a frame.
   **Rotation fallbacks.** A rotation is written the way the post can: `offset-r` on the Fanuc family (a register without a rotation) becomes G68
   about the measured point; `g68` on Siemens (no G68 word) becomes the frame's rotation, with the note that it turns about the frame's zero;
   LinuxCNC writes G68 with the Fanuc words and `G10 L2 R` for the register. The plan's `notes` say which one was used. A refusal remains only where
@@ -162,7 +169,7 @@ Built on top of §2:
   `post.swivel`, Heidenhain `PLANE SPATIAL`); the interpreter follows it, so the replay sees the moves in the fixture's frame. A post without the words (generic,
   GRBL, LinuxCNC, Brother, Mazak, Mitsubishi) or a Siemens post without its swivel record refuses the setup with the reason (`planeRefusal`, an issue; nothing
   is generated); the plane takes the tilt of one axis (A or B) and C. The probe of such a part is written inside the same plane, so it measures the datum the
-  cuts will use; its replay is `unreplayed` (the replay turns the table, it does not model the plane word).
+  cuts will use; its replay runs in the plane (below).
 - **Each part's frame.** The fixture's boxes (clamps) and the other blanks stay in the first part's datum frame, and so does the body. Every register's moves are carried INTO
   that frame, not the boxes into the part's: a table turn leaves the moves in the machine, where the part stands turned about its datum, so a machine point `t` is the fixture
   point `D + Rt (t - D)` and the tool axis (vertical in the machine) is the third row of the table's rotation `R` in the fixture; a tilted-plane post has already put the moves in
@@ -179,7 +186,7 @@ Still not done:
 
 1. Templates in the desktop panel, copy / mirror of a template over a symmetric fixture, templates from the tool library.
 2. The viewer does not draw the combined fixture view's clamps (the data is in the evidence); the desktop does not send `fixtures` / `envelope` to the sidecar.
-3. The probe replay in a tilted plane (it is `unreplayed`), on an indexed face with a feature, and a table-C write.
+3. The probe replay of a table-C write, of a rotation under a tilted plane (the writer refuses it), of two outlines on top of each other, and of features that overlap.
 4. The pass of a back-boring bar through the pilot is judged on the cylinder of its farthest insert corner about the hole axis (`backBoreReach`, exact for the
    oriented insert's corners): against a round pilot that is the contact the oriented insert makes, and it is conservative only against material that is not round about the
    hole (the real insert occupies a sector, the envelope a full circle). A sector-shaped insert in the tri-dexel needs a non-axisymmetric tool solid, which the contact

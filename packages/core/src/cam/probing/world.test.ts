@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Vec3 } from "../../cad/vec.ts"
-import { boxWorld, cylinderWorld, meshWorld, planeWorld, plateWorld, pocketWorld, sphereWorld, surfaceWorld, unionWorld, type StylusBall } from "./world.ts"
+import { boxWorld, cylinderWorld, featureProblem, featureWorld, meshWorld, planeWorld, plateWorld, pocketWorld, sphereWorld, surfaceWorld, unionWorld, type PlateFeatures, type StylusBall } from "./world.ts"
 import { boxSurface } from "./sphere-cast.ts"
 
 const v = (x: number, y: number, z: number): Vec3 => ({ x, y, z })
@@ -117,5 +117,54 @@ describe("composition", () => {
       expect(ha.tip.z).toBeCloseTo(hb.tip.z, 9)
       expect(ha.normal.x).toBeCloseTo(hb.normal.x, 9)
     }
+  })
+})
+
+describe("a full rotation places a part, and a plate carries several features at once", () => {
+  const rect = (cx: number, cy: number, hx: number, hy: number, angle = 0) => [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]].map(([x, y]) => ({ x: cx + Math.cos(angle) * x! - Math.sin(angle) * y!, y: cy + Math.sin(angle) * x! + Math.cos(angle) * y! }))
+  const plate: PlateFeatures = { lo: -10, hi: 0, islands: [{ polygon: rect(30, 25, 30, 25) }], bores: [{ centre: { x: 12, y: 12 }, radius: 5 }], pockets: [{ polygon: rect(40, 30, 4, 100, -0.3), depth: 6 }] }
+
+  test("a matrix placement turned about Z is the same as the yaw it stands for, and a tilted one presents its faces tilted", () => {
+    const c = Math.cos(0.4), s = Math.sin(0.4)
+    const yaw = boxWorld(v(0, 0, -10), v(10, 10, 0), { translate: v(1, 2, 0.5), rotate: 0.4 })
+    const full = boxWorld(v(0, 0, -10), v(10, 10, 0), { translate: v(1, 2, 0.5), matrix: [c, -s, 0, s, c, 0, 0, 0, 1] })
+    const a = yaw.touch(v(-30, 5, -5), v(30, 5, -5), ball())!, b = full.touch(v(-30, 5, -5), v(30, 5, -5), ball())!
+    for (const k of ["x", "y", "z"] as const) { expect(b.tip[k]).toBeCloseTo(a.tip[k], 12); expect(b.normal[k]).toBeCloseTo(a.normal[k], 12) }
+    // A quarter turn about X: the part's +Z stands along the world's -Y, its +Y along +Z; the block's bottom is now a wall at y = 10 facing +Y.
+    const tilted = boxWorld(v(0, 0, -10), v(10, 10, 0), { translate: v(0, 0, 0), matrix: [1, 0, 0, 0, 0, -1, 0, 1, 0] })
+    const hit = tilted.touch(v(5, 40, 5), v(5, -40, 5), ball())!
+    expect(hit.normal.y).toBeCloseTo(1, 12)
+    expect(hit.tip.y).toBeCloseTo(10 + 2, 9)
+  })
+
+  test("the plate's faces, bore walls and an angled slot's walls are touched where they are, and a slot that runs out through the edge leaves the wall below its floor", () => {
+    expect(featureProblem(plate)).toBeUndefined()
+    const w = featureWorld(plate)
+    // The top face away from every feature; a through bore has no floor: a touch straight down inside it passes through the plate.
+    expect(w.touch(v(55, 5, 20), v(55, 5, -20), ball())!.tip.z).toBeCloseTo(0, 9)
+    expect(w.touch(v(12, 12, 20), v(12, 12, -20), ball())).toBeUndefined()
+    // The bore wall from its centre toward +X: the ball centre stops one radius short of the wall at 12 + 5.
+    const bore = w.touch(v(12, 12, -5), v(30, 12, -5), ball())!
+    expect(bore.tip.x).toBeCloseTo(17 - 2, 9)
+    // The slot turned by -0.3 rad, 8 wide: from its centre line along its measuring direction the wall is 4 away, normal across it.
+    const dir = { x: Math.cos(-0.3), y: Math.sin(-0.3) }
+    const wall = w.touch(v(40, 30, -3), v(40 + dir.x * 20, 30 + dir.y * 20, -3), ball())!
+    expect(Math.hypot(wall.tip.x - 40, wall.tip.y - 30)).toBeCloseTo(4 - 2, 9)
+    expect(wall.normal.x * dir.x + wall.normal.y * dir.y).toBeCloseTo(-1, 9)
+    // Its floor is 6 below the top: straight down inside the slot lands there, not on the top face.
+    expect(w.touch(v(40, 30, 20), v(40, 30, -20), ball())!.tip.z).toBeCloseTo(-6, 9)
+    // The slot runs out through the plate's edge: the plate's side wall stops at the floor there, so the opening is free at the top.
+    const along = { x: -Math.sin(-0.3), y: Math.cos(-0.3) }
+    const out = w.touch(v(40 + along.x * 60, 30 + along.y * 60, -3), v(40 + along.x * 20, 30 + along.y * 20, -3), ball())
+    expect(out).toBeUndefined()
+  })
+
+  test("what cannot be one solid is named: overlapping outlines, bores, pockets, a pocket through a round boss", () => {
+    const twice = { ...plate, islands: [{ circle: { centre: { x: 20, y: 20 }, radius: 10 } }, { circle: { centre: { x: 28, y: 20 }, radius: 10 } }] } satisfies PlateFeatures
+    expect(featureProblem(twice)).toMatch(/two outlines/)
+    expect(featureProblem({ ...plate, bores: [{ centre: { x: 12, y: 12 }, radius: 5 }, { centre: { x: 15, y: 12 }, radius: 5 }] })).toMatch(/two bores overlap/)
+    expect(featureProblem({ ...plate, pockets: [{ polygon: rect(12, 12, 8, 8), depth: 4 }] })).toMatch(/bore and a pocket overlap/)
+    expect(featureProblem({ ...plate, pockets: [{ polygon: rect(40, 30, 4, 100, -0.3), depth: 6 }, { polygon: rect(40, 30, 100, 4, 0), depth: 6 }] })).toMatch(/two pockets overlap/)
+    expect(featureProblem({ ...plate, islands: [{ circle: { centre: { x: 30, y: 25 }, radius: 12 } }], pockets: [{ polygon: rect(30, 25, 4, 100), depth: 4 }], bores: [] })).toMatch(/round boss/)
   })
 })
