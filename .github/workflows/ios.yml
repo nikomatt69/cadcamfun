@@ -8,6 +8,10 @@ on:
     paths:
       - "apps/mobile/**"
       - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ios.yml"
   workflow_dispatch:
 
 permissions:
@@ -55,6 +59,8 @@ jobs:
       # Runs the app end to end, not just compiles it. The runner hosts a real sidecar with the companion gateway on; the
       # simulator shares the Mac's network, so the app pairs with it over pinned TLS, and the job then asserts, from the
       # desktop side, that this device authenticated and listed the projects. The app process must also still be alive.
+      # iOS shows "Open in CADCAMFUN?" for a fresh simctl openurl until LaunchServices has approved the scheme. That
+      # approval is read at boot, so it is written while the simulator is shut down.
       - name: Pair the simulator app with a desktop and check the round trip
         run: |
           set -euo pipefail
@@ -72,21 +78,81 @@ jobs:
 
           APP="$RUNNER_TEMP/cadcamfun-ios/Build/Products/Release-iphonesimulator/CADCAMFUN.app"
           echo "app bundle: $APP"
-          test -n "$APP"
+          test -d "$APP"
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
           UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for rt in sorted(d, reverse=True) if "iOS" in rt for x in d[rt] if "iPhone" in x["name"]))')
           echo "simulator: $UDID, bundle: $BUNDLE_ID"
+
+          # Shutdown is asynchronous. Writing the plist during "Shutting Down" and booting
+          # again races LaunchServices, which only reads the approval at the next boot.
+          device_state() {
+            xcrun simctl list devices -j | UDID="$UDID" python3 -c 'import json,os,sys; u=os.environ["UDID"]; devices=json.load(sys.stdin)["devices"]; print(next(x["state"] for group in devices.values() for x in group if x.get("udid")==u))'
+          }
+          ensure_shutdown() {
+            for _ in $(seq 1 90); do
+              STATE=$(device_state)
+              echo "simulator state: $STATE"
+              case "$STATE" in
+                Shutdown) return 0 ;;
+                Booted) xcrun simctl shutdown "$UDID" || true ;;
+              esac
+              sleep 2
+            done
+            echo "simulator did not shut down" >&2
+            return 1
+          }
+          PREFS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Preferences"
+          if [ ! -d "$PREFS" ]; then
+            echo "booting once so the simulator data directory exists"
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            ensure_shutdown
+          else
+            ensure_shutdown
+          fi
+          python3 - "$UDID" "$BUNDLE_ID" <<'PY'
+          import os, plistlib, sys
+          udid, bundle = sys.argv[1], sys.argv[2]
+          path = os.path.expanduser(
+              f"~/Library/Developer/CoreSimulator/Devices/{udid}/data/Library/Preferences/com.apple.launchservices.schemeapproval.plist"
+          )
+          os.makedirs(os.path.dirname(path), exist_ok=True)
+          data = {}
+          if os.path.exists(path):
+              with open(path, "rb") as handle:
+                  loaded = plistlib.load(handle)
+              if isinstance(loaded, dict):
+                  data = loaded
+          data["com.apple.CoreSimulator.CoreSimulatorBridge-->cadcamfun"] = bundle
+          with open(path, "wb") as handle:
+              plistlib.dump(data, handle, fmt=plistlib.FMT_BINARY)
+          print("approved cadcamfun for", bundle)
+          PY
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
+          # Absent on older simctl. The simulator does not enforce local-network privacy; this is a no-op there.
+          xcrun simctl privacy "$UDID" grant local-network "$BUNDLE_ID" || true
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          READY=""
+          for _ in $(seq 1 45); do
+            READY=$(xcrun simctl spawn "$UDID" launchctl list | awk -v id="UIKitApplication:$BUNDLE_ID" '$0 ~ id { print $1; exit }' || true)
+            if [ -n "$READY" ] && [ "$READY" != "-" ]; then break; fi
+            sleep 1
+          done
+          echo "app pid before deep link: ${READY:-none}"
+          test -n "$READY" && [ "$READY" != "-" ]
+          # The Release bundle needs a moment to mount the router. A link that arrives earlier is dropped.
+          sleep 12
           xcrun simctl openurl "$UDID" "$LINK"
 
           # The desktop's view: the device token was accepted (lastSeen is set only after a pinned-TLS request authenticated).
           SEEN=""
-          for _ in $(seq 1 45); do
+          for i in $(seq 1 45); do
             SEEN=$(api "http://127.0.0.1:$PORT/api/companion" | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print((d[0]["lastSeen"] or "") if d else "")')
             [ -n "$SEEN" ] && break
+            # Resend when the first delivery raced the scene. The scheme is already approved, so this does not prompt.
+            if [ $((i % 8)) -eq 0 ]; then xcrun simctl openurl "$UDID" "$LINK"; fi
             sleep 2
           done
           echo "device last seen: ${SEEN:-never}"
