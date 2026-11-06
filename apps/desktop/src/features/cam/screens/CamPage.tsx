@@ -55,7 +55,8 @@ import { freshProgram, freshResult, useProbingStore } from "../store/probingStor
 import { useInspectionStore } from "../store/inspectionStore.ts"
 import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
 import { probeCycles } from "../lib/probing/cycles.ts"
-import { fixtureBoxes, placedProgram } from "../lib/setup.ts"
+import { clampBoxes, fixtureBoxes, placedProgram, travelBox } from "../lib/setup.ts"
+import { useSetupStore } from "../store/setupStore.ts"
 import { overlayModelOf } from "../lib/probing/overlay-input.ts"
 import { partSolidsOf } from "../lib/probing/part-solids.ts"
 import { workOriginOf } from "../lib/probing/probe-targets.ts"
@@ -77,6 +78,7 @@ const postExtension = (post: PostProcessorType): string => (post === "heidenhain
 export default function CamPage(): JSX.Element {
   const app = useApp()
   const camStore = useCamStore()
+  const setupStore = useSetupStore()
   const gen = useGeneratorStore()
   const previewSettings = () => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode ? gen.generatedSettings ?? gen.settings : gen.settings
   const previewLibraryTool = () => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode && gen.generatedSettings !== undefined ? gen.generatedTool : gen.selectedLibraryTool
@@ -119,6 +121,9 @@ export default function CamPage(): JSX.Element {
     return undefined
   })
   const operationToolModels = createMemo(() => operationTools().length > 0 ? new Map(operationTools().map((o) => [o.toolId, o.model])) : (headerModels()?.size ?? 0) > 0 ? headerModels() : undefined)
+  // The clamps and the machine travel the setup panel describes are outlined in the view as they are edited, before anything is generated.
+  const clampsOfSetup = createMemo(() => clampBoxes(setupStore.choices.fixtures))
+  const travelOfSetup = createMemo(() => travelBox(setupStore.choices.envelope))
   const previewMachine = createMemo(() => previewSetup(machineChoice().kind, previewSettings(), previewStock(), {
     ...(kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}),
     program: camStore.program, gcode: camStore.gcode, tool: toolModel()
@@ -508,6 +513,8 @@ export default function CamPage(): JSX.Element {
                   {...(previewTools() !== undefined ? { tools: previewTools()! } : {})}
                   {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})}
                   {...(camStore.generatedProgram?.gcode === camStore.gcode ? { workpieces: camStore.generatedProgram.workpieces } : {})}
+                  {...(clampsOfSetup().length > 0 ? { clamps: clampsOfSetup() } : {})}
+                  {...(travelOfSetup() !== undefined ? { travel: travelOfSetup()! } : {})}
                   {...(camStore.generatedProgram?.gcode === camStore.gcode && fixtureBoxes(camStore.generatedProgram.evidence).length > 0 ? { fixtureView: fixtureBoxes(camStore.generatedProgram.evidence) } : {})}
                   machine={previewMachine()} defaultToolModel={probeToolModel() ?? toolModel()} toolIssues={probePreview() !== undefined ? [] : toolIssues()}
                   operationTools={operationTools().length > 0 ? operationTools() : importedTools()}

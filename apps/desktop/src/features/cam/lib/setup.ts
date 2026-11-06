@@ -15,8 +15,10 @@ type ToolKind = cam.Tool["kind"]
 const KINDS: Readonly<Record<string, ToolKind>> = { endmill: "endmill", ballnose: "ballnose", drill: "drill", vbit: "vbit", chamfer: "vbit" }
 
 /** The tool of a toolpath: the library tool when the settings name none is a generic one per type, diameter and flute count. */
-export const toolOfToolpath = (toolpath: ElementToolpath): cam.Tool => {
-  const s = toolpath.toolpathSettings
+export const toolOfToolpath = (toolpath: ElementToolpath): cam.Tool => toolOfSettings(toolpath.toolpathSettings)
+
+/** The generic tool of a set of toolpath settings (one per type, diameter and flute count). */
+export const toolOfSettings = (s: ElementToolpath["toolpathSettings"]): cam.Tool => {
   const kind = KINDS[s.toolType] ?? "endmill"
   return {
     id: `${s.toolType}-${s.toolDiameter}-${s.flutes}`,
@@ -38,10 +40,22 @@ export interface SetupChoices {
   readonly workpieceOrder: cam.program.WorkpieceOrder
   /** Pockets the tool magazine holds; 0 = not stated. */
   readonly magazineSize: number
+  /** Clamps, jaws and plates, as boxes in the frame of the first part's datum. */
+  readonly fixtures: ReadonlyArray<cam.program.FixtureBox>
+  /** The machine's travel in the same frame: the placed blanks must lie inside it. Absent = not stated. */
+  readonly envelope: Setup["envelope"] | undefined
+  /** Named cycles of operations (rough, semi-finish, finish) and the features they are applied to. */
+  readonly templates: ReadonlyArray<cam.program.OperationTemplate>
+  readonly uses: ReadonlyArray<cam.program.TemplateUse>
+  /** The datum probe of every part, generated as its own program with `probePart`. */
+  readonly partProbe: Setup["partProbe"] | undefined
+  /** Ask the sidecar for the part probe program with the cutting programs. */
+  readonly probePart: boolean
 }
 
 export const DEFAULT_SETUP_CHOICES: SetupChoices = {
-  name: "Setup", post: cam.program.DEFAULT_POST_CONFIG, grouping: "single", retractBeforeToolChange: true, workOffset: "G54", workpieces: [], workpieceOrder: "toolFirst", magazineSize: 0
+  name: "Setup", post: cam.program.DEFAULT_POST_CONFIG, grouping: "single", retractBeforeToolChange: true, workOffset: "G54", workpieces: [], workpieceOrder: "toolFirst", magazineSize: 0,
+  fixtures: [], envelope: undefined, templates: [], uses: [], partProbe: undefined, probePart: false
 }
 
 const REGISTERS: ReadonlyArray<Setup["workOffset"]> = ["G54", "G55", "G56", "G57", "G58", "G59"]
@@ -77,8 +91,146 @@ export const nextWorkpiece = (existing: ReadonlyArray<cam.program.Workpiece>, na
   return withRegister({ id: `wp-${n}`, name: name(n), workOffset: "G54" }, choice.key)
 }
 
+// ---------------------------------------------------------------- fixtures: clamps, jaws and the machine's travel
+
+/** A new clamp box to the left of the first part (the frame of its datum), for the user to move and size. */
+export const nextFixture = (existing: ReadonlyArray<cam.program.FixtureBox>, name: (n: number) => string): cam.program.FixtureBox => {
+  let n = existing.length + 1
+  while (existing.some((box) => box.id === `fx-${n}`)) n++
+  const shift = (n - 1) * 30
+  return { id: `fx-${n}`, name: name(n), min: { x: -80, y: -30 + shift, z: -20 }, max: { x: -60, y: 0 + shift, z: 0 } }
+}
+
+/** The clamp with one corner coordinate changed: the box stays a box (max is kept above min by the schema's own issue, shown next to the row). */
+export const withFixtureCorner = (box: cam.program.FixtureBox, corner: "min" | "max", axis: "x" | "y" | "z", value: number): cam.program.FixtureBox =>
+  ({ ...box, [corner]: { ...box[corner], [axis]: value } })
+
+/** The machine travel a setup starts from when it is switched on: 1 m by 1 m by 600 mm around the first part's datum, top face at Z0 plus the head's room. */
+export const DEFAULT_ENVELOPE: NonNullable<Setup["envelope"]> = { min: { x: -500, y: -500, z: -400 }, max: { x: 500, y: 500, z: 200 } }
+
+/** A drawable box of the clamps and the travel: the corner and the size, in the viewport's frame. */
+export interface DrawnBox { readonly name: string; readonly origin: Vec3; readonly size: Vec3 }
+const drawn = (name: string, b: { readonly min: Vec3; readonly max: Vec3 }): DrawnBox => ({ name, origin: b.min, size: { x: b.max.x - b.min.x, y: b.max.y - b.min.y, z: b.max.z - b.min.z } })
+export const clampBoxes = (fixtures: ReadonlyArray<cam.program.FixtureBox>): ReadonlyArray<DrawnBox> =>
+  fixtures.filter((box) => box.max.x > box.min.x && box.max.y > box.min.y && box.max.z > box.min.z).map((box) => drawn(box.name, box))
+export const travelBox = (envelope: Setup["envelope"] | undefined): DrawnBox | undefined =>
+  envelope === undefined || !(envelope.max.x > envelope.min.x && envelope.max.y > envelope.min.y && envelope.max.z > envelope.min.z) ? undefined : drawn("travel", envelope)
+
+// ---------------------------------------------------------------- operation templates
+
+/** The id a new template, step or use takes: the first `${prefix}-n` the list does not hold. */
+export const freshId = (prefix: string, taken: ReadonlyArray<string>): string => {
+  let n = taken.length + 1
+  while (taken.includes(`${prefix}-${n}`)) n++
+  return `${prefix}-${n}`
+}
+
+/** A step of a template from toolpath settings (the generator's, or a toolpath's): its tool is the generic one of those settings. */
+export const stepOfSettings = (id: string, name: string, settings: ElementToolpath["toolpathSettings"], dependsOn?: ReadonlyArray<string>): cam.program.OperationTemplateStep => ({
+  id, name, params: settings, tool: toolOfSettings(settings), ...(dependsOn !== undefined && dependsOn.length > 0 ? { dependsOn } : {})
+})
+
+/** The step with some of its settings changed (a depth, a stepdown, a diameter): the tool follows the settings. */
+export const withStepSettings = (step: cam.program.OperationTemplateStep, patch: Partial<ElementToolpath["toolpathSettings"]>): cam.program.OperationTemplateStep => {
+  const params = { ...step.params, ...patch }
+  return { ...step, params, tool: toolOfSettings(params) }
+}
+
+/** The steps of a template after step `id` switched waiting for step `other`; none left = no dependency key. */
+export const toggleStepDependency = (template: cam.program.OperationTemplate, id: string, other: string): cam.program.OperationTemplate => ({
+  ...template,
+  steps: template.steps.map((step) => {
+    if (step.id !== id) return step
+    const { dependsOn: _old, ...rest } = step
+    const next = toggleDependency(step.dependsOn, other)
+    return next === undefined ? rest : { ...rest, dependsOn: next }
+  })
+})
+
+/** The template without step `id`: the steps that waited for it no longer do. Nothing changes when it is the last step. */
+export const withoutStep = (template: cam.program.OperationTemplate, id: string): cam.program.OperationTemplate => {
+  if (template.steps.length <= 1) return template
+  return { ...template, steps: template.steps.filter((step) => step.id !== id).map((step) => {
+    const { dependsOn, ...rest } = step
+    const next = (dependsOn ?? []).filter((other) => other !== id)
+    return next.length === 0 ? rest : { ...rest, dependsOn: next }
+  }) }
+}
+
+/** A template applied to elements: one instance per element, steps in step order (each tool loaded once) unless the user chose feature order. */
+export const useOf = (id: string, template: cam.program.OperationTemplate, elementIds: ReadonlyArray<string>, over: Partial<cam.program.TemplateUse> = {}): cam.program.TemplateUse =>
+  ({ id, templateId: template.id, elementIds, perElement: true, order: "perStep", ...over })
+
+/** The operations the setup runs after its template uses are expanded, as the plan shows them: name, tool and element names. */
+export const expandedOperations = (setup: Setup): ReadonlyArray<{ readonly id: string; readonly name: string; readonly tool: string; readonly elementIds: ReadonlyArray<string> }> => {
+  if ((setup.uses ?? []).length === 0) return []
+  const base = new Set(setup.operations.map((op) => op.id))
+  return cam.program.expandSetup(setup).setup.operations.filter((op) => !base.has(op.id)).map((op) => ({ id: op.id, name: op.name, tool: op.tool.name, elementIds: op.elementIds }))
+}
+
+// ---------------------------------------------------------------- the datum probe of every part
+
+export type PartProbeCycle = cam.program.PartProbeCycle
+export type ProbeCycleKind = PartProbeCycle["kind"]
+export const PROBE_KINDS: ReadonlyArray<ProbeCycleKind> = ["z-surface", "bore", "boss", "edge", "corner"]
+export const MAX_PROBE_CYCLES = 4
+
+/** The cycle a kind starts from, for the user to adjust: where each part's datum is expected, in the part's own frame. */
+export const defaultProbeCycle = (kind: ProbeCycleKind): PartProbeCycle => {
+  switch (kind) {
+    case "z-surface": return { kind, at: { x: 0, y: 0 }, expectedZ: 0 }
+    case "bore": return { kind, centre: { x: 0, y: 0 }, diameter: 10, depth: 5 }
+    case "boss": return { kind, centre: { x: 0, y: 0 }, diameter: 20, depth: 5 }
+    case "edge": return { kind, at: { x: 0, y: 0, z: -5 }, normal: { x: 1, y: 0 } }
+    case "corner": return { kind, corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5 }
+  }
+}
+
+/** The numeric fields of a cycle, as `[label key, read, write]`: one editor for every kind. */
+export type ProbeFieldKey = "x" | "y" | "z" | "expectedZ" | "diameter" | "depth" | "normalX" | "normalY"
+export const probeFields = (cycle: PartProbeCycle): ReadonlyArray<{ readonly key: ProbeFieldKey; readonly value: number; readonly set: (value: number) => PartProbeCycle }> => {
+  switch (cycle.kind) {
+    case "z-surface": return [
+      { key: "x", value: cycle.at.x, set: (v) => ({ ...cycle, at: { ...cycle.at, x: v } }) },
+      { key: "y", value: cycle.at.y, set: (v) => ({ ...cycle, at: { ...cycle.at, y: v } }) },
+      { key: "expectedZ", value: cycle.expectedZ, set: (v) => ({ ...cycle, expectedZ: v }) }
+    ]
+    case "bore": case "boss": return [
+      { key: "x", value: cycle.centre.x, set: (v) => ({ ...cycle, centre: { ...cycle.centre, x: v } }) },
+      { key: "y", value: cycle.centre.y, set: (v) => ({ ...cycle, centre: { ...cycle.centre, y: v } }) },
+      { key: "diameter", value: cycle.diameter, set: (v) => ({ ...cycle, diameter: v > 0 ? v : cycle.diameter }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+    case "edge": return [
+      { key: "x", value: cycle.at.x, set: (v) => ({ ...cycle, at: { ...cycle.at, x: v } }) },
+      { key: "y", value: cycle.at.y, set: (v) => ({ ...cycle, at: { ...cycle.at, y: v } }) },
+      { key: "z", value: cycle.at.z, set: (v) => ({ ...cycle, at: { ...cycle.at, z: v } }) },
+      { key: "normalX", value: cycle.normal.x, set: (v) => ({ ...cycle, normal: { ...cycle.normal, x: Math.max(-1, Math.min(1, v)) } }) },
+      { key: "normalY", value: cycle.normal.y, set: (v) => ({ ...cycle, normal: { ...cycle.normal, y: Math.max(-1, Math.min(1, v)) } }) }
+    ]
+    case "corner": return [
+      { key: "x", value: cycle.corner.x, set: (v) => ({ ...cycle, corner: { ...cycle.corner, x: v } }) },
+      { key: "y", value: cycle.corner.y, set: (v) => ({ ...cycle, corner: { ...cycle.corner, y: v } }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+  }
+}
+
+/** The blank of the page's stock as a setup block: its corner, its size, its top face at `origin.z` (the frame of the generator's stock). */
+export const blockOfStock = (stock: cam.generator.Stock): NonNullable<Setup["stock"]> => {
+  const x = stock.radius > 0 ? 2 * stock.radius : stock.width, y = stock.radius > 0 ? 2 * stock.radius : stock.height
+  return { x, y, z: stock.depth, origin: { x: stock.x - x / 2, y: stock.y - y / 2, z: stock.topZ }, material: stock.material ?? "aluminum" }
+}
+
 /** The setup of the panel's toolpaths, in execution order. A toolpath that is hidden is not machined. */
-export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choices: SetupChoices = DEFAULT_SETUP_CHOICES): Setup => ({
+export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choices: SetupChoices = DEFAULT_SETUP_CHOICES, stock?: cam.generator.Stock): Setup => {
+  // Clamps and travel are checked against the placed blanks: the first part is placed at the datum, a fixture of one part is listed as that part, and the blank is the page's stock.
+  const placed = choices.fixtures.length > 0 || choices.envelope !== undefined
+  const parts: ReadonlyArray<Workpiece> = choices.workpieces.length > 1 ? choices.workpieces
+    : placed ? [choices.workpieces[0] ?? { id: "wp-1", name: "Workpiece 1", workOffset: choices.workOffset }] : []
+  const listed = parts.map((wp, index) => (placed && index === 0 && wp.placement === undefined ? { ...wp, placement: { x: 0, y: 0, z: 0 } } : wp))
+  const block = placed && stock !== undefined ? blockOfStock(stock) : undefined
+  return {
   id: "desktop-setup",
   name: choices.name,
   machineType: "mill",
@@ -88,8 +240,14 @@ export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choi
   post: choices.post,
   grouping: choices.grouping,
   retractBeforeToolChange: choices.retractBeforeToolChange,
-  // One workpiece is the setup itself: the list is sent only when the fixture holds several, so a stored setup stays what it was.
-  ...(choices.workpieces.length > 1 ? { workpieces: choices.workpieces, workpieceOrder: choices.workpieceOrder } : {}),
+  // One workpiece is the setup itself: the list is sent only when the fixture holds several (or clamps need the part placed), so a stored setup stays what it was.
+  ...(listed.length > 0 ? { workpieces: listed, workpieceOrder: choices.workpieceOrder } : {}),
+  ...(block !== undefined ? { stock: block } : {}),
+  ...(choices.fixtures.length > 0 ? { fixtures: choices.fixtures } : {}),
+  ...(choices.envelope !== undefined ? { envelope: choices.envelope } : {}),
+  ...(choices.templates.length > 0 ? { templates: choices.templates } : {}),
+  ...(choices.uses.length > 0 ? { uses: choices.uses } : {}),
+  ...(choices.partProbe !== undefined ? { partProbe: choices.partProbe } : {}),
   // A probe cycle is not a cutting operation: it has its own program (`camProbing.emit`) and never joins the cutting setup.
   operations: [...toolpaths].filter((toolpath) => toolpath.probe === undefined).sort((a, b) => a.order - b.order).map((toolpath): Operation => ({
     id: toolpath.id,
@@ -103,11 +261,13 @@ export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choi
     ...(toolpath.dependsOn !== undefined && toolpath.dependsOn.length > 0 ? { dependsOn: toolpath.dependsOn } : {}),
     ...(choices.workpieces.length > 1 && toolpath.workpieceIds !== undefined ? { workpieceIds: toolpath.workpieceIds.filter((id) => choices.workpieces.some((wp) => wp.id === id)) } : {})
   }))
-})
+  }
+}
 
 /** The elements the setup's operations name, by id, for the generate request. An element no longer in the drawing is left out (the sidecar answers with which). */
 export const elementsOfSetup = (setup: Setup, elements: ReadonlyArray<CadElement>): Record<string, CadElement> => {
-  const wanted = new Set(setup.operations.flatMap((op) => op.elementIds))
+  // The template uses are operations too: their elements are wanted by the generate request.
+  const wanted = new Set(cam.program.expandSetup(setup).setup.operations.flatMap((op) => op.elementIds))
   const out: Record<string, CadElement> = {}
   for (const element of elements) {
     const id = String(element["id"])
@@ -123,7 +283,8 @@ export const programFileName = (program: { readonly name: string; readonly progr
 /** The choices a saved setup was written with, so loading it puts the panel back as it was saved. */
 export const choicesOfSetup = (setup: Setup): SetupChoices => ({
   name: setup.name, post: setup.post, grouping: setup.grouping, retractBeforeToolChange: setup.retractBeforeToolChange, workOffset: setup.workOffset,
-  workpieces: setup.workpieces ?? [], workpieceOrder: setup.workpieceOrder ?? "toolFirst", magazineSize: setup.magazineSize ?? 0
+  workpieces: setup.workpieces ?? [], workpieceOrder: setup.workpieceOrder ?? "toolFirst", magazineSize: setup.magazineSize ?? 0,
+  fixtures: setup.fixtures ?? [], envelope: setup.envelope, templates: setup.templates ?? [], uses: setup.uses ?? [], partProbe: setup.partProbe, probePart: setup.partProbe !== undefined
 })
 
 export interface RestoredToolpaths {

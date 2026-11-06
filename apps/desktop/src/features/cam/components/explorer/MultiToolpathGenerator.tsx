@@ -134,9 +134,12 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
   // The multi-operation setup (spec 14): the toolpaths become one program with tool changes (or one file per tool / operation, by the
   // setup store's grouping), written by the post of the sidecar's `camSetup` group, not by joining the toolpaths' texts.
   const generatePrograms = async (): Promise<CamSetupGenerated | undefined> => {
-    const setup = setupOfToolpaths(store.toolpaths, useSetupStore.getState().choices)
+    const stock = stockOf(job.sources())
+    const choices = useSetupStore.getState().choices
+    const setup = setupOfToolpaths(store.toolpaths, choices, stock)
+    // `probePart`: the datum probe of every part comes first, as a program of its own (the part probe of the setup says what it measures).
     // `evidence`: each program is replayed per work offset against its own blank (a kernel job per register), so the saved program carries its release.
-    const request = { setup, elements: elementsOfSetup(setup, elements.elements) as never, stock: stockOf(job.sources()), evidence: true }
+    const request = { setup, elements: elementsOfSetup(setup, elements.elements) as never, stock, evidence: true, ...(choices.probePart && choices.partProbe !== undefined ? { probePart: true } : {}) }
     try {
       const result = await app.runtime.run(makeSetupService(app.client).generate(request))
       useSetupStore.getState().setResult(result)
@@ -161,7 +164,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
 
   // A generated program opens in the editor with its IR (the register of every toolpath), and the viewport draws each part where it lies.
   const openProgram = (program: CamSetupGenerated["programs"][number]): void => {
-    const workpieces = cam.program.workpiecesOf(setupOfToolpaths(store.toolpaths, useSetupStore.getState().choices))
+    const workpieces = cam.program.workpiecesOf(setupOfToolpaths(store.toolpaths, useSetupStore.getState().choices, stockOf(job.sources())))
     camStore.clearOperationResults()
     camStore.setKernelArtifact(undefined); camStore.setKernelRequest(undefined)
     const evidence = evidenceOfProgram(program.evidence, program.gcode)

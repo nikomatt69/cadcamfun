@@ -96,6 +96,10 @@ export interface View3DProps {
     readonly state: "part" | "crossed"
     readonly reach?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
   }>
+  /** The clamps, jaws and plates of the setup (boxes in the first part's datum frame), outlined with their names. */
+  readonly clamps?: ReadonlyArray<{ readonly name: string; readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }>
+  /** The machine travel of the setup, drawn faintly around the work. */
+  readonly travel?: { readonly origin: { readonly x: number; readonly y: number; readonly z: number }; readonly size: { readonly x: number; readonly y: number; readonly z: number } }
   readonly showControls?: boolean
   /** Optional screen controls placed immediately before Fullscreen, including in fullscreen mode. */
   readonly controlsFooter?: JSX.Element
@@ -214,7 +218,7 @@ export function View3D(props: View3DProps) {
   const orthographicView = () => flat() || !["perspective", "four-view"].includes(preset())
   let playback: Playback = emptyPlayback()
   let seconds = 0
-  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.extraStocks; props.fixtureBoxes; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
+  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.extraStocks; props.fixtureBoxes; props.clamps; props.travel; props.toolpathDisplay; props.tools; props.defaultTool; props.toolModels; props.defaultToolModel; props.machine; props.motion; props.machineDisplay; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
   createEffect(() => { preset(); untrack(setPreset) })
   createEffect(() => { if (props.renderMode) updateMode(props.renderMode) })
@@ -540,6 +544,21 @@ export function View3D(props: View3DProps) {
           boxGeometry.dispose()
           outline.position.set(origin.x + size.x / 2, origin.y + size.y / 2, origin.z + size.z / 2); outline.visible = props.toolpathDisplay?.stockVisible ?? true; content.add(outline)
         }
+      }
+      // The setup's workholding (clamps, jaws, plates) and, faintly, the machine travel the placed blanks must lie inside.
+      if (props.machine === undefined || props.machine.kind === "mill") {
+        const box = (b: { readonly origin: Vec3; readonly size: Vec3 }, color: number, opacity: number, name: string): THREE.LineSegments => {
+          const geometry = new THREE.BoxGeometry(b.size.x, b.size.y, b.size.z)
+          const lines = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthTest: false }))
+          geometry.dispose()
+          lines.position.set(b.origin.x + b.size.x / 2, b.origin.y + b.size.y / 2, b.origin.z + b.size.z / 2); lines.renderOrder = 7; lines.name = name; content.add(lines)
+          return lines
+        }
+        for (const clamp of props.clamps ?? []) {
+          box(clamp, 0xf59e0b, 0.95, "setup-clamp")
+          addPointLabel(clamp.name, { x: clamp.origin.x + clamp.size.x / 2, y: clamp.origin.y + clamp.size.y / 2, z: clamp.origin.z + clamp.size.z })
+        }
+        if (props.travel !== undefined) box(props.travel, 0x94a3b8, 0.25, "setup-travel")
       }
       // The parts of the program seen together: a blank each (red where a cut crossed into it), and a faint box for how far its own cuts reached.
       for (const part of props.fixtureBoxes ?? []) {

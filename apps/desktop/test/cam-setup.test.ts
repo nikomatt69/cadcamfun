@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
 import { addToolpath, initialState, moveToolpathUp, toggleToolpathVisibility } from "../src/features/cam/lib/multiToolpath.ts"
 import { addJobSetup, jobRelease, patchJobSetup, removeJobSetup } from "../src/features/cam/lib/job.ts"
-import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, arcPoints, evidenceOfProgram, fixtureBoxes, programFileName, toggleToolpathWorkpiece, toggleDependency, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup } from "../src/features/cam/lib/setup.ts"
+import { DEFAULT_SETUP_CHOICES, choicesOfSetup, elementsOfSetup, MAX_WORKPIECES, REGISTER_CHOICES, extraStocks, nextWorkpiece, registerKey, withRegister, workpiecesFromElements, offsetsOf, placedProgram, arcPoints, evidenceOfProgram, fixtureBoxes, programFileName, toggleToolpathWorkpiece, toggleDependency, withoutWorkpiece, setupOfToolpaths, toolpathsOfSetup, blockOfStock, clampBoxes, travelBox, nextFixture, withFixtureCorner, DEFAULT_ENVELOPE, stepOfSettings, withStepSettings, toggleStepDependency, withoutStep, useOf, expandedOperations, defaultProbeCycle, probeFields, PROBE_KINDS } from "../src/features/cam/lib/setup.ts"
 import { TOOLPATH_COLORS } from "../src/features/cam/lib/multiToolpath.ts"
 import { useSetupStore } from "../src/features/cam/store/setupStore.ts"
 
@@ -379,5 +379,108 @@ describe("the replay evidence of a generated program", () => {
     expect(fixtureBoxes(undefined)).toEqual([])
     const single = { ...evidence(), fixture: { ...evidence().fixture, parts: [part("G54", 0)] } }
     expect(fixtureBoxes(evidenceOfProgram(single, gcode))).toEqual([])
+  })
+})
+
+describe("clamps, the machine travel, templates and the part probe", () => {
+  const stock = { width: 60, height: 40, depth: 10, radius: 0, x: 5, y: 0, topZ: 0, allowance: 0, material: "aluminum" } as cam.generator.Stock
+  const withChoices = (patch: Partial<typeof DEFAULT_SETUP_CHOICES>) => ({ ...DEFAULT_SETUP_CHOICES, ...patch })
+
+  test("nothing of them is sent while none is described, so a stored setup stays what it was", () => {
+    const setup = setupOfToolpaths(panel().toolpaths, DEFAULT_SETUP_CHOICES, stock)
+    for (const key of ["fixtures", "envelope", "templates", "uses", "partProbe", "stock", "workpieces"]) expect(setup).not.toHaveProperty(key)
+  })
+
+  test("clamps or a travel put the first part at the datum, list a single part, and send the page's stock so the blanks can be checked", () => {
+    const fixtures = [nextFixture([], (n) => `Jaw ${n}`)]
+    const setup = setupOfToolpaths(panel().toolpaths, withChoices({ fixtures, envelope: DEFAULT_ENVELOPE }), stock)
+    expect(setup.workpieces).toEqual([{ id: "wp-1", name: "Workpiece 1", workOffset: "G54", placement: { x: 0, y: 0, z: 0 } }])
+    expect(setup.stock).toEqual({ x: 60, y: 40, z: 10, origin: { x: -25, y: -20, z: 0 }, material: "aluminum" })
+    expect(setup.fixtures).toEqual(fixtures)
+    expect(setup.envelope).toEqual(DEFAULT_ENVELOPE)
+    expect(() => cam.program.decodeSetup(JSON.parse(JSON.stringify(setup)))).not.toThrow()
+    // A round stock is its bounding square.
+    expect(blockOfStock({ ...stock, radius: 15 })).toMatchObject({ x: 30, y: 30, origin: { x: -10, y: -15 } })
+  })
+
+  test("a blank inside a clamp, or outside the travel, is an issue of the setup the panel shows next to its row", () => {
+    const jaw = { id: "fx-1", name: "Left jaw", min: { x: -10, y: -30, z: -20 }, max: { x: 10, y: 30, z: 0 } }
+    const inside = setupOfToolpaths(panel().toolpaths, withChoices({ fixtures: [jaw] }), stock)
+    expect(cam.program.validateSetup(inside).map((issue) => issue.message).join(" ")).toMatch(/blank overlaps Left jaw/)
+    const moved = setupOfToolpaths(panel().toolpaths, withChoices({ fixtures: [{ ...jaw, min: { x: -90, y: -30, z: -20 }, max: { x: -60, y: 30, z: 0 } }] }), stock)
+    expect(cam.program.validateSetup(moved).filter((issue) => /overlaps/.test(issue.message))).toEqual([])
+    const tight = setupOfToolpaths(panel().toolpaths, withChoices({ envelope: { min: { x: -10, y: -10, z: -50 }, max: { x: 10, y: 10, z: 10 } } }), stock)
+    expect(cam.program.validateSetup(tight).map((issue) => issue.message).join(" ")).toMatch(/outside the machine travel/)
+  })
+
+  test("the boxes of the viewport are the clamps that are boxes and the travel; a clamp that is not one is not drawn", () => {
+    const good = nextFixture([], (n) => `Jaw ${n}`)
+    const bad = withFixtureCorner({ ...good, id: "fx-2", name: "Bad" }, "max", "x", good.min.x - 5)
+    expect(clampBoxes([good, bad])).toEqual([{ name: "Jaw 1", origin: good.min, size: { x: 20, y: 30, z: 20 } }])
+    expect(travelBox(DEFAULT_ENVELOPE)).toEqual({ name: "travel", origin: DEFAULT_ENVELOPE.min, size: { x: 1000, y: 1000, z: 600 } })
+    expect(travelBox(undefined)).toBeUndefined()
+    expect(nextFixture([good], (n) => `Jaw ${n}`).id).toBe("fx-2")
+  })
+
+  const rough = stepOfSettings("rough", "Rough", { ...base, toolDiameter: 6, depth: 4, stepdown: 2, operationType: "pocket" })
+  const finish = stepOfSettings("finish", "Finish", { ...base, toolDiameter: 3, depth: 4, stepdown: 4, operationType: "contour" })
+
+  test("a template step follows its settings: the tool is the generic one of its diameter", () => {
+    expect(rough.tool).toMatchObject({ kind: "endmill", diameter: 6 })
+    const thinner = withStepSettings(rough, { toolDiameter: 4 })
+    expect(thinner.params.toolDiameter).toBe(4)
+    expect(thinner.tool.diameter).toBe(4)
+    expect(thinner.tool.id).not.toBe(rough.tool.id)
+  })
+
+  test("a step waits for an earlier one by a switch; none left is no key; removing a step releases the ones that waited for it", () => {
+    const template = { id: "tpl-1", name: "Pocket", steps: [rough, finish] }
+    const waits = toggleStepDependency(template, "finish", "rough")
+    expect(waits.steps[1]!.dependsOn).toEqual(["rough"])
+    expect(toggleStepDependency(waits, "finish", "rough").steps[1]).not.toHaveProperty("dependsOn")
+    expect(withoutStep(waits, "rough").steps).toHaveLength(1)
+    expect(withoutStep(waits, "rough").steps[0]).not.toHaveProperty("dependsOn")
+    expect(withoutStep({ ...template, steps: [rough] }, "rough").steps).toHaveLength(1)
+  })
+
+  test("a use of the template expands to its steps on every element, step by step; the plan lists them, the request names their elements", () => {
+    const template = { id: "tpl-1", name: "Pocket", steps: [rough, toggleStepDependency({ id: "t", name: "t", steps: [rough, finish] }, "finish", "rough").steps[1]!] }
+    const choices = withChoices({ templates: [template], uses: [useOf("use-1", template, ["el-a", "el-b"], { name: "Pockets" })] })
+    const setup = setupOfToolpaths([], choices, stock)
+    expect(setup.operations).toEqual([])
+    const listed = expandedOperations(setup)
+    expect(listed.map((op) => op.id)).toEqual(["use-1[1]:rough", "use-1[2]:rough", "use-1[1]:finish", "use-1[2]:finish"])
+    expect(listed[2]).toMatchObject({ elementIds: ["el-a"], tool: expect.stringContaining("3") })
+    expect(Object.keys(elementsOfSetup(setup, [{ id: "el-a", type: "rectangle" }, { id: "el-b", type: "circle" }, { id: "el-z", type: "circle" }]))).toEqual(["el-a", "el-b"])
+    expect(cam.program.planPrograms(setup).toolChanges).toBe(1)
+    expect(expandedOperations(setupOfToolpaths(panel().toolpaths, DEFAULT_SETUP_CHOICES, stock))).toEqual([])
+  })
+
+  test("the choices of a saved setup come back with templates, uses, clamps, the travel and the probe", () => {
+    const template = { id: "tpl-1", name: "Pocket", steps: [rough, finish] }
+    const probe = { cycles: [defaultProbeCycle("z-surface"), defaultProbeCycle("bore")] }
+    const choices = withChoices({ templates: [template], uses: [useOf("use-1", template, ["el-a"])], fixtures: [nextFixture([], (n) => `Jaw ${n}`)], envelope: DEFAULT_ENVELOPE, partProbe: probe, probePart: true })
+    const saved = setupOfToolpaths(panel().toolpaths, choices, stock)
+    const back = choicesOfSetup(saved)
+    expect(back).toMatchObject({ templates: [template], fixtures: choices.fixtures, envelope: DEFAULT_ENVELOPE, partProbe: probe, probePart: true })
+    expect(back.uses).toEqual(choices.uses)
+  })
+
+  test("every probe cycle kind has a default the schema accepts, and its fields edit it without leaving the schema", () => {
+    for (const kind of PROBE_KINDS) {
+      const cycle = defaultProbeCycle(kind)
+      const setup = { ...setupOfToolpaths(panel().toolpaths, withChoices({ partProbe: { cycles: [cycle] } }), stock) }
+      expect(() => cam.program.decodeSetup(JSON.parse(JSON.stringify(setup))), kind).not.toThrow()
+      const fields = probeFields(cycle)
+      expect(fields.length).toBeGreaterThan(1)
+      const moved = fields[0]!.set(7)
+      expect(probeFields(moved)[0]!.value).toBe(7)
+      expect(moved.kind).toBe(kind)
+    }
+    // A diameter or a depth of zero is not accepted: the cycle keeps its value.
+    const bore = defaultProbeCycle("bore")
+    expect(probeFields(bore).find((f) => f.key === "diameter")!.set(0)).toEqual(bore)
+    // A normal stays a unit component.
+    expect(probeFields(defaultProbeCycle("edge")).find((f) => f.key === "normalX")!.set(5)).toMatchObject({ normal: { x: 1 } })
   })
 })
