@@ -163,12 +163,17 @@ Built on top of §2:
   GRBL, LinuxCNC, Brother, Mazak, Mitsubishi) or a Siemens post without its swivel record refuses the setup with the reason (`planeRefusal`, an issue; nothing
   is generated); the plane takes the tilt of one axis (A or B) and C. The probe of such a part is written inside the same plane, so it measures the datum the
   cuts will use; its replay is `unreplayed` (the replay turns the table, it does not model the plane word).
-- **Each part's frame.** The fixture's boxes (clamps) and the other blanks are stored in the first part's datum frame. A table turn leaves a part's moves in its own
-  frame, so `boxInPartFrame` carries a box there (about that part's datum, by the table's rotation: a quarter turn keeps a box a box, any other angle gives the bounding
-  box, which covers and is conservative); the blank-overlap check, the reach check and both exact tests use it. A part turned or tilted by its index is not carved
-  into the lattice body (its remaining stock stays the per-part replay's figure, and the evidence notes say so); a tilted plane is already applied by the interpreter.
+- **Each part's frame.** The fixture's boxes (clamps) and the other blanks stay in the first part's datum frame, and so does the body. Every register's moves are carried INTO
+  that frame, not the boxes into the part's: a table turn leaves the moves in the machine, where the part stands turned about its datum, so a machine point `t` is the fixture
+  point `D + Rt (t - D)` and the tool axis (vertical in the machine) is the third row of the table's rotation `R` in the fixture; a tilted-plane post has already put the moves in
+  the fixture frame, with the tool axis along the plane's z. So a part turned by ANY angle, or tilted, is carved into the one body like the others (its `bodyRemovedMm3` /
+  `bodyRemainingMm3` exist), no clamp or blank is turned into a bounding box, the lattice contact check and the cut use the tilted axes, and `reach` is in the fixture frame (arcs
+  count with points along them, not only their ends). `boxInPartFrame` remains for the per-operation clamp-reach warnings of the planner.
 - **Exact blank-to-blank contact.** Another part's blank is an obstacle judged like a clamp: the swept tool (radius, shank, holder when described) against the box, sampled
-  every 0.05 mm (`blankMethod: "exact-box"`, `blankErrorMm`), so a 0.3 mm graze below the lattice cell is a crossing and one 0.05 mm clear is not.
+  every 0.05 mm (`blankMethod: "exact-box"`, `blankErrorMm`), so a 0.3 mm graze below the lattice cell is a crossing and one 0.05 mm clear is not. A vertical tool uses the closed
+  form (`boxPenetration`); a tool whose axis is tilted in the fixture frame uses `toolBoxDepth`: the cones of the tool as rings every 0.1 mm along the axis with points about 0.25 mm
+  apart round them, the deepest below the box's faces (a lower bound: a contact thinner than the sampling falls between samples, and the evidence notes say so). This replaces
+  refining the lattice near contacts: the exact test is the lower bound everywhere, so no contact is left to the cell's noise.
 
 Still not done:
 
@@ -178,8 +183,7 @@ Still not done:
 4. The pass of a back-boring bar through the pilot is judged on the cylinder of its farthest insert corner about the hole axis (`backBoreReach`, exact for the
    oriented insert's corners): against a round pilot that is the contact the oriented insert makes, and it is conservative only against material that is not round about the
    hole (the real insert occupies a sector, the envelope a full circle). A sector-shaped insert in the tri-dexel needs a non-axisymmetric tool solid, which the contact
-   test does not have. The one tri-dexel of the fixture carves every register that keeps a vertical tool in one pass; a part turned or tilted by its index is judged
-   exactly as boxes (blank-to-blank contact and clamps), and the lattice supplies the remaining-stock figures only for the others.
+   test does not have. The one tri-dexel of the fixture carves every register, turned and tilted ones included.
 5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids in the carving (they are exact boxes in the contact
    test, but the body's remaining stock does not subtract what a clamp occupies of the blank); holder collision against the machine; no controller
    qualification (a pass is the reference interpreter's, not a machine's).
