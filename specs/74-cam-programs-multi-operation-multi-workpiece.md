@@ -85,12 +85,32 @@ Built on top of §2:
   release. It needs a placement on every part after the first (else a note says so). It is a box test on the tool axis: the tool radius is
   not added, arcs count by their ends, and the remaining volume is the per-part figure of the replay, not one tri-dexel of the whole fixture.
 
+- **Operation templates.** `Setup.templates` (a named cycle of steps: tool, settings, `dependsOn`, `fromPreviousStock`) and `Setup.uses` (a
+  template applied to elements: `perElement` one instance per element, `order` `perStep` or `perFeature`, `workpieceIds`, `position`
+  among the setup's own operations, `overrides` of settings) are expanded by the pure `expandSetup` into ordinary operations
+  (`<use>[<n>]:<step>` ids). `validateSetup` expands first and names a missing template, an empty use, an override that is not a setting
+  or not valid, a clash of ids, a rest pass in a step-by-step order. The assistant (`setup_plan` / `setup_save` / `setup_generate`), the
+  HTTP plan / generate routes (stateless and saved) expand before planning and generating. Not done: copy / mirror / pattern in
+  geometry (the legacy operation names elements, the caller owns the geometry, so a pattern is a use over several elements); the
+  desktop's setup panel does not edit templates (it reads the expanded operations where `validateSetup` is called, but `planPrograms` and
+  `generateSetup` in the core still expect an expanded setup: a caller must call `expandSetup` first).
+- **Datum probe of every part.** `Setup.partProbe` (cycles in the part's own frame: z-surface, edge, corner, bore, boss; probe pocket,
+  stylus, feed, correction `limit`) and `partProbeProgram` write one program of the probe tool that, for each workpiece in fixture order,
+  runs the cycles under that part's register (`G54..G59`, `G54.1 Pn`, the part's rotary index first) and adds the measured deviation to that
+  register with the kernel's own cycles and actions (an alarm beyond `limit`, default 5 mm). `cam setup_plan` returns `probe` (tool
+  number, register / touches / axes per part, or `refused`); `setup_generate` and the HTTP generate routes take `probePart: true` and put
+  that program FIRST (`kind: "probe"`). It is a program of its own run before the cuts, not inline in each part's toolpaths (inline would
+  put the probe in the cutting programs' tool table and magazine: `generateSetup` would have to place it). It has no material-removal
+  replay (the kernel's `simulateProbing` is not run for it) and the touches of a part that is not where its placement says are the
+  operator's to check.
+
 Still not done:
 
-1. Operation templates and copy/mirror/pattern of operations in the legacy setup (the kernel has them).
+1. Templates in the desktop panel, copy / mirror of a template over a symmetric fixture, templates from the tool library.
 2. One tri-dexel of the whole fixture (clamps as solids, the figures of all parts from one run); today the parts are replayed one by one
    and then compared by boxes in one frame.
 3. The viewer does not draw the combined fixture view (the data is in the evidence).
-4. Probing each part's datum tied to `workpieces`.
+4. The part probe inline in each part's toolpaths, simulated with `simulateProbing` against a misplaced blank, probing more than one
+   cycle kind with angles (web, pocket, rotation correction) and a tilted-plane or rotary index probe.
 5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids (boxes only), holder collision against
    the machine; no controller qualification (a pass is the reference interpreter's, not a machine's).
