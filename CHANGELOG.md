@@ -3,6 +3,38 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.101 (November 2026)
+
+## Core
+
+- The part probe measures web, slot, rectangle and edge-angle cycles, writes a measured rotation (g68, register or table) and is replayed against a displaced blank: plan.probe.parts[].replay says whether the corrected register puts the blank where it is
+- A back-boring bar has inserts (flutes) of a width: the pilot rule and the replay envelope use the reach of their corners, the shift is searched, and the replay matches the NC's rounded shift (a non-round Q no longer fell out of the envelope)
+- The fixture is one tri-dexel body: every blank and clamp in one solid, every register's moves cut into it in program order, each part's remaining stock read from it; clamps are judged exactly (box against the swept tool, 0.05 mm step) so a 0.3 mm graze is a crossing
+- The parts of a fixture and its clamps are judged on a tri-dexel with the tool's radius and holder counted: a part's blank or a clamp the tool edge reaches is a crossing, a replay that could not finish claims nothing
+- The setup that cuts under the part is judged on its own tri-dexel: back-boring's rapid, holder, gouge and leftover claims are decided (the shifted bar as the pilot rule's envelope), a job whose every claim passes is released although each setup alone cannot see the faces that look away
+- PlanPrograms and generateSetup expand a setup's template uses first, so the desktop plan of a saved setup shows their operations
+- Operation templates and the part probe reach the assistant and the HTTP routes: setup_plan/save/generate expand template uses, probePart stores the datum probe of every workpiece as the first program
+- Operation templates (a cycle of operations applied to features, expanded before planning) and a datum probe program per workpiece register
+- A carried stock keeps the void of an undercut: the job is replayed on a tri-dexel handed from setup to setup, part-coverage names its evidence instead of the height-field limit
+- The HTTP generate routes of a setup replay each program per work offset on request, and a program with several registers is seen in one frame (blank per placement, cuts into another part's blank block the release)
+- Enhance CAD import/export functionality with new file types and improved UI; add vector and mesh file import capabilities, update toolbar actions, and refine import/export dialogs
+
+## Desktop
+
+- The probe editor offers the cycles the core added (web, slot, rectangle, face angle), so the panel typechecks against the new schema
+- The setup panel edits clamps, the machine travel, operation templates with their uses, and the part probe; the viewer outlines clamps and travel; the request carries the page's stock so blanks are checked against them
+- The viewer draws the parts of a multi-register program together from the replay (blank, reach, crossed parts in red), switched in the visualizer settings
+- A setup's programs are generated with their replay, which is saved with the program and shown in its row (release and a verdict per register)
+- The arcs and cycles of a part tilted by its index are drawn as segments within 0.01 mm of the curve, not as one chord
+
+## AI
+
+- Spec 74 and the skill say what the HTTP replay and the one-frame view of the parts do
+
+## Documentation
+
+- Spec 74 records operation templates and the part probe
+
 ## v0.1.100 (November 2026)
 
 ## Desktop
