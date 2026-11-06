@@ -373,7 +373,8 @@ describe("the closed loop on the machine: the cut replayed in machine coordinate
 
   test("a control without G68 refuses the rotation with what to use", () => {
     const job = jobWith([{ kind: "rotation", result: "rotation", via: "g68", policy: { mode: "set" } }])
-    const art = runJob({ ...job, machine: machineOf("vmc-standard", "linuxcnc") })
+    // LinuxCNC writes G68 with the Fanuc words; Okuma has neither G68 here nor a rotation in its work coordinates.
+    const art = runJob({ ...job, machine: machineOf("vmc-standard", "okuma") })
     const text = art.status === "ok" ? art.value.issues.map((i) => i.message).join(" ") : art.issues.map((i) => i.message).join(" ")
     expect(text).toMatch(/offset-r/)
   })

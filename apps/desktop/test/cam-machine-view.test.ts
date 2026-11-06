@@ -83,9 +83,14 @@ describe("mill: the part is clamped, the tool turns", () => {
   })
 
   test("a cut into the jaws is listed and drawn red", () => {
-    const s = scene(setup, "M3 S9000\nG0 X-55 Y-33 Z5\nG1 Z-18 F200\nG1 X55\nG0 Z5", DEFAULT_MACHINE_DISPLAY, { radius: 3, length: 40 })
+    const code = "M3 S9000\nG0 X-55 Y-33 Z5\nG1 Z-18 F200\nG1 X55\nG0 Z5"
+    const s = scene(setup, code, DEFAULT_MACHINE_DISPLAY, { radius: 3, length: 40 })
+    const hidden = scene(setup, code, { ...DEFAULT_MACHINE_DISPLAY, showPathLines: false }, { radius: 3, length: 40 })
     expect(s.findings.map((f) => f.code)).toContain("MILL_INTO_VISE")
-    expect(s.root.getObjectByName("collisions")).toBeDefined()
+    expect(s.root.getObjectByName("collisions")?.visible).toBe(true)
+    expect(hidden.root.getObjectByName("collisions")?.visible).toBe(false)
+    expect(hidden.findings.map((f) => f.code)).toContain("MILL_INTO_VISE")
+    s.dispose(); hidden.dispose()
   })
 
   test("the spindle angle turns clockwise from above with M3 and stops with M5", () => {
@@ -180,6 +185,19 @@ describe("printer: nothing turns, the nozzle deposits layer by layer", () => {
     expect((all.root.getObjectByName("deposits") as THREE.LineSegments).geometry.drawRange.count).toBe(4)
     const nozzle = s.root.getObjectByName("nozzle")!
     expect(nozzle.position.toArray()).toEqual([20, 20, 0.4])
+  })
+
+  test("hiding path lines hides printer travel while preserving deposited material", () => {
+    const visible = scene(setup, code)
+    const hidden = scene(setup, code, { ...DEFAULT_MACHINE_DISPLAY, showPathLines: false })
+    try {
+      expect(visible.root.getObjectByName("travel")?.visible).toBe(true)
+      expect(hidden.root.getObjectByName("travel")?.visible).toBe(false)
+      hidden.update(hidden.timeline.duration)
+      const deposits = hidden.root.getObjectByName("deposits") as THREE.LineSegments
+      expect(deposits.visible).toBe(true)
+      expect(deposits.geometry.drawRange.count).toBeGreaterThan(0)
+    } finally { visible.dispose(); hidden.dispose() }
   })
 })
 

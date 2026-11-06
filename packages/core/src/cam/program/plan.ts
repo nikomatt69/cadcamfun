@@ -3,7 +3,7 @@
  * UI can offer every grouping from the same planner and show the cost of each (tool loads, tool changes) before anything is generated.
  */
 import type { Operation } from "./op.ts"
-import { enabledOperations, type Setup } from "./setup.ts"
+import { enabledOperations, expandSetup, runsOf, workpiecesOf, type Setup } from "./setup.ts"
 import { assignPockets, buildToolTable, type ToolTableEntry } from "./tooltable.ts"
 
 export interface PlannedProgram {
@@ -53,7 +53,9 @@ export const groupsOf = (setup: Setup): ReadonlyArray<{ readonly name: string; r
   }
 }
 
-export const planPrograms = (setup: Setup): SetupPlan => {
+export const planPrograms = (given: Setup): SetupPlan => {
+  // Template uses become operations first; an already expanded setup comes back unchanged.
+  const setup = expandSetup(given).setup
   const ops = enabledOperations(setup)
   const pockets = assignPockets(ops)
   const table = buildToolTable(ops)
@@ -64,7 +66,7 @@ export const planPrograms = (setup: Setup): SetupPlan => {
     const toolNumbers: number[] = []
     let previous: string | undefined
     const seen = new Set<string>()
-    for (const op of group.operations) {
+    for (const { operation: op } of runsOf(setup, group.operations)) {
       const pocket = pockets.get(op.id)!
       if (!toolNumbers.includes(pocket)) toolNumbers.push(pocket)
       if (previous !== undefined && previous !== op.tool.id) {
@@ -77,5 +79,9 @@ export const planPrograms = (setup: Setup): SetupPlan => {
     }
     programs.push({ name: group.name, programNumber: setup.post.programNumberBase + index, toolNumbers, operations: group.operations.map((op) => op.id) })
   })
+  if (setup.workpieceOrder === "partFirst" && workpiecesOf(setup).length > 1 && setup.grouping === "single") {
+    const saved = planPrograms({ ...setup, workpieceOrder: "toolFirst" }).toolChanges
+    if (saved < toolChanges) warnings.push(`Finishing one workpiece before the next repeats every tool change: running each tool over all the workpieces saves ${toolChanges - saved} tool changes`)
+  }
   return { programs, toolTable: table.entries, toolLoads: programs.length + toolChanges, toolChanges, warnings: [...new Set(warnings)] }
 }

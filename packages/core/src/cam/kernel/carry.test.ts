@@ -4,6 +4,7 @@ import { carriedColumns } from "./carry.ts"
 import type { ManufacturingJob, OperationSpec, ResidualStock } from "./contracts.ts"
 import { runSetups, type SetupsArtifact } from "./setups.ts"
 import { setupTransform } from "../setup.ts"
+import { TriDexel } from "./tridexel.ts"
 
 setDefaultTimeout(100_000)
 
@@ -76,5 +77,27 @@ describe("runSetups with carryStock", () => {
     const again = run({ ...job(true), setups: [{ id: "a", operations: [face("f1", 10)] }, { id: "b", operations: [face("f2", 10)] }] })
     const [, b] = again.setups.map((s) => s.artifact)
     expect(b!.stock.initialVolume - b!.stock.finalVolume).toBeLessThan(area * 0.05)
+  })
+})
+
+describe("carriedColumns: a residual that carries the tri-dexel keeps the void", () => {
+  // A 10 x 10 x 8 plate whose underside has a 4 mm deep pocket over x < 5 (a back-bored counterbore): the height field of the same setup
+  // holds the column from its floor to its top and so counts the pocket as solid; the tri-dexel holds the gap.
+  const box = TriDexel.box({ x: 0, y: 0, z: -8 }, { x: 10, y: 10, z: 0 }, 0.25)
+  const solid = TriDexel.fromSolid({ x: 0, y: 0, z: -8 }, { x: 10, y: 10, z: 0 }, 0.25, (p) => box.solidAt(p) && !(p.x < 5 && p.z < -4))!
+  const top = new Float64Array(100).fill(0)
+  const residual: ResidualStock = { orientation: "+Z", origin: { x: 0, y: 0, z: 0 }, nx: 10, ny: 10, minX: 0, minY: 0, cellX: 1, cellY: 1, floor: -8, top, solid: { orientation: "+Z", origin: { x: 0, y: 0, z: 0 }, stock: solid, complete: true, reasons: [] } }
+  const without: ResidualStock = { ...residual, solid: undefined as never }
+  delete (without as { solid?: unknown }).solid
+
+  test("read from below, the pocket is air at the top of the column and only the 4 mm of plate is solid", () => {
+    const flipped = carriedColumns(residual, setupTransform("-Z"))(2.5, -5, -1, 9)
+    expect(flipped.top).toBeCloseTo(4, 1)
+    expect(flipped.solid).toBeCloseTo(4, 1)
+    // The height field of the same setup cannot know: the whole column counts as solid.
+    const blind = carriedColumns(without, setupTransform("-Z"))(2.5, -5, -1, 9)
+    expect(blind.solid).toBeCloseTo(8, 1)
+    // Beside the pocket the two agree.
+    expect(carriedColumns(residual, setupTransform("-Z"))(7.5, -5, -1, 9).solid).toBeCloseTo(8, 1)
   })
 })

@@ -18,8 +18,7 @@ import type { PaletteEntry } from "../../lib/probing/cycle-palette.data.ts"
 import { planLocal, type ProbeOperation } from "../../lib/probing/operation.ts"
 import type { ProbeTarget } from "../../lib/probing/probe-targets.ts"
 import { summarizeInspection } from "../../lib/probing/inspection.ts"
-import { nativePatch, nativeStatusOf } from "../../lib/probing/native.ts"
-import type { RunCalibration } from "../../lib/probing/simulation.ts"
+import type { RunCalibration } from "../../lib/probing/result.ts"
 import type { ProbingDefaults } from "../../../../shared/state/settings.ts"
 import type { OffsetScope } from "../../store/workOffsetStore.ts"
 import { InspectionList } from "./InspectionList.tsx"
@@ -81,14 +80,10 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
   const stale = () => { const s = selected(); const p = program(); return s !== undefined && p !== undefined && freshProgram(probing.programs, s.id, s.probe) === undefined }
   const dialect = () => probing.dialect ?? c.profile()?.post ?? "fanuc"
   const toggle = (section: ProbingSection) => () => probing.toggleSection(section)
-  // Whether native is possible is asked of the operation as turning it on would leave it (unconditional datum write).
-  const checkedNative = (op: ProbeOperation): ProbeOperation => (op.native === true ? op : { ...op, ...nativePatch(op, true) })
-  // The gutter marks touch lines only on the text they were counted in: the program the simulation posted (same hash).
-  const contactLines = createMemo(() => {
-    const r = run(), p = program()
-    if (r === undefined || p === undefined || r.programHash === undefined || r.programHash !== p.hash) return new Set<number>()
-    return new Set(r.outcome.contacts.flatMap((contact) => contact.line === undefined ? [] : [contact.line]))
-  })
+  // The palette is taller than the panel: a new cycle would open out of sight and the click would seem to do nothing.
+  let editorEl: HTMLDivElement | undefined
+  const revealEditor = () => queueMicrotask(() => editorEl?.scrollIntoView?.({ block: "start", behavior: "smooth" }))
+  const contactLines = createMemo(() => new Set((run()?.outcome.contacts ?? []).flatMap((contact) => contact.line === undefined ? [] : [contact.line])))
   const summary = (): string | undefined => {
     const r = run()
     if (r === undefined) return undefined
@@ -135,10 +130,11 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
 
       <PanelSection id="probing-cycles" icon={SECTION_ICON.cycles} title={t("cam.probing.section.cycles")} open={probing.open.cycles} onToggle={toggle("cycles")} testId="probing-section-cycles"
         summary={t("cam.probing.cycles.count", { count: cycles().length })}>
-        <ProbeCyclePalette profile={c.profile()} onAdd={(entry) => c.add(entry)} />
+        <ProbeCyclePalette profile={c.profile()} onAdd={(entry) => { c.add(entry); revealEditor() }} />
         <ProbeCycleList cycles={cycles()} selectedId={probing.selectedId} resultOf={resultOf}
           onSelect={(id) => probing.select(id)} onToggleVisible={(id) => c.toggleVisible(id)} onMove={(id, dir) => c.move(id, dir)}
           onDuplicate={(id) => c.duplicate(id)} onRemove={(id) => c.remove(id)} />
+        <div ref={editorEl} data-testid="probe-editor-anchor" />
         <Show when={selected()}>{(cycle) => (
           <ProbeCycleEditor id={cycle().id} operation={cycle().probe} profile={c.profile()} defaults={c.defaults()} targets={c.targets()} picking={probing.picking}
             onChange={(patch) => c.update(cycle().id, patch)} onPick={c.pick} onTarget={(target) => c.applyTarget(cycle().id, target)} />
@@ -182,10 +178,14 @@ export function ProbingTab(props: { readonly controller: ProbingController }): J
       <PanelSection id="probing-program" icon={SECTION_ICON.program} title={t("cam.probing.section.program")} open={probing.open.program} onToggle={toggle("program")} testId="probing-section-program">
         <Show when={selected()} fallback={<p class="panel-empty">{t("cam.probing.program.select")}</p>}>{(cycle) => (
           <ProbeProgramPreview program={program()} stale={stale()} dialect={dialect()} dialects={c.dialects()} busy={probing.busy} showIn3d={probing.showIn3d} contactLines={contactLines()} misplacement={probing.misplacement} onMisplacement={(patch) => probing.setMisplacement(patch)}
+            nativeStyle={c.profile()?.probing?.macroStyle} native={cycle().probe.native === true} onNative={(native) => c.update(cycle().id, { native })}
             disabled={!planLocal(cycle().probe, { profile: c.profile(), defaults: c.defaults() }).ok} onDialect={(id) => probing.setDialect(id)} onGenerate={() => void c.generate(cycle().id)} onSimulate={() => void c.simulate(cycle().id)}
-            native={{ checked: cycle().probe.native === true, status: nativeStatusOf(checkedNative(cycle().probe), { profile: c.profile(), defaults: c.defaults() }) }}
-            onNative={(checked) => c.update(cycle().id, nativePatch(cycle().probe, checked))}
-            onShow3d={(show) => { probing.setShowIn3d(show); if (show) cam.setActiveTab("toolpath") }} onInsert={(nc) => c.insert(nc)} />
+            onShow3d={(show) => {
+              // The overlay stays armed after a simulation while the editor is in front: there the button brings the 3D view, not the switch off.
+              if (!show && cam.activeTab !== "toolpath") { cam.setActiveTab("toolpath"); return }
+              probing.setShowIn3d(show)
+              if (show) cam.setActiveTab("toolpath")
+            }} onInsert={(nc) => c.insert(nc)} />
         )}</Show>
       </PanelSection>
       <Show when={cam.gcode !== "" && selected() === undefined}><p class="panel-hint">{t("cam.probing.hint.legacy")}</p></Show>

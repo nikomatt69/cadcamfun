@@ -307,3 +307,36 @@ test("a machine configuration of the library is a machine the kernel plans again
     useGeneratorStore.getState().patchKernelSettings({ machine: cam.kernel.DEFAULT_MACHINE.id, machineConfig: undefined })
   }
 })
+
+test("a job of two setups runs one program per setup on its own work offset, the panel lists them with the job's release and opens either", async () => {
+  useElementsStore.getState().addElements([{ id: "p", type: "cube", width: 20, height: 12, depth: 6, x: 0, y: 0, z: 0, layerId: "default" }])
+  useElementsStore.setState({ selectedElement: null })
+  const view = app.visit("/cam")
+  try {
+    const add = await app.wait(() => document.querySelector<HTMLButtonElement>("[data-testid='kernel-job-add']"), 30_000)
+    add.click()
+    expect(useGeneratorStore.getState().kernelSettings.setups).toEqual([{ id: "setup-1", orientation: "+Z", workOffset: "G54" }, { id: "setup-2", orientation: "+Z", workOffset: "G55" }])
+    expect(document.querySelectorAll("[data-testid='kernel-job-setup']")).toHaveLength(2)
+    // The second setup cannot take the first one's register.
+    const second = document.querySelector("[data-setup='setup-2'] [data-testid='kernel-job-offset']") as HTMLSelectElement
+    second.value = "G54"
+    second.dispatchEvent(new window.Event("change", { bubbles: true }))
+    expect(useGeneratorStore.getState().kernelSettings.setups![1]!.workOffset).toBe("G55")
+    document.querySelector<HTMLButtonElement>("[data-testid='kernel-generate']")!.click()
+    const rows = await app.wait(() => { const found = document.querySelectorAll("[data-testid='kernel-job-program']"); return found.length === 2 ? found : null }, 110_000)
+    expect([...rows].map((row) => row.getAttribute("data-setup"))).toEqual(["setup-1", "setup-2"])
+    expect(rows[0]!.textContent).toContain("G54")
+    expect(rows[1]!.textContent).toContain("G55")
+    expect(document.querySelector("[data-testid='kernel-job-release']")?.textContent).toMatch(/preview|verified-program/)
+    // The editor holds the first setup's program; opening the other swaps program and request together.
+    expect(useCamStore.getState().kernelRequest?.setupId).toBe("setup-1")
+    expect(useCamStore.getState().kernelArtifact?.program.workOffset).toBe("G54")
+    const open = rows[1]!.querySelector<HTMLButtonElement>("[data-testid='kernel-job-open']")!
+    expect(open.disabled).toBe(false)
+    open.click()
+    expect(useCamStore.getState().kernelRequest?.setupId).toBe("setup-2")
+    expect(useCamStore.getState().kernelArtifact?.program.workOffset).toBe("G55")
+    expect(useCamStore.getState().gcode).toContain("G55")
+    expect(document.querySelector("[data-testid='kernel-stale']")).toBeNull()
+  } finally { view.dispose() }
+})

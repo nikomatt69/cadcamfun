@@ -35,6 +35,41 @@ const marked = (cycle: ProbeCycle, actions: ReadonlyArray<ProbeAction>, style: M
 const programOf = (moves: ReadonlyArray<Move>) => makeProgram("native", [{ id: "p", name: "probe", toolId: "probe", spindleRpm: 0, coolant: "off", moves: [{ _tag: "Rapid", to: { x: 0, y: 0, z: 30 } }, ...moves] }])
 const write = (id: PostId, moves: ReadonlyArray<Move>, nativeCycles: boolean): string => posts[id].emit(programOf(moves), { header: false, nativeCycles })
 
+describe("what the vendors' manuals ask of a native cycle", () => {
+  const nativeOf = (cycle: ProbeCycle, actions: ReadonlyArray<ProbeAction>, style: MacroStyle, extra: { readonly post?: string } = {}) =>
+    nativeCycle(cycle, actions, style, inlineOf(cycle, actions).moves, { ...nctx, ...extra })
+  const extended = (p: number): ProbeAction => ({ kind: "set-offset", ref: { kind: "extended", p }, axes: { X: "x", Y: "y" }, policy: { mode: "set" } })
+
+  test("Heidenhain: Q305 = 0 moves the active datum at once, so a measurement alone is refused, and Q303 is never -1", () => {
+    const measure = nativeOf(bore, [], "heidenhain-ts")
+    expect("refused" in measure && measure.refused).toMatch(/Q305 = 0/)
+    const nc = write("heidenhain", marked(bore, [setXY], "heidenhain-ts"), true)
+    expect(nc).toMatch(/Q303=\+1/)
+    expect(nc).not.toMatch(/Q303=-1/)
+    expect(nc).not.toMatch(/Q305=\+?0\b/)
+  })
+
+  test("Siemens CYCLE978 gives the direction of travel: down on a surface, against the normal on an edge", () => {
+    expect(write("siemens", marked(top, [setZ], "siemens-cycles"), true)).toMatch(/_MA=3[\s\S]*_MD=1[\s\S]*_MVAR=100\b/)
+    const left: ProbeCycle = { kind: "edge", at: { x: 0, y: 20, z: -5 }, normal: { x: -1, y: 0 } }
+    expect(write("siemens", marked(left, [{ kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { X: "x" }, policy: { mode: "set" } }], "siemens-cycles"), true)).toMatch(/_MD=0\b/)
+  })
+
+  test("Siemens: without an offset to write the variant only measures (hundreds 0), and _KNUM is 0", () => {
+    const nc = write("siemens", marked(bore, [], "siemens-cycles"), true)
+    expect(nc).toMatch(/_KNUM=0\b/)
+    expect(nc).toMatch(/_MVAR=1\b/)
+  })
+
+  test("Renishaw: an extended offset is S154.pp on Haas, and refused where the word is not known", () => {
+    const haas = nativeOf(bore, [extended(7)], "renishaw", { post: "haas" })
+    if ("refused" in haas) throw new Error(haas.refused)
+    expect(write("haas", haas.moves, true)).toContain("S154.07")
+    const fanuc = nativeOf(bore, [extended(7)], "renishaw", { post: "fanuc" })
+    expect("refused" in fanuc && fanuc.refused).toMatch(/only known on Haas/)
+  })
+})
+
 describe("native probe cycles", () => {
   const cases: ReadonlyArray<[string, PostId, MacroStyle, ProbeCycle, ReadonlyArray<ProbeAction>, string]> = [
     ["heidenhain-412", "heidenhain", "heidenhain-ts", bore, [setXY], "TCH PROBE 412 DATUM INSIDE CIRCLE"],

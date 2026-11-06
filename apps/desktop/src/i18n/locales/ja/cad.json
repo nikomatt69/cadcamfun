@@ -122,7 +122,7 @@
   "cad.importExport.selectFile": "CAD ファイルを選択",
   "cad.importExport.upload": "ファイルをアップロード",
   "cad.importExport.orDrag": "またはドラッグ＆ドロップ",
-  "cad.importExport.formats": "JSON、STL、OBJ、PLY、STEP、IGES または CAD/CAM FUN ファイル",
+  "cad.importExport.formats": "STEP, IGES, DXF, SVG, STL, OBJ, PLY, 3MF, GLB, JSON, CAD, CADCAM",
   "cad.importExport.attention": "注意",
   "cad.importExport.importWarning": "ファイルを読み込むと現在の作図データは置き換えられます。読み込む前に必ず作業内容を保存してください。",
   "cad.importExport.fileName": "ファイル名",
@@ -1259,5 +1259,16 @@
   "cad.param.groupName": "Group name",
   "cad.param.ungroup": "Ungroup",
   "cad.param.expandGroup": "Expand",
-  "cad.param.collapseGroup": "Collapse"
+  "cad.param.collapseGroup": "Collapse",
+  "cad.importExport.selectFiles": "CADファイルまたはフォルダーを選択",
+  "cad.importExport.chooseFiles": "ファイルを選択",
+  "cad.importExport.chooseFolder": "フォルダーを選択",
+  "cad.importExport.importing": "{total}件中{current}件をインポート中…",
+  "cad.importExport.importAdditive": "ファイルは現在の図面に追加されます。サブフォルダーも検索します。",
+  "cad.importExport.importSummary": "{files}ファイル（{elements}要素）をインポート、{failed}ファイルは失敗しました。",
+  "cad.importExport.importSuccess": "{count}要素をインポートしました",
+  "cad.importExport.importFailed": "インポートできません",
+  "cad.importExport.importWarnings": "警告",
+  "cad.importExport.importNoLayer": "アクティブなレイヤーがありません。何も追加されませんでした。",
+  "cad.importExport.importDone": "完了"
 }

@@ -599,6 +599,8 @@
   "ai.catalog.write": "Запись",
   "ai.catalog.destructive": "Разрушительные",
   "ai.catalog.tools": "{count} инструментов",
+  "ai.toolTitle.cad": "Чтение чертежа",
+  "ai.toolTitle.cad_edit": "Правка чертежа",
   "ai.catalog.actions": "{count} действий",
   "ai.catalog.empty": "Каталог пока недоступен.",
   "ai.catalog.unavailable": "Хост не ответил.",

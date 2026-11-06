@@ -386,7 +386,7 @@ export const booleanStrict = (A: Brep, B: Brep, op: BooleanOp, options: BooleanO
   // only the faces near the other operand are meshed: a fillet tool touches a few faces of a large body, and meshing the
   // whole body for every Boolean of a blend sequence was most of its cost. A face away from the other operand has no
   // intersection; it stays one fragment, classified as a whole.
-  const opts = { chordTol: seedChord, angleTolDeg: options.seedAngleDeg ?? 10 }
+  const opts = { chordTol: seedChord, angleTolDeg: options.seedAngleDeg ?? 10, edgeNormalTurn: false }
   const pad = seedChord * 2
   const faceBoxesOf = (b: Brep, fb: FaceBoundaries): Array<{ lo: Vec3; hi: Vec3 }> =>
     b.faces.map((f, fi) => {

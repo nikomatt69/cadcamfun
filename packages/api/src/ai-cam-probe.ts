@@ -35,10 +35,7 @@ export const CamProbeInput = Schema.Struct({
   frame: Schema.optionalKey(Schema.Struct({ a: Schema.optionalKey(degrees), b: Schema.optionalKey(degrees), c: Schema.optionalKey(degrees) })),
   /** The control the program is written for (default: the machine's post, else fanuc). */
   dialect: Schema.optionalKey(CamProbingDialect),
-  /**
-   * Write the control's own cycle (`G65 P98xx`, `TCH PROBE 4xx`, `CYCLE97x`) with the machine's `probing.macroStyle`. It writes the datum
-   * unconditionally (`update: set`, no tolerance), no checks, no tilted plane; anything else is refused with the reason.
-   */
+  /** Write the control's own cycle (the machine's macro style); its `probing` claim stays unresolved. */
   native: Schema.optionalKey(Schema.Boolean),
   machineConfig: Schema.optionalKey(id),
   settings: Schema.optionalKey(CamProbingSettingsInput),

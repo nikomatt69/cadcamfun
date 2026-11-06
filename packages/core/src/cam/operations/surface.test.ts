@@ -89,7 +89,8 @@ describe("parallel finishing", () => {
       if (rho > 8.5) continue
       const truth = Math.sqrt(12 ** 2 - rho ** 2) - 2 - 10
       expect(p.z).toBeGreaterThanOrEqual(truth - 0.015)
-      expect(p.z).toBeLessThan(truth + 0.08)
+      // The drop-cutter reads each column's ceiling, the highest surface in its 0.1 mm square: slope x cell above the truth at worst.
+      expect(p.z).toBeLessThan(truth + 0.03 + (rho / Math.sqrt(12 ** 2 - rho ** 2)) * 0.1)
       checked++
     }
     expect(checked).toBeGreaterThan(200)

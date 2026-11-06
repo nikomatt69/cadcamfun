@@ -8,7 +8,7 @@
  * generated, imported and hand-edited code all share one pipeline.
  */
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js"
-import { useSearchParams } from "@solidjs/router"
+import { useNavigate, useSearchParams } from "@solidjs/router"
 import { WorkspaceInspector } from "../../../shared/components/panel/inspector.tsx"
 import { Box, Crosshair, ShieldCheck, Wrench } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
@@ -25,6 +25,7 @@ import { makeToolpathGenerator } from "../api/generator.ts"
 import { combineOperationResults, useCamStore } from "../store/camStore.ts"
 import { useGeneratorStore, type LibraryTool } from "../store/generatorStore.ts"
 import CamToolbar from "../components/CamToolbar.tsx"
+import CamImportDialog from "../components/CamImportDialog.tsx"
 import CamSidebar, { type SidebarTab } from "../components/CamSidebar.tsx"
 import ToolpathGenerator from "../components/ToolpathGenerator.tsx"
 import VerifyPanel from "../components/VerifyPanel.tsx"
@@ -54,6 +55,8 @@ import { freshProgram, freshResult, useProbingStore } from "../store/probingStor
 import { useInspectionStore } from "../store/inspectionStore.ts"
 import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
 import { probeCycles } from "../lib/probing/cycles.ts"
+import { clampBoxes, fixtureBoxes, placedProgram, travelBox } from "../lib/setup.ts"
+import { useSetupStore } from "../store/setupStore.ts"
 import { overlayModelOf } from "../lib/probing/overlay-input.ts"
 import { partSolidsOf } from "../lib/probing/part-solids.ts"
 import { workOriginOf } from "../lib/probing/probe-targets.ts"
@@ -75,6 +78,7 @@ const postExtension = (post: PostProcessorType): string => (post === "heidenhain
 export default function CamPage(): JSX.Element {
   const app = useApp()
   const camStore = useCamStore()
+  const setupStore = useSetupStore()
   const gen = useGeneratorStore()
   const previewSettings = () => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode ? gen.generatedSettings ?? gen.settings : gen.settings
   const previewLibraryTool = () => gen.currentGCode !== "" && gen.currentGCode === camStore.gcode && gen.generatedSettings !== undefined ? gen.generatedTool : gen.selectedLibraryTool
@@ -117,6 +121,9 @@ export default function CamPage(): JSX.Element {
     return undefined
   })
   const operationToolModels = createMemo(() => operationTools().length > 0 ? new Map(operationTools().map((o) => [o.toolId, o.model])) : (headerModels()?.size ?? 0) > 0 ? headerModels() : undefined)
+  // The clamps and the machine travel the setup panel describes are outlined in the view as they are edited, before anything is generated.
+  const clampsOfSetup = createMemo(() => clampBoxes(setupStore.choices.fixtures))
+  const travelOfSetup = createMemo(() => travelBox(setupStore.choices.envelope))
   const previewMachine = createMemo(() => previewSetup(machineChoice().kind, previewSettings(), previewStock(), {
     ...(kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}),
     program: camStore.program, gcode: camStore.gcode, tool: toolModel()
@@ -146,12 +153,13 @@ export default function CamPage(): JSX.Element {
     const cycle = selectedProbe()
     if (cycle === undefined || !probingState.showIn3d || camStore.rightTab !== "probing") return undefined
     const program = freshProgram(probingState.programs, cycle.id, cycle.probe)
-    return program?.parsed === undefined ? undefined : { ...program.parsed, nc: program.nc, ...(program.hash !== undefined ? { hash: program.hash } : {}) }
+    return program?.parsed === undefined ? undefined : { ...program.parsed, nc: program.played?.text ?? program.nc, ...(program.played !== undefined ? { sourceLines: program.played.lines } : {}) }
   })
   const shownProgram = () => probePreview()?.program ?? camStore.program
   const shownMotion = () => (probePreview() !== undefined ? probePreview()!.motion : camStore.motion)
   const shownGcode = () => probePreview()?.nc ?? camStore.gcode
   const [search, setSearch] = useSearchParams()
+  const navigate = useNavigate()
 
   const [gcode, setGcodeSignal] = createSignal<string>(camStore.gcode)
   const [processedGcode, setProcessedGcode] = createSignal("")
@@ -160,8 +168,8 @@ export default function CamPage(): JSX.Element {
   const [showLibrary, setShowLibrary] = createSignal(false)
   const [showCosts, setShowCosts] = createSignal(false)
   const [showHistory, setShowHistory] = createSignal(false)
+  const [showImport, setShowImport] = createSignal(false)
   const [saveRequest, setSaveRequest] = createSignal<{ readonly code: string; readonly extension: string; readonly projectOnly: boolean }>()
-  let ribbonFilePicker: HTMLInputElement | undefined
   let parseVersion = 0
   let manualParse: AbortController | undefined
   let automaticParse: AbortController | undefined
@@ -204,7 +212,7 @@ export default function CamPage(): JSX.Element {
         else saveGCode()
       },
       "file.export": () => { saveGCode() },
-      "file.import": () => { ribbonFilePicker?.click() },
+      "file.import": () => { setShowImport(true) },
       "edit.undo": { run: () => { useCamHistoryStore.getState().undo() }, inText: inEditor },
       "edit.redo": { run: () => { useCamHistoryStore.getState().redo() }, inText: inEditor },
       "cam.tab.editor": () => { camStore.setActiveTab("editor") },
@@ -234,6 +242,8 @@ export default function CamPage(): JSX.Element {
     if (camStore.operationResults.length > 0 && text === combineOperationResults(camStore.operationResults).gcode) return
     // The kernel returned this exact program with named operations/tool changes; reparsing would discard that structure.
     if (camStore.kernelArtifact?.nc === text) return
+    // A setup's program keeps the register of every toolpath (which part it machines): the viewport draws each part where it lies.
+    if (camStore.generatedProgram?.gcode === text) { camStore.setProgram(placedProgram(camStore.generatedProgram.program, camStore.generatedProgram.workpieces)); return }
     const controller = new AbortController()
     automaticParse = controller
     const owner = captureEditorOwner()
@@ -253,13 +263,10 @@ export default function CamPage(): JSX.Element {
   // A different program on the stage starts from its beginning.
   createEffect(on(() => probePreview()?.nc, () => { camStore.setPlaying(false); camStore.setPlaybackTime(0) }, { defer: true }))
   const probeRun = createMemo(() => inspectionState.opened ?? (selectedProbe() === undefined ? undefined : freshResult(probingState.results, selectedProbe()!.id, selectedProbe()!.probe)))
-  // Contacts are placed in time only on the program their lines were counted in (the simulated one); another text would misplace them.
-  const linesMatch = (run: { readonly programHash?: string | undefined }, preview: { readonly hash?: string | undefined } | undefined): boolean =>
-    preview !== undefined && run.programHash !== undefined && run.programHash === preview.hash
   const probeOverlay = createMemo(() => {
     const run = probeRun(), cycle = selectedProbe()
     if (run === undefined || cycle === undefined || !probingState.showIn3d || camStore.rightTab !== "probing") return undefined
-    return overlayModelOf({ result: run, operation: cycle.probe, deviationScale: app.settings.settings().probing.deviationScale, timeline: linesMatch(run, probePreview()) ? shownTimeline() : undefined })
+    return overlayModelOf({ result: run, operation: cycle.probe, deviationScale: app.settings.settings().probing.deviationScale, timeline: probePreview() !== undefined ? shownTimeline() : undefined, sourceLines: probePreview()?.sourceLines })
   })
   const probePart = createMemo(() => {
     if (camStore.rightTab !== "probing") return undefined
@@ -355,6 +362,15 @@ export default function CamPage(): JSX.Element {
     setSaveRequest({ code, extension, projectOnly })
   }
 
+  const saveWorkspace = async (): Promise<void> => {
+    const owner = captureEditorOwner()
+    if (owner.drawingId || camStore.savedProgram) {
+      const result = await projectSession(app).saveInteractive()
+      if (result === undefined || !owner.current()) return
+    }
+    if (!camStore.savedProgram && gcode().trim()) saveGCode(true)
+  }
+
   const toggleSimulation = (): void => {
     const next = !camStore.playing
     if (next && camStore.program.toolpaths.length === 0) {
@@ -430,8 +446,10 @@ export default function CamPage(): JSX.Element {
           isSimulating={camStore.playing}
           aiEnhanced={app.panelOpen()}
           showChat={app.panelOpen()}
-          onSave={saveGCode}
-          onImport={importGCode}
+          onSave={() => void saveWorkspace()}
+          onImport={() => setShowImport(true)}
+          onExport={() => saveGCode()}
+          onProjects={() => navigate("/projects")}
           onToggleSimulation={toggleSimulation}
           onOpenLibrary={() => setShowLibrary(true)}
           onOpenCosts={() => setShowCosts(true)}
@@ -442,7 +460,7 @@ export default function CamPage(): JSX.Element {
 
         <CamRibbon
           onSave={saveGCode}
-          onImport={() => ribbonFilePicker?.click()}
+          onImport={() => setShowImport(true)}
           onOpenLibrary={() => setShowLibrary(true)}
           onOpenCosts={() => setShowCosts(true)}
           onSelectActiveTab={(next) => camStore.setActiveTab(next)}
@@ -455,18 +473,7 @@ export default function CamPage(): JSX.Element {
           postProcessor={selectedPostProcessor()}
         />
 
-        <input
-          ref={ribbonFilePicker}
-          type="file"
-          class="hidden"
-          accept=".nc,.gcode,.ngc,.tap,.cnc,.txt,.h,.mpf,.json"
-          aria-label={t("cam.import")}
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0]
-            if (file) importGCode(file)
-            event.currentTarget.value = ""
-          }}
-        />
+        <CamImportDialog open={showImport()} hasProgram={gcode().length > 0} onClose={() => setShowImport(false)} onOpen={importGCode} />
 
         <div
           class="cam-workspace__body flex flex-1 overflow-hidden w-full"
@@ -505,6 +512,10 @@ export default function CamPage(): JSX.Element {
                   dock={<TitleBlockOverlay mode="3d" cam />}
                   {...(previewTools() !== undefined ? { tools: previewTools()! } : {})}
                   {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})}
+                  {...(camStore.generatedProgram?.gcode === camStore.gcode ? { workpieces: camStore.generatedProgram.workpieces } : {})}
+                  {...(clampsOfSetup().length > 0 ? { clamps: clampsOfSetup() } : {})}
+                  {...(travelOfSetup() !== undefined ? { travel: travelOfSetup()! } : {})}
+                  {...(camStore.generatedProgram?.gcode === camStore.gcode && fixtureBoxes(camStore.generatedProgram.evidence).length > 0 ? { fixtureView: fixtureBoxes(camStore.generatedProgram.evidence) } : {})}
                   machine={previewMachine()} defaultToolModel={probeToolModel() ?? toolModel()} toolIssues={probePreview() !== undefined ? [] : toolIssues()}
                   operationTools={operationTools().length > 0 ? operationTools() : importedTools()}
                   {...(operationToolModels() !== undefined ? { toolModels: operationToolModels()! } : {})}

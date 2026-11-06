@@ -27,6 +27,10 @@ export const ToolSchema = Schema.Struct({
   angle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 180 }))),
   /** Tip radius of a `ballnose`, mm. */
   tipRadius: Schema.optionalKey(Positive),
+  /** Holder (collet nut and body) above the stick-out, mm: with it the replay checks shank and holder clearance; without it only the flutes are modelled. */
+  holder: Schema.optionalKey(Schema.Struct({ diameter: Positive, length: Positive })),
+  /** Cutting minutes the tool lasts before it is replaced (an edge life the operator sets); a setup counts the minutes it cuts against it. */
+  lifeMinutes: Schema.optionalKey(Positive),
   /** Exact half-section `(r, z)` of a swept-profile cutter (tapered, lollipop, barrel, lens; spec 69 D1); the 3D strategies read its lower envelope. */
   profile: Schema.optionalKey(Schema.Array(Schema.Struct({ r: NonNegative, z: Schema.Finite })))
 })

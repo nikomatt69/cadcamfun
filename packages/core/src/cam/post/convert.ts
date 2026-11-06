@@ -166,13 +166,16 @@ export const programOfNc = (text: string, options: { readonly source?: PostId; r
     else if (okuma) for (const m of code.matchAll(/(?:^|[^A-Z])G0*15\s*H0*([1-6])(?![\d.])/g)) offsets.add(`G${53 + Number(m[1])}` as WorkOffset)
     else for (const m of code.matchAll(/(?:^|[^A-Z])G0*(5[4-9])(?![\d.])/g)) offsets.add(`G${m[1]}` as WorkOffset)
   }
-  if (offsets.size > 1) errors.push(`The program uses several work offsets (${[...offsets].join(", ")}): convert each setup on its own`)
   if (errors.length > 0) return { errors, notes }
 
   const run = interpretGcode(text, { track: true, okuma, dwell: options.source === undefined ? "seconds" : dialectOf(options.source)?.dwell ?? "seconds" })
   for (const e of run.errors) errors.push(e)
   const states = run.states ?? []
   if (states.length !== run.segments.length) errors.push("The replay could not report the machine state of every move")
+  // Several work offsets (the parts of a fixture) convert when the replay follows every one of them: each part is its own toolpath under its register.
+  const registers = new Set(states.map((s) => s.workOffset ?? "G54"))
+  const followed = [...offsets].every((o) => registers.has(o)) && offsets.size > 0
+  if (offsets.size > 1 && !followed) errors.push(`The program uses several work offsets (${[...offsets].join(", ")}) that the replay cannot follow in this dialect: convert each setup on its own`)
   const refuse = (test: (s: MotionSample) => boolean, why: string) => {
     const at = states.find(test)
     if (at !== undefined) errors.push(`Line ${at.line}: ${why}`)
@@ -192,11 +195,12 @@ export const programOfNc = (text: string, options: { readonly source?: PostId; r
   let nextComment = 0
 
   const toolpaths: Toolpath[] = []
-  let current: { tool: number | undefined; rpm: number; coolant: MotionSample["coolant"]; moves: Move[] } | undefined
+  let current: { tool: number | undefined; rpm: number; coolant: MotionSample["coolant"]; work: string; moves: Move[] } | undefined
   const flush = () => {
     if (current === undefined || current.moves.length === 0) return
     const k = toolpaths.length + 1
-    toolpaths.push({ id: `nc-${k}`, name: current.tool !== undefined ? `T${current.tool}` : `Operation ${k}`, toolId: String(current.tool ?? 1), spindleRpm: current.rpm, coolant: current.coolant, moves: current.moves })
+    const work = registers.size > 1 && /^G5[4-9]$/.test(current.work) ? { workOffset: current.work as WorkOffset } : {}
+    toolpaths.push({ id: `nc-${k}`, name: current.tool !== undefined ? `T${current.tool}` : `Operation ${k}`, toolId: String(current.tool ?? 1), spindleRpm: current.rpm, coolant: current.coolant, moves: current.moves, ...work })
   }
   let mended = 0
   let nextOrient = 0
@@ -206,9 +210,9 @@ export const programOfNc = (text: string, options: { readonly source?: PostId; r
     const state = states[i]!
     // A spindle stopped at an orientation (M19) is still the operation's spindle: it restarts at the same speed, so it stays in the toolpath.
     const rpm = state.oriented === true ? current?.rpm ?? 0 : state.spindle === "off" ? 0 : Math.round(state.rpm)
-    if (current === undefined || state.tool !== current.tool || rpm !== current.rpm || state.coolant !== current.coolant) {
+    if (current === undefined || state.tool !== current.tool || rpm !== current.rpm || state.coolant !== current.coolant || (state.workOffset ?? "G54") !== current.work) {
       flush()
-      current = { tool: state.tool, rpm, coolant: state.coolant, moves: [] }
+      current = { tool: state.tool, rpm, coolant: state.coolant, work: state.workOffset ?? "G54", moves: [] }
     }
     // Comments and spindle orientations before this segment, in the order of their lines.
     for (;;) {
@@ -264,7 +268,7 @@ export const programOfNc = (text: string, options: { readonly source?: PostId; r
   const name = options.name ?? pgm ?? (number !== undefined ? `O${number}` : "PROGRAM")
   const program = makeProgram(name, toolpaths, {
     units: inch ? "inch" : "mm",
-    ...(offsets.size === 1 ? { workOffset: [...offsets][0]! } : {}),
+    ...(offsets.size === 1 ? { workOffset: [...offsets][0]! } : registers.size > 1 && /^G5[4-9]$/.test(toolpaths[0]?.workOffset ?? "") ? { workOffset: toolpaths[0]!.workOffset! } : {}),
     ...(number !== undefined ? { metadata: { programNumber: String(Number(number)) } } : {})
   })
   return { program, run, errors, notes }

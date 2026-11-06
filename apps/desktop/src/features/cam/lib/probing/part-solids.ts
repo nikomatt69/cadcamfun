@@ -4,11 +4,19 @@
  * is being picked or when the probing settings ask for the part.
  */
 import { cam, type Solid } from "@cadcamfun/core"
+import type { Schema } from "effect"
 import type { WorkOrigin } from "./probe-targets.ts"
 
 type CadElement = cam.generator.CadElement
 
 const SOLID_TYPES = new Set(["cube", "cylinder", "prism", "cone", "pyramid", "capsule", "sphere", "hemisphere", "ellipsoid", "torus"])
+
+/** The stock as a drawing element, in the drawing's coordinates: what a simulation touches while nothing is modelled yet. */
+export const stockElementOf = (stock: { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly depth?: number; readonly topZ: number }): Record<string, Schema.Json> | undefined => {
+  const depth = stock.depth ?? 0
+  if (!(stock.width > 0 && stock.height > 0 && depth > 0)) return undefined
+  return { id: "stock", type: "cube", x: stock.x, y: stock.y, z: stock.topZ - depth / 2, width: stock.width, height: stock.height, depth }
+}
 
 export const partSolidsOf = (
   elements: ReadonlyArray<CadElement>,

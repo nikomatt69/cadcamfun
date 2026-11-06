@@ -227,17 +227,42 @@ const manufactured = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.L
 const jobResult = CamJobResult
 const chainStatus = Schema.Struct({ ok: Schema.Literal(true), operationId: str, restFrom: nullable(str), generated: Schema.Boolean, warnings: strings })
 /** A setup plan is a verdict: `valid` is false when the issues list is not empty, and that is an answer, not a refusal. */
-const setupPlan = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), valid: Schema.Boolean, plan: CamSetupPlan, issues: Schema.Array(CamSetupIssue) })
+const setupPlan = Schema.Struct({
+  ok: Schema.Literal(true), mutated: Schema.Literal(false), valid: Schema.Boolean, plan: CamSetupPlan, issues: Schema.Array(CamSetupIssue),
+  /** Template uses expanded into operations: how many operations the setup has once they are. */
+  operations: Schema.optionalKey(int),
+  /** The part probe the setup would run: the tool number, the register, touches and offset axes of each workpiece, or why it cannot (`refused`). */
+  probe: Schema.optionalKey(record)
+})
 const setupList = Schema.Struct({
   ok: Schema.Literal(true), projectId: str,
-  setups: Schema.Array(Schema.Struct({ id: str, name: str, updatedAt: str, operations: int, grouping: str, machineType: str }))
+  setups: Schema.Array(Schema.Struct({ id: str, name: str, updatedAt: str, operations: int, workpieces: int, grouping: str, machineType: str }))
 })
 
 // ---------------------------------------------------------------- `cam_edit` (writes)
 
+/** The programs a saved setup made, each stored as a program of the project; its tool table and the cost of its tool changes. */
+const setupGenerated = Schema.Struct({
+  ok: Schema.Literal(true), projectId: str, setupId: str,
+  programs: Schema.Array(Schema.Struct({
+    operationId: str, name: str, programNumber: int, toolNumbers: Schema.Array(int), operations: int, toolpaths: int, lines: int,
+    /** What the replay of the stored text found, per workpiece register; the release level it adds up to (`blocked` on a gouge, a rapid through material or a travel violation). */
+    release: Schema.optionalKey(str), evidence: Schema.optionalKey(record),
+    /** `probe`: the datum probe of the parts (`probePart`): no cutting tool, no replay, to be run before the cuts. */
+    kind: Schema.optionalKey(Schema.Literal("probe"))
+  })),
+  totals: Schema.Struct({ programs: int, toolLoads: int, toolChanges: int, cutLength: num, rapidLength: num, estimatedSeconds: num }),
+  /** Cutting minutes per tool against its life, with the sister tools that took over. */
+  toolLife: Schema.optionalKey(Schema.Array(record)),
+  /** With `probePart`: the part probe stored as the first program (its tool number, and per workpiece the register, touches and offset axes). */
+  probe: Schema.optionalKey(record),
+  warnings: strings
+})
 const setupSaved = Schema.Struct({ ok: Schema.Literal(true), projectId: str, setupId: str, name: str, updatedAt: str, created: Schema.Boolean })
 
-const programStored = Schema.Struct({ ok: Schema.Literal(true), operationId: str, release: str, identity: record, ...drawingRef })
+/** A job of several setups stores one program per setup: `operationId` is the first; `programIds`, `workOffsets` and `releases` map each setup id to its program, datum and own release. */
+const bySetup = Schema.Record(Schema.String, Schema.String)
+const programStored = Schema.Struct({ ok: Schema.Literal(true), operationId: str, release: str, identity: record, programIds: Schema.optionalKey(bySetup), workOffsets: Schema.optionalKey(bySetup), releases: Schema.optionalKey(bySetup), ...drawingRef })
 const operationCreated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, name: str, drawing: str, elements: int })
 const operationUpdated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, settings: record, note: str })
 /** A generated program: its statistics and the first lines. A failed generation is a refusal, never an empty preview. */
@@ -452,6 +477,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam_edit.verify": write(["report"], verified),
   "cam_edit.stock_set": write(["stock"], stockSet),
   "cam_edit.setup_save": write(["operation"], setupSaved),
+  "cam_edit.setup_generate": write(["program"], setupGenerated),
   "cam_edit.export": write(["file"], exported),
   "cam_edit.probe": write(["operation", "program"], probeStored),
   "cam_edit.probe_run": write(["report"], probeReported),

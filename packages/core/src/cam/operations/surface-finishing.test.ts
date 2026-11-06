@@ -91,12 +91,12 @@ describe("constant-scallop (3D offset) finishing", () => {
     expect(r.stats.loops).toBeGreaterThan(10)
     const pts = cuts(r)
     // Every point rides the ball's surface: never below the analytic drop-cutter height, never far above it.
-    // Above it by at most the slope times half a cell (the drop-cutter's conservative side), so the bound is checked off the rim.
+    // Above it by at most the slope times a cell (each column reads as the highest surface in its square), so the bound is checked off the rim.
     for (const p of pts) {
       const rho = Math.hypot(p.x, p.y)
       if (rho > 11.5) continue
       expect(p.z).toBeGreaterThanOrEqual(sphereTip(rho) - 0.012)
-      if (rho <= 8.5) expect(p.z).toBeLessThan(sphereTip(rho) + 0.08)
+      if (rho <= 8.5) expect(p.z).toBeLessThan(sphereTip(rho) + 0.03 + (rho / Math.sqrt(12 ** 2 - rho ** 2)) * 0.1)
     }
     // Polar angle of each tip point on the tip surface: the sphere of ball centres (radius 12 about (0, 0, -10)) 2 mm lower,
     // so radius 12 about (0, 0, -12). A ring is a cluster of equal angles.

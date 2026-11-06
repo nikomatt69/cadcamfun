@@ -1,13 +1,13 @@
 import { For, Show, createContext, createEffect, createMemo, createSignal, onCleanup, onMount, useContext, type JSX } from "solid-js"
 import { ChevronDown, ChevronUp, X } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
-import type { CamKernelArtifact, CamKernelResult, CamMachineConfig } from "@cadcamfun/api"
+import type { CamKernelArtifact, CamKernelRequest, CamKernelResult, CamMachineConfig } from "@cadcamfun/api"
 import { useApp } from "../../../../shared/state/context.ts"
 import { t } from "../../../../i18n/index.ts"
 import { captureEditorOwner } from "../../../ai/lib/editor-sync.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useJob } from "../../hooks/useJob.ts"
-import { kernelRequestOf } from "../../lib/job.ts"
+import { addJobSetup, jobRelease, kernelRequestOf, MAX_JOB_SETUPS, patchJobSetup, removeJobSetup, type JobSetup } from "../../lib/job.ts"
 import { diffLines, modelChangeText } from "../../lib/model-change.ts"
 import { ncVerifyRequest } from "../../lib/verify-nc.ts"
 import { tcpRefusal } from "../../lib/kernel-tcp.ts"
@@ -54,6 +54,9 @@ interface KernelApi {
   readonly settings: () => ReturnType<typeof useGeneratorStore.getState>["kernelSettings"]
   readonly savedMachines: () => ReadonlyArray<CamMachineConfig>
   readonly machineValue: () => string
+  readonly printerValue: () => string
+  readonly savedPrinters: () => ReadonlyArray<CamMachineConfig>
+  readonly selectPrinter: (value: string) => void
   readonly linkPost: (postId: string | null) => Promise<void>
   readonly request: () => ReturnType<typeof kernelRequestOf> | undefined
   readonly artifact: () => CamKernelArtifact | undefined
@@ -81,11 +84,19 @@ interface KernelApi {
   readonly setError: (message: string | undefined) => void
   readonly ownRun: () => boolean
   readonly result: () => CamKernelResult | undefined
+  /** The programs of the last run of a job of several setups, one per setup (empty for a single fixing or when the job changed since). */
+  readonly jobRuns: () => ReadonlyArray<JobRun>
+  /** The setup whose program the editor holds. */
+  readonly activeSetup: () => string | undefined
+  readonly openSetup: (id: string) => void
 }
+
+/** One setup of a job: its own program and its own release. */
+export interface JobRun { readonly id: string; readonly orientation: string; readonly workOffset: string; readonly result: CamKernelResult }
 
 const KernelContext = createContext<KernelApi>()
 
-const useKernel = (): KernelApi => {
+export const useKernel = (): KernelApi => {
   const api = useContext(KernelContext)
   if (api === undefined) throw new Error("Kernel controls render inside KernelSession")
   return api
@@ -114,8 +125,24 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
   const [ownRun, setOwnRun] = createSignal(false)
   const [diff, setDiff] = createSignal<ReturnType<typeof cam.kernel.programDiff>>()
   const [ncCheck, setNcCheck] = createSignal<NcCheck>({ state: "idle" })
+  const [runs, setRuns] = createSignal<{ readonly requestId: string; readonly input: CamKernelRequest; readonly runs: ReadonlyArray<JobRun> }>()
   /** The machine configurations of the library: the machines the person configured, usable by the kernel. */
   const [savedMachines, setSavedMachines] = createSignal<ReadonlyArray<CamMachineConfig>>([])
+  const [savedPrinters, setSavedPrinters] = createSignal<ReadonlyArray<CamMachineConfig>>([])
+  const [printerValue, setPrinterValue] = createSignal(cam.kernel.PRINTERS[0]!.id)
+  const selectPrinter = (value: string): void => {
+    const config = savedPrinters().find((row) => `config:${row.id}` === value)
+    const machine = config !== undefined ? cam.kernel.kernelMachineOfConfig(config) : cam.kernel.findPrinter(value)
+    const printer = machine?.printer
+    if (printer === undefined) return
+    setPrinterValue(value)
+    gen.patchSettings({
+      bedWidth: printer.bed.width, bedDepth: printer.bed.depth, buildHeight: printer.buildHeight,
+      bedOrigin: printer.bed.origin, printerKinematics: printer.kinematics,
+      nozzleDiameter: printer.nozzle.diameter, extrusionWidth: printer.nozzle.diameter, filamentDiameter: printer.filamentDiameter
+    })
+    gen.setPrinter({ flavor: printer.flavor })
+  }
   /** The machine the panel plans against: a saved configuration, else the preset id. */
   const machineValue = (): string => {
     const config = settings().machineConfig
@@ -167,7 +194,10 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
     if (!value) return false
     if (!current) return true
     const source = store.kernelRequest, stock = current.stock
-    const stockChanged = (current.setupOrientation ?? "+Z") === "+Z" && (stock !== undefined ? (
+    // One setup of a job is its own fixing: its orientation and datum are the setup's, not the panel's single fixing.
+    const mine = source?.setupId !== undefined ? current.setups?.find((setup) => setup.id === source.setupId) : undefined
+    const orientation = mine?.orientation ?? current.setupOrientation ?? "+Z", offset = mine?.workOffset ?? current.workOffset ?? "G54"
+    const stockChanged = orientation === "+Z" && current.setups === undefined && (stock !== undefined ? (
       Math.abs(stock.width - (value.stockBounds.max.x - value.stockBounds.min.x)) > 1e-9 ||
       Math.abs(stock.height - (value.stockBounds.max.y - value.stockBounds.min.y)) > 1e-9 ||
       Math.abs(stock.depth - (value.stockBounds.max.z - value.stockBounds.min.z)) > 1e-9 ||
@@ -177,12 +207,12 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
     // The machine the request names: a saved configuration becomes `config:<id>`, a preset keeps its id.
     const machineId = current.machineConfig !== undefined ? `config:${current.machineConfig.id}` : current.machine
     return value.nc !== store.gcode || value.material.id !== (cam.kernel.findMaterial(current.material)?.id ?? current.material) || value.machine.id !== machineId ||
-      (value.setupOrientation ?? "+Z") !== (current.setupOrientation ?? "+Z") ||
+      (value.setupOrientation ?? "+Z") !== orientation ||
       cam.kernel.canonicalJson(source?.stock ?? null) !== cam.kernel.canonicalJson(current.stock ?? null) ||
-      stockChanged || value.program.workOffset !== (current.workOffset ?? "G54") ||
+      stockChanged || value.program.workOffset !== offset ||
       source !== undefined && ((source.tolerance ?? 0.01) !== (current.tolerance ?? 0.01) || (source.origin ?? "stock-center") !== (current.origin ?? "stock-center") || source.finishAllowance !== current.finishAllowance || source.scallop !== current.scallop || source.resolution !== current.resolution) ||
       partChanged(value, current.elements) ||
-      source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.tabs ?? null, source.breadth ?? null, source.tcp ?? false, source.nativeCycles ?? false, source.subprograms ?? false, source.smoothing ?? null, source.postDefinition ?? null]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.tabs ?? null, current.breadth ?? null, current.tcp ?? false, current.nativeCycles ?? false, current.subprograms ?? false, current.smoothing ?? null, current.postDefinition ?? null])
+      source !== undefined && cam.kernel.canonicalJson([source.operations ?? null, source.tools ?? null, source.deburr ?? null, source.tabs ?? null, source.breadth ?? null, source.tcp ?? false, source.nativeCycles ?? false, source.subprograms ?? false, source.smoothing ?? null, source.postDefinition ?? null, source.setups ?? null, source.carryStock ?? false]) !== cam.kernel.canonicalJson([current.operations ?? null, current.tools ?? null, current.deburr ?? null, current.tabs ?? null, current.breadth ?? null, current.tcp ?? false, current.nativeCycles ?? false, current.subprograms ?? false, current.smoothing ?? null, current.postDefinition ?? null, current.setups ?? null, current.carryStock ?? false])
   }
   const requestId = createMemo(() => request()?.id)
   createEffect(() => {
@@ -192,8 +222,12 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
   // The library's machines: what the person configured is what the kernel plans against.
   onMount(() => {
     void app.runtime.run(app.client.machineConfigs.list({ query: {} }))
-      .then((value) => setSavedMachines(kernelMachineConfigsOf(machinesFromResponse(value)).filter((row) => cam.kernel.kernelMachineOfConfig(row)?.kind !== "printer")))
-      .catch(() => setSavedMachines([]))
+      .then((value) => {
+        const configs = kernelMachineConfigsOf(machinesFromResponse(value))
+        setSavedMachines(configs.filter((row) => cam.kernel.kernelMachineOfConfig(row)?.kind !== "printer"))
+        setSavedPrinters(configs.filter((row) => cam.kernel.kernelMachineOfConfig(row)?.kind === "printer"))
+      })
+      .catch(() => { setSavedMachines([]); setSavedPrinters([]) })
   })
   onCleanup(() => { disposed = true; controller?.abort(); if (controller) gen.setGenerating(false) })
 
@@ -274,6 +308,35 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
     }
   }
 
+  type Made = Extract<CamKernelResult, { status: "ok" }>
+  /** Publishes one program (the whole job's, or one setup's) as the editor's: its NC, its IR, its evidence and the request that reproduces it. */
+  const publish = (value: Made, input: CamKernelRequest): void => {
+    // Publish this exact program, retaining tool changes; old operation programs and verification belong to different NC.
+    store.clearOperationResults()
+    useVerifyStore.getState().reset()
+    store.setKernelArtifact(value.value)
+    store.setKernelRequest(input)
+    gen.setResult(value.value.nc, [])
+    store.setGcode(value.value.nc)
+    store.setProgram(value.value.program)
+    props.onGCodeGenerated(value.value.nc)
+  }
+  const jobRuns = (): ReadonlyArray<JobRun> => {
+    const held = runs()
+    return held !== undefined && held.requestId === request()?.id ? held.runs : []
+  }
+  const activeSetup = (): string | undefined => store.kernelRequest?.setupId
+  /** Opens another setup of the job in the editor: its program was made by the same run. */
+  const openSetup = (id: string): void => {
+    const held = runs()
+    const run = held?.runs.find((candidate) => candidate.id === id)
+    if (held === undefined || run === undefined || held.requestId !== request()?.id || run.result.status !== "ok" || run.result.value.release === "blocked") return
+    setResult(run.result)
+    setNcCheck({ state: "idle" })
+    setDiff(undefined)
+    publish(run.result, { ...held.input, setupId: id })
+  }
+
   const generate = async (): Promise<void> => {
     const input = request()
     if (!input || gen.isGenerating) return
@@ -289,23 +352,28 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
       const projectId = owner.projectId
       runId = crypto.randomUUID()
       store.setKernelProgress(undefined)
-      const value = await app.runtime.run(api.manufacture(projectId == null ? input : { ...input, progress: { projectId, runId } }), { signal: signal.signal })
-      if (disposed || signal.signal.aborted || !owner.current() || request()?.id !== input.id || store.gcode !== previousCode) return
+      // A job of several setups is one run per setup: each answers with that setup's program (`setupId`), the job is re-run for it so the
+      // stock carried from the setup before reproduces it. A single fixing is the one run it always was.
+      const listed = input.setups ?? []
+      const wanted: ReadonlyArray<JobSetup | undefined> = listed.length > 0 ? listed : [undefined]
+      const made: JobRun[] = []
+      for (const setup of wanted) {
+        const body: CamKernelRequest = setup === undefined ? input : { ...input, setupId: setup.id }
+        const value = await app.runtime.run(api.manufacture(projectId == null ? body : { ...body, progress: { projectId, runId } }), { signal: signal.signal })
+        if (disposed || signal.signal.aborted || !owner.current() || request()?.id !== input.id || store.gcode !== previousCode) return
+        made.push({ id: setup?.id ?? "", orientation: setup?.orientation ?? input.setupOrientation ?? "+Z", workOffset: setup?.workOffset ?? (value.status === "ok" ? value.value.program.workOffset : input.workOffset ?? "G54"), result: value })
+      }
+      setRuns(listed.length > 0 ? { requestId: input.id, input, runs: made } : undefined)
+      // The program shown: the first setup that was not blocked; else the first failure, so its reasons are what the panel lists.
+      const shown = made.find((run) => run.result.status === "ok" && run.result.value.release !== "blocked") ?? made.find((run) => run.result.status !== "ok") ?? made[0]!
+      const value = shown.result
       setResult(value)
       // The program that was there before this run, compared with the one this run made (also a blocked one: the person sees what got worse).
       const prior = store.kernelArtifact
       setNcCheck({ state: "idle" })
       setDiff(value.status === "ok" && prior !== undefined ? cam.kernel.programDiff(prior, value.value) : undefined)
       if (value.status !== "ok" || value.value.release === "blocked") return
-      // Publish this exact program, retaining tool changes; old operation programs and verification belong to different NC.
-      store.clearOperationResults()
-      useVerifyStore.getState().reset()
-      store.setKernelArtifact(value.value)
-      store.setKernelRequest(input)
-      gen.setResult(value.value.nc, [])
-      store.setGcode(value.value.nc)
-      store.setProgram(value.value.program)
-      props.onGCodeGenerated(value.value.nc)
+      publish(value, listed.length > 0 ? { ...input, setupId: shown.id } : input)
     } catch (cause) {
       if (!disposed && !signal.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
@@ -315,11 +383,55 @@ export function KernelSession(props: { readonly onGCodeGenerated: (code: string)
 
   return (
     <KernelContext.Provider value={{
-      settings, savedMachines, machineValue, linkPost, request, artifact, stale, ncCheck, verifyEditorNc, diff, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
-      patchOperation, moveOperation, library, usedCutters, patchCutter, generate, progressLabel, error, setError, ownRun, result
+      settings, savedMachines, machineValue, printerValue, savedPrinters, selectPrinter, linkPost, request, artifact, stale, ncCheck, verifyEditorNc, diff, modelChange, planNotes, setPlanNotes, plan, operations, setOperations,
+      patchOperation, moveOperation, library, usedCutters, patchCutter, generate, progressLabel, error, setError, ownRun, result, jobRuns, activeSetup, openSetup
     }}>
       {props.children}
     </KernelContext.Provider>
+  )
+}
+
+/** The setups of a job: each is a fixing of the part (orientation) on its own work offset, and each becomes its own program. */
+function KernelJobSetups(): JSX.Element {
+  const gen = useGeneratorStore()
+  const kernel = useKernel()
+  const settings = kernel.settings
+  const list = (): ReadonlyArray<JobSetup> => settings().setups ?? []
+  const set = (next: ReadonlyArray<JobSetup> | undefined): void => {
+    // A new list is a new plan: the edited operations belong to the single fixing.
+    gen.patchKernelSettings({ setups: next === undefined ? undefined : [...next], ...(next === undefined && settings().setups === undefined ? {} : { operations: undefined }) })
+    kernel.setPlanNotes([])
+  }
+  return (
+    <div class="space-y-2" data-testid="kernel-job-setups">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs font-semibold text-[color:var(--panel-text)]">{t("cam.kernel.job.title")}</span>
+        <button type="button" class="panel-btn" disabled={list().length >= MAX_JOB_SETUPS} data-testid="kernel-job-add"
+          onClick={() => set(addJobSetup(settings().setups, settings().setupOrientation) ?? settings().setups)}>{t("cam.kernel.job.add")}</button>
+      </div>
+      <For each={list()}>{(setup) => (
+        <div class="flex items-center gap-2 text-xs" data-testid="kernel-job-setup" data-setup={setup.id}>
+          <span class="w-14 truncate" title={setup.id}>{setup.id}</span>
+          <select class={INPUT} aria-label={t("cam.kernel.setupOrientation")} value={setup.orientation ?? "+Z"} data-testid="kernel-job-orientation"
+            onChange={(event) => set(patchJobSetup(list(), setup.id, { orientation: event.currentTarget.value as cam.kernel.SetupOrientation }))}>
+            <For each={cam.kernel.SETUP_ORIENTATIONS}>{(orientation) => <option value={orientation}>{orientation}</option>}</For>
+          </select>
+          <select class={INPUT} aria-label={t("cam.kernel.workOffset")} value={setup.workOffset ?? "G54"} data-testid="kernel-job-offset"
+            onChange={(event) => set(patchJobSetup(list(), setup.id, { workOffset: event.currentTarget.value as cam.WorkOffset }))}>
+            <For each={["G54", "G55", "G56", "G57", "G58", "G59"]}>{(offset) => <option value={offset}>{offset}</option>}</For>
+          </select>
+          <button type="button" class="panel-btn" aria-label={t("cam.kernel.job.remove")} title={t("cam.kernel.job.remove")} data-testid="kernel-job-remove"
+            onClick={() => set(removeJobSetup(list(), setup.id))}><X size={12} /></button>
+        </div>
+      )}</For>
+      <Show when={list().length > 1}>
+        <label class="panel-check">
+          <input type="checkbox" checked={settings().carryStock === true} data-testid="kernel-job-carry"
+            onChange={(event) => gen.patchKernelSettings({ carryStock: event.currentTarget.checked ? true : undefined })} />
+          {t("cam.kernel.job.carry")}
+        </label>
+      </Show>
+    </div>
   )
 }
 
@@ -371,6 +483,7 @@ export function KernelMachineControls(): JSX.Element {
         elements={kernel.request()?.elements as ReadonlyArray<Record<string, unknown>> | undefined} current={settings().setupOrientation}
         onUse={(orientation) => { gen.patchKernelSettings({ setupOrientation: orientation, operations: undefined }); gen.updateSettings("workholdingConfigured", false); kernel.setPlanNotes([]) }}
       />
+      <KernelJobSetups />
       <KernelSwarf
         elements={kernel.request()?.elements as ReadonlyArray<Record<string, unknown>> | undefined}
         fiveAxis={(() => {
@@ -535,6 +648,26 @@ export function KernelRunControls(): JSX.Element {
       <Show when={kernel.artifact()}>{(value) => (
         <div class="space-y-2 text-xs" data-testid="kernel-evidence">
           <div class="flex justify-between gap-3 font-semibold"><span>{t("cam.kernel.release")}</span><span>{value().release}</span></div>
+          <Show when={kernel.jobRuns().length > 1}>
+            <div class="space-y-1" data-testid="kernel-job-programs">
+              <div class="flex justify-between gap-3 font-semibold" data-testid="kernel-job-release">
+                <span>{t("cam.kernel.job.release")}</span>
+                <span>{jobRelease(kernel.jobRuns().map((run) => run.result.status === "ok" ? run.result.value.release : "blocked")) ?? ""}</span>
+              </div>
+              <For each={kernel.jobRuns()}>{(run) => (
+                <div class="flex items-center justify-between gap-2" data-testid="kernel-job-program" data-setup={run.id} data-active={kernel.activeSetup() === run.id}>
+                  <span class="truncate">
+                    <strong>{run.id}</strong> {run.orientation} · {run.workOffset} ·{" "}
+                    {run.result.status === "ok" ? run.result.value.release
+                      : t("cam.kernel.job.failed", { id: run.id, message: run.result.issues[0]?.message ?? "" })}
+                  </span>
+                  <button type="button" class="panel-btn" data-testid="kernel-job-open"
+                    disabled={run.result.status !== "ok" || run.result.value.release === "blocked" || kernel.activeSetup() === run.id}
+                    onClick={() => kernel.openSetup(run.id)}>{t("cam.kernel.job.open")}</button>
+                </div>
+              )}</For>
+            </div>
+          </Show>
           <Show when={kernel.stale()}><p role="status" class="text-[color:var(--panel-warn)]" data-testid="kernel-stale">{t("cam.kernel.stale")}</p></Show>
           <Show when={diffLines(kernel.diff()).length > 0}>
             <div class="panel-hint space-y-1" data-testid="kernel-diff">

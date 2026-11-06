@@ -83,7 +83,7 @@ describe("what the generator writes agrees with its machine", () => {
 
   test("every lathe operation turns the workpiece, uses X and Z only, and works towards the chuck", () => {
     for (const operationType of KINEMATICS.lathe.operations) {
-      const gcode = run({ machineType: "lathe", toolType: "turning", operationType })
+      const gcode = run({ machineType: "lathe", toolType: "turning", operationType, stockBore: 20 })
       expect(errors(gcode, "lathe"), operationType).toEqual([])
       expect(codes(gcode, "lathe"), operationType).not.toContain("LATHE_Z_AWAY")
       expect(gcode).not.toMatch(/\bY[-\d]/)
@@ -104,7 +104,7 @@ describe("what the generator writes agrees with its machine", () => {
   test("every lathe operation stays in front of the chuck jaws (spec 31)", () => {
     for (const operationType of ["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]) {
       for (const [stockLength, gripLength] of [[100, 20], [40, 25], [30, 20]] as const) {
-        const gcode = run({ machineType: "lathe", operationType, depth: 2, stepdown: 1, stockLength, gripLength })
+        const gcode = run({ machineType: "lathe", operationType, depth: 2, stepdown: 1, stockLength, gripLength, stockBore: 20 })
         const zs = [...gcode.matchAll(/^G(?:1|32) .*?\bZ(-?[\d.]+)/gm)].map((m) => Number(m[1]))
         expect(Math.min(...zs, 0), `${operationType} ${stockLength}/${gripLength}`).toBeGreaterThanOrEqual(-(stockLength - gripLength - 2) - 1e-9)
       }

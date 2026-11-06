@@ -124,6 +124,12 @@ describe("back-boring from the far side (rule H3)", () => {
     expect(narrow.unmachined.some((u) => /back-boring is not possible/.test(u))).toBe(true)
     const off = plan(30, fromBelow(12))
     expect(off.unmachined.some((u) => /not drilled from above/.test(u))).toBe(true)
+    // An insert 12 mm wide (corners 6 mm to either side of its centre line) reaches 6 mm or more about the hole axis whatever the shift: the Ø12 pilot is too narrow for it.
+    const bar = DEFAULT_CUTTERS.find((t) => t.kind === "boringbar")!
+    const wide = plan(30, fromBelow(12), { holeCycles: true }, [...DEFAULT_CUTTERS.filter((t) => t.kind !== "boringbar"), { ...bar, id: "boringbar-wide", insertWidth: 12 }])
+    expect(wide.decisions).toContainEqual(expect.objectContaining({ rule: "H3-back-bore", outcome: "refused", reason: expect.stringMatching(/12 mm wide.*does not pass the Ø12 pilot hole/) }))
+    const narrowInsert = plan(30, fromBelow(12), { holeCycles: true }, [...DEFAULT_CUTTERS.filter((t) => t.kind !== "boringbar"), { ...bar, id: "boringbar-4", insertWidth: 4 }])
+    expect(narrowInsert.decisions).toContainEqual(expect.objectContaining({ rule: "H3-back-bore", outcome: "planned" }))
     const noBar = plan(30, fromBelow(12), { holeCycles: true }, DEFAULT_CUTTERS.filter((t) => t.kind !== "boringbar"))
     expect(noBar.decisions).toContainEqual(expect.objectContaining({ rule: "H3-back-bore", outcome: "refused", reason: expect.stringMatching(/no boring bar set to Ø16/) }))
   })

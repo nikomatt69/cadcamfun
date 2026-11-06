@@ -23,16 +23,15 @@ import { isProbeToolpath } from "../lib/probing/cycles.ts"
 import { loadOffsets, saveOffsets } from "../lib/probing/offset-sync.ts"
 import { defaultChecks, defaultOperation, followOf, movesOffset, planLocal, type ProbeOperation } from "../lib/probing/operation.ts"
 import { profileOfMachine } from "../lib/probing/machine.ts"
+import { stockElementOf } from "../lib/probing/part-solids.ts"
 import { applyTarget, targetAt, targetsOf, workOriginOf, type ProbeTarget } from "../lib/probing/probe-targets.ts"
 import { reportData, resultOfReport } from "../lib/probing/report-data.ts"
 import { useInspectionStore } from "../store/inspectionStore.ts"
 import { useMultiToolpathStore } from "../store/multiToolpathStore.ts"
-import { cycleOfSpec } from "../lib/probing/cycle-fields.ts"
 import { entriesOfRows } from "../lib/probing/work-offsets.ts"
 import { fingerprintOf } from "../lib/probing/result.ts"
-import { isProbingDialect, macroStyleOf } from "../lib/probing/native.ts"
-import { requestOf, resultOfCalibration, resultOfSimulation, stylusCalibrationOf } from "../lib/probing/simulation.ts"
-import { freshProgram, useProbingStore } from "../store/probingStore.ts"
+import { requestOf, resultOfCalibration, resultOfSimulation } from "../lib/probing/simulation.ts"
+import { useProbingStore } from "../store/probingStore.ts"
 import { useCamStore } from "../store/camStore.ts"
 import { useSetupStore } from "../store/setupStore.ts"
 import { useWorkOffsetStore } from "../store/workOffsetStore.ts"
@@ -52,7 +51,7 @@ type ParseProgram = (nc: string) => Promise<{ readonly program: cam.Program; rea
 const newRunId = (): string => globalThis.crypto.randomUUID()
 
 /** Write program and Simulate of the panel: the sidecar plans and writes, the results land in the probing store. */
-export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service" | "machine" | "defaults" | "elements" | "projectId"> & { readonly parse: ParseProgram }): ProbingProgramService => {
+export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service" | "machine" | "defaults" | "elements" | "stock" | "projectId"> & { readonly parse: ParseProgram }): ProbingProgramService => {
   const probing = useProbingStore
   const context = () => {
     const machine = deps.machine()
@@ -63,31 +62,18 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
     if (deps.service.program === undefined) throw new Error(t("cam.probing.program.unavailable"))
     return deps.service.program
   }
+  /** A program for the panel: parsed for the 3D view, which plays exactly this text (the run's lines are lines of it). */
+  const keep = async (id: string, operation: ProbeOperation, dialect: string, written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string; native?: string; played?: { text: string; lines: ReadonlyArray<number> } }) => {
+    const parsed = await deps.parse(written.played?.text ?? written.nc).catch(() => undefined)
+    probing.getState().setProgram({ operationId: id, dialect, fingerprint: fingerprintOf(operation), ...written, ...(parsed !== undefined ? { parsed } : {}) })
+  }
   return {
     generate: async (id, operation, dialect) => {
       const service = calls()
-      const ctx = context()
-      const fingerprint = fingerprintOf(operation)
-      const decoded = cycleOfSpec(operation.cycle)
-      let written: { nc: string; lines: number; notes: ReadonlyArray<string>; warnings: ReadonlyArray<string>; hash?: string; native?: string }
-      if (decoded.ok && decoded.cycle.kind === "rotary-axis") {
-        const c = decoded.cycle
-        const request = requestOf(operation, ctx)
-        if ("refused" in request) throw new Error(request.refused)
-        const out = await deps.run(service.calibrateRotary({ axis: c.axis, sphere: c.sphere, angles: c.angles.map((a) => a * 180 / Math.PI), settings: request.settings, dialect: dialect as never }))
-        if (out.nc === undefined) throw new Error(out.refused ?? t("cam.probing.program.unavailable"))
-        written = { nc: out.nc, lines: out.nc.split("\n").length, notes: out.notes, warnings: [] }
-      } else {
-        const request = requestOf(operation, ctx)
-        if ("refused" in request) throw new Error(request.refused)
-        // A native cycle is written for the machine's package; the core refuses what the package cannot express (no silent fallback).
-        const style = macroStyleOf(ctx.profile)
-        const native = operation.native === true ? { native: true, ...(style !== undefined ? { macroStyle: style } : {}) } : {}
-        const out = await deps.run(service.emit({ ...request, dialect: dialect as never, ...native }))
-        written = { nc: out.nc, lines: out.lines, notes: out.notes, warnings: out.warnings, hash: out.identity.nc, ...(out.native !== undefined ? { native: out.native } : {}) }
-      }
-      const parsed = await deps.parse(written.nc).catch(() => undefined)
-      probing.getState().setProgram({ operationId: id, dialect, fingerprint, ...written, ...(parsed !== undefined ? { parsed } : {}) })
+      const request = requestOf(operation, { ...context(), dialect })
+      if ("refused" in request) throw new Error(request.refused)
+      const out = await deps.run(service.emit({ ...request, dialect: dialect as never }))
+      await keep(id, operation, dialect, { nc: out.nc, lines: out.lines, notes: out.notes, warnings: out.warnings, hash: out.identity.nc, ...(out.native !== undefined ? { native: out.native } : {}) })
     },
     simulate: async (id, operation, dialect) => {
       const service = calls()
@@ -96,44 +82,39 @@ export const createProbingProgram = (deps: Pick<ControllerDeps, "run" | "service
       const runId = newRunId()
       const progress = project !== null ? { progress: { projectId: project, runId } } : {}
       const m = probing.getState().misplacement
-      const decoded = cycleOfSpec(operation.cycle)
-      if (decoded.ok && decoded.cycle.kind === "rotary-axis") {
-        const c = decoded.cycle
-        const request = requestOf(operation, ctx)
-        if ("refused" in request) throw new Error(request.refused)
-        const truth = m.x !== 0 || m.y !== 0 || m.z !== 0 ? { truth: { pivot: m } } : {}
-        const out = await deps.run(service.calibrateRotary({ axis: c.axis, sphere: c.sphere, angles: c.angles.map((a) => a * 180 / Math.PI), settings: request.settings, ...truth, ...progress }))
+      const request = requestOf(operation, { ...ctx, dialect })
+      if ("refused" in request) throw new Error(request.refused)
+      const { operation: cycle, settings, frame, actions, checks, assumed } = request
+      // A job operation measures the table the control believes in; the offset fields simulate one that is really elsewhere.
+      if (cycle.kind === "rotary-axis" && (m.x !== 0 || m.y !== 0 || m.z !== 0)) {
+        const out = await deps.run(service.calibrateRotary({ axis: cycle.axis, sphere: cycle.sphere, angles: cycle.angles.map((a) => a * 180 / Math.PI), settings, truth: { pivot: m }, ...(assumed !== undefined ? { assumed } : {}), ...progress }))
         probing.getState().setResult(resultOfCalibration(out, { operationId: id, operation }))
         return
       }
-      const request = requestOf(operation, ctx)
-      if ("refused" in request) throw new Error(request.refused)
       const planned = planLocal(operation, { profile: ctx.profile, defaults: ctx.defaults })
-      if (!planned.ok) throw new Error(planned.reason)
-      const elements = deps.elements() as unknown as ReadonlyArray<Record<string, Schema.Json>>
+      const stock = deps.stock()
+      const origin = workOriginOf(stock)
+      const stockElement = stockElementOf(stock)
+      const drawn = deps.elements() as unknown as ReadonlyArray<Record<string, Schema.Json>>
+      const elements = drawn.length > 0 ? drawn : stockElement !== undefined ? [stockElement] : []
       if (elements.length === 0) throw new Error(t("cam.probing.program.noPart"))
       const table = useWorkOffsetStore.getState()
       const workOffsets = table.machineConfigId !== undefined && table.rows.length > 0 ? entriesOfRows(table.rows, "machine") : undefined
-      const { operation: cycle, settings, frame, actions, checks } = request
-      // The run is posted for the control and that text replayed, so each contact carries the line of its touch block: the program
-      // view marks it and playback reveals it in time. A native cycle is the vendor's code and is never replayed: its inline touches
-      // are simulated without a program, and the native program the user wrote stays the one shown.
-      const posted = operation.native !== true && isProbingDialect(dialect) ? { dialect } : {}
       const sim = await deps.run(service.simulate({
         elements, settings, operations: [{ id, operation: cycle, ...(actions !== undefined ? { actions } : {}), ...(checks !== undefined ? { checks } : {}) }],
-        ...(frame !== undefined ? { frame } : {}), ...(workOffsets !== undefined ? { workOffsets } : {}),
-        misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, ...posted, ...progress
+        ...(frame !== undefined ? { frame } : {}), ...(workOffsets !== undefined ? { workOffsets } : {}), ...(assumed !== undefined ? { assumed } : {}),
+        dialect: dialect as never, misplacement: { x: m.x, y: m.y, z: m.z, c: m.c }, partOrigin: origin, ...(stockElement !== undefined ? { stockElement } : {}), ...progress
       }))
-      if (sim.program !== undefined) {
-        const parsed = await deps.parse(sim.program.nc).catch(() => undefined)
-        probing.getState().setProgram({
-          operationId: id, dialect: sim.program.dialect, fingerprint: fingerprintOf(operation), nc: sim.program.nc, lines: sim.program.lines,
-          notes: [], warnings: sim.warnings ?? [], hash: sim.program.identity.nc, ...(parsed !== undefined ? { parsed } : {})
-        })
-      }
-      const program = freshProgram(probing.getState().programs, id, operation)
-      const result = resultOfSimulation(sim, { operationId: id, operation, expected: planned.routine.contacts, runId, ...(program?.hash !== undefined ? { programHash: program.hash } : {}) })
-      probing.getState().setResult(result)
+      // The report's lines are lines of this text: the 3D view must play it, not a program written earlier.
+      if (sim.program !== undefined) await keep(id, operation, dialect, { nc: sim.program.nc, lines: sim.program.lines, notes: [], warnings: sim.warnings ?? [], hash: sim.program.identity.nc, ...(sim.played !== undefined ? { played: sim.played } : {}) })
+      probing.getState().setResult(resultOfSimulation(sim, {
+        operationId: id, operation, expected: planned.ok ? planned.routine.contacts : [], runId, ...(sim.program !== undefined ? { programHash: sim.program.identity.nc } : {})
+      }))
+      // The contacts are real but no program came with them: the panel says why, or the 3D view would just stay empty.
+      if (sim.program === undefined) probing.getState().setError((sim.warnings ?? []).join("; ") || t("cam.probing.program.noProgram"))
+      // A run the control stopped measured nothing: its alarm is the reason, and the panel must say it.
+      const alarms = sim.report.operations.flatMap((o) => [...o.alarms.map((a) => a.text), ...(o.stopped !== undefined ? [o.stopped] : [])])
+      if (alarms.length > 0) probing.getState().setError(t("cam.probing.program.stopped", { reason: [...new Set(alarms)].join("; ") }))
     }
   }
 }
@@ -146,7 +127,7 @@ export interface ControllerDeps {
   readonly machine: () => { readonly id: string; readonly name: string; readonly type?: string | undefined; readonly config: object } | null
   readonly defaults: () => ProbingDefaults
   readonly elements: () => ReadonlyArray<CadElement>
-  readonly stock: () => { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly topZ: number }
+  readonly stock: () => { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly depth?: number; readonly topZ: number }
   readonly setups: () => ReadonlyArray<{ readonly id: string; readonly name: string }>
   readonly projectId: () => string | null
   readonly insert: (nc: string) => void
@@ -264,9 +245,7 @@ export const createProbingController = (deps: ControllerDeps): ProbingController
 
     calibrationOf: (id) => {
       const result = probing.getState().results[id]
-      const operation = operationOf(id)
-      if (result === undefined || operation === undefined) return undefined
-      return result.calibration ?? stylusCalibrationOf(result, operation)
+      return result === undefined || result.verdict === "fail" || result.verdict === "missed" || result.verdict === "incomplete" ? undefined : result.calibration
     },
     applyCalibration: async (id) => {
       const machine = deps.machine()
@@ -335,12 +314,13 @@ export const useProbing = (options: { readonly insert: (nc: string) => void; rea
   const machine = () => cad.selectedMachine
   const defaults = () => app.settings.settings().probing
   const elements = () => job.elements()
+  const stock = () => { const s = stockOf(job.sources()); return { x: s.x, y: s.y, width: s.width, height: s.height, depth: s.depth, topZ: s.topZ } }
   const projectId = () => document.projectId
   const generator = makeToolpathGenerator(app.client)
   return createProbingController({
     run, service, machine, defaults, elements, projectId,
-    program: options.program ?? createProbingProgram({ run, service, machine, defaults, elements, projectId, parse: (nc) => run(generator.parse(nc, "Probing")) }),
-    stock: () => { const s = stockOf(job.sources()); return { x: s.x, y: s.y, width: s.width, height: s.height, topZ: s.topZ } },
+    program: options.program ?? createProbingProgram({ run, service, machine, defaults, elements, stock, projectId, parse: (nc) => run(generator.parse(nc, "Probing")) }),
+    stock,
     setups: () => setups.documents.map((d) => ({ id: d.id, name: d.name })),
     insert: options.insert,
     onMachineProbing: (saved) => {

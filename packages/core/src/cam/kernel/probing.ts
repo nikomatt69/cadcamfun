@@ -113,7 +113,7 @@ export const probeToolpath = (op: ProbeOperationSpec, env: ProbeEnvironment, set
   const first = moves.find((m) => m._tag === "Probe")
   let native: string | undefined
   if (op.native === true) {
-    const marked = nativeCycle(cycle, op.actions ?? [], machine.probing?.macroStyle ?? "inline", moves, { probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: frame !== undefined })
+    const marked = nativeCycle(cycle, op.actions ?? [], machine.probing?.macroStyle ?? "inline", moves, { probe, safeZ: ctx.safeZ, clearance: ctx.clearance, tilted: frame !== undefined, post: machine.post })
     if ("refused" in marked) return { refused: `native cycle refused (clear native on the operation for the inline touches): ${marked.refused}` }
     moves = [...marked.moves]
     native = marked.word

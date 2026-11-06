@@ -26,6 +26,12 @@ export const offsetFamilyOf = (profile: Pick<MachineProfile, "post" | "controlle
   return post === "generic" ? "fanuc" : post
 }
 
+/** How a measured rotation reaches this control: into the offset when it keeps a rotation there (Siemens, LinuxCNC), else G68 on what follows. */
+export const rotationViaOf = (ref: WorkOffsetRef, family: OffsetFamily): "offset-r" | "g68" => {
+  const address = addressOf(ref, family)
+  return !("refused" in address) && address.read("R") !== undefined ? "offset-r" : "g68"
+}
+
 /** Why `key` is not an offset this control has, or undefined when it can be selected and written. */
 export const offsetRefusal = (key: string, family: OffsetFamily, capacity?: OffsetCapacity): string | undefined => {
   const ref = parseOffsetRef(key)

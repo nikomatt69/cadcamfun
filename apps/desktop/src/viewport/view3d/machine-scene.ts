@@ -30,6 +30,8 @@ export interface MachineDisplay {
   readonly showMachine?: boolean
   readonly showTool?: boolean
   readonly showHolder?: boolean
+  /** Draw travel and collision path lines (default true); printed deposits remain visible. */
+  readonly showPathLines?: boolean
 }
 
 export const DEFAULT_MACHINE_DISPLAY: MachineDisplay = { showWorkholding: true, showTriad: true, spin: true, depositMode: "progressive" }
@@ -210,7 +212,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
     const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0xff2d2d, depthTest: false }))
-    lines.renderOrder = 25; lines.name = "collisions"
+    lines.renderOrder = 25; lines.name = "collisions"; lines.visible = display.showPathLines !== false
     root.add(lines)
   }
 
@@ -301,7 +303,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     for (const i of deposits.travels) { const m = timeline.moves[i]!; travel.push(m.from.x, m.from.y, m.from.z, m.to.x, m.to.y, m.to.z) }
     const tg = new THREE.BufferGeometry(); tg.setAttribute("position", new THREE.Float32BufferAttribute(travel, 3))
     const travels = new THREE.LineSegments(tg, new THREE.LineDashedMaterial({ color: 0x6b7280, dashSize: 1.5, gapSize: 1.5, transparent: true, opacity: 0.6 }))
-    travels.computeLineDistances(); travels.name = "travel"
+    travels.computeLineDistances(); travels.name = "travel"; travels.visible = display.showPathLines !== false
     root.add(travels)
   }
 

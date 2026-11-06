@@ -122,7 +122,7 @@
   "cad.importExport.selectFile": "选择 CAD 文件",
   "cad.importExport.upload": "上传文件",
   "cad.importExport.orDrag": "或拖放到此处",
-  "cad.importExport.formats": "JSON、STL、OBJ、PLY、STEP、IGES 或 CAD/CAM FUN 文件",
+  "cad.importExport.formats": "STEP, IGES, DXF, SVG, STL, OBJ, PLY, 3MF, GLB, JSON, CAD, CADCAM",
   "cad.importExport.attention": "注意",
   "cad.importExport.importWarning": "导入文件将替换当前图纸。导入前请确保已保存工作。",
   "cad.importExport.fileName": "文件名",
@@ -1259,5 +1259,16 @@
   "cad.param.groupName": "Group name",
   "cad.param.ungroup": "Ungroup",
   "cad.param.expandGroup": "Expand",
-  "cad.param.collapseGroup": "Collapse"
+  "cad.param.collapseGroup": "Collapse",
+  "cad.importExport.selectFiles": "选择 CAD 文件或文件夹",
+  "cad.importExport.chooseFiles": "选择文件",
+  "cad.importExport.chooseFolder": "选择文件夹",
+  "cad.importExport.importing": "正在导入第 {current} 个，共 {total} 个…",
+  "cad.importExport.importAdditive": "文件将添加到当前图形，并递归扫描子文件夹。",
+  "cad.importExport.importSummary": "已导入 {files} 个文件（{elements} 个元素）；{failed} 个文件未导入。",
+  "cad.importExport.importSuccess": "已导入 {count} 个元素",
+  "cad.importExport.importFailed": "无法导入",
+  "cad.importExport.importWarnings": "警告",
+  "cad.importExport.importNoLayer": "没有活动图层，未添加任何内容。",
+  "cad.importExport.importDone": "完成"
 }

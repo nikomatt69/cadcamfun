@@ -167,6 +167,10 @@ class Builder {
   finish(cycle: ProbeCycle): ProbeRoutine {
     this.up()
     if (this.touches === 0) throw new RangeError("a cycle without a touch")
+    // The traverses run at safe height: below the feature they would go through it. Tool setter and rotary cycles work in machine coordinates.
+    const machine = cycle.kind === "tool-length" || cycle.kind === "tool-radius" || cycle.kind === "broken-tool" || cycle.kind === "rotary-axis"
+    const top = Math.max(...this.contacts.map((c) => c.expected.z), "top" in cycle && cycle.top !== undefined ? cycle.top : -Infinity)
+    if (!machine && top >= this.ctx.safeZ) throw new RangeError(`the safe height Z${this.ctx.safeZ} is not above the feature at Z${top}: raise it`)
     return { cycle, moves: this.moves, contacts: this.contacts, results: this.results, nominal: this.nominal, units: this.units, notes: this.notes, ...(this.hostFit !== undefined ? { hostFit: this.hostFit } : {}) }
   }
 }

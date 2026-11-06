@@ -27,7 +27,7 @@ const programOf = (gcode: string, unreadable: string) =>
  * tolerance gate and the process evidence). One function, so the run, the plan and the revalidation of a saved program agree.
  */
 export const jobOfRequest = (payload: CamKernelRequest) => {
-  const { progress: _progress, enforceTolerance, process, ...snapshot } = payload
+  const { progress: _progress, enforceTolerance, process, setupId: _setupId, ...snapshot } = payload
   const job = cam.kernel.jobOfSnapshot(snapshot)
   if (job.status === "failed") return job
   const value = {
@@ -38,13 +38,29 @@ export const jobOfRequest = (payload: CamKernelRequest) => {
   return { status: "ok" as const, value }
 }
 
+/** The artifact of one setup of a multi-setup run, or the run's issues; an id the job does not have is an issue, not a guess. */
+export const setupResult = (ran: cam.kernel.CamResult<cam.kernel.SetupsArtifact>, setupId: string): cam.kernel.CamResult<cam.kernel.CamArtifact> => {
+  if (ran.status === "failed") return ran
+  const one = ran.value.setups.find((r) => r.id === setupId)
+  if (one === undefined) return { status: "failed", issues: [{ tag: "InvalidInput", severity: "error", stage: "prepare", message: `The job has no setup '${setupId}' (it has ${ran.value.setups.map((r) => r.id).join(", ")})` }] }
+  return { status: "ok", value: one.artifact }
+}
+
 /** The same request adapter serves preview generation and persistence revalidation. */
 export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest, report?: (progress: CamRunProgress) => void) {
   const job = jobOfRequest(payload)
   if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
+  // A request that lists setups runs the whole job and answers with the setup it names (`setupId`): a stored program is one setup, and
+  // re-running the job (not the setup alone) is what reproduces it when the stock is carried from the setup before.
+  const listed = job.value.setups
+  if (listed !== undefined && payload.setupId === undefined && listed.length > 1) {
+    return yield* new BadRequest({ message: `The request lists ${listed.length} setups (${listed.map((s) => s.id).join(", ")}): name the one to answer with in setupId` })
+  }
   // In a scoped worker: the event loop keeps serving while the kernel works, a dropped request interrupts the fiber (its signal
   // terminates the worker) and a job that runs past its deadline is stopped.
-  const result = yield* runKernelJobEffect("cam-manufacture", job.value, report !== undefined ? { onProgress: report } : {}).pipe(
+  const result = yield* (listed === undefined
+    ? runKernelJobEffect("cam-manufacture", job.value, report !== undefined ? { onProgress: report } : {})
+    : runKernelJobEffect("cam-setups", job.value, report !== undefined ? { onProgress: report } : {}).pipe(Effect.map((ran) => setupResult(ran, payload.setupId ?? listed[0]!.id)))).pipe(
     Effect.mapError((error) => new BadRequest({ message: error.explained ? error.message : "The CAM kernel request could not be evaluated" })),
     // A dropped request interrupts the fiber: say so on the stream, since the code after the run never executes.
     Effect.onInterrupt(() => Effect.sync(() => report?.("cancelled")))
@@ -129,3 +145,33 @@ export const prepareCamProgramData = Effect.fn("cam.prepareProgramData")(functio
   }
   return output
 })
+
+/** A replay that did not run to the end: no verdict, no figures, the reason. */
+export const failedReplay = (reason: string): cam.kernel.VerifyNcResult => ({
+  complete: false, reasons: [`the replay did not finish: ${reason}`], findings: [], gouge: { volume: 0, depth: 0, rays: 0 }, left: { volume: 0, depth: 0, rays: 0 },
+  detached: 0, stockVolume: 0, removedVolume: 0, cell: 0, errorBound: 0, threshold: 0, moves: 0, feedMoves: 0, verdict: "incomplete"
+})
+
+/**
+ * The replay of a program a saved setup generated, as the jobs it needs (the program text once per workpiece register against that
+ * workpiece's blank) and how their results become the evidence. The assistant runs the jobs as owned kernel jobs, the HTTP routes as
+ * effects: one plan for both, so the release a program gets does not depend on who asked.
+ */
+export const setupReplayPlan = (setup: cam.program.Setup, program: cam.program.GeneratedProgram, geometryOf: (op: cam.program.Operation) => cam.generator.GeometryInput, configured: cam.generator.Stock | undefined) => {
+  const replay = cam.program.setupReplay(setup, program, geometryOf, configured)
+  const part = replay.part.map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
+  const jobs = replay.registers.map((register) => ({
+    nc: program.replayGcode ?? program.gcode, part: part as never, stock: register.stock, register: register.register, cell: 0.25, tolerance: 0.05,
+    tools: replay.tools.map((t) => ({ number: t.number, cutter: t.cutter as never }))
+  }))
+  return { jobs, finish: (results: ReadonlyArray<cam.kernel.VerifyNcResult>) => cam.program.setupEvidence(program.gcode, replay, results, program.tools, program.replayGcode) }
+}
+
+/** The same replay run through the kernel's worker queue, one register after the other; a register that cannot finish is a preview with the reason. */
+export const replaySetupEffect = (setup: cam.program.Setup, program: cam.program.GeneratedProgram, geometryOf: (op: cam.program.Operation) => cam.generator.GeometryInput, configured: cam.generator.Stock | undefined) => {
+  const plan = setupReplayPlan(setup, program, geometryOf, configured)
+  return Effect.forEach(plan.jobs, (job) => runKernelJobEffect("cam-verify-nc", job).pipe(
+    Effect.map((outcome) => ("error" in outcome ? failedReplay(outcome.error) : outcome)),
+    Effect.catch((cause) => Effect.succeed(failedReplay(cause instanceof Error ? cause.message : String(cause))))
+  )).pipe(Effect.map((results) => plan.finish(results)))
+}

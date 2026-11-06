@@ -94,7 +94,7 @@ test("Write program with native on writes the machine package's cycle; Simulate 
   const block = brep.transformBrep(brep.makeBox(100, 60, 20), brep.translation({ x: 0, y: 0, z: -20 }))
   const drilled = brep.booleanBrep(block, brep.transformBrep(brep.makeCylinder(10, 40), brep.translation({ x: 30, y: 30, z: -30 })), "subtract").brep
   const elements = () => [{ id: "part", type: "brep", brep: drilled, x: 0, y: 0, z: 0 }]
-  const deps = { run, service, machine, defaults: () => DEFAULT_PROBING, elements: () => elements() as never, projectId: () => null }
+  const deps = { run, service, machine, defaults: () => DEFAULT_PROBING, elements: () => elements() as never, stock: () => ({ x: 0, y: 0, width: 100, height: 60, topZ: 0 }), projectId: () => null }
   const program = hook.createProbingProgram({ ...deps, parse: async () => undefined })
   const c = hook.createProbingController({ ...deps, program, stock: () => ({ x: 0, y: 0, width: 100, height: 60, topZ: 0 }), setups: () => [], insert: () => {} })
   stores.multi.getState().clearAllToolpaths()
@@ -110,11 +110,12 @@ test("Write program with native on writes the machine package's cycle; Simulate 
   expect(written.nc).toContain("G65")
   await c.simulate(cycle.id)
   expect(stores.probing.getState().error).toBeUndefined()
-  // The native program stays the one shown; the run carries no lines that would point into another text.
-  expect(stores.probing.getState().programs[cycle.id]!.nc).toBe(written.nc)
+  // The run replays the inline touches the cycle stands for: that program is the one shown, and every contact points into it.
+  const replayed = stores.probing.getState().programs[cycle.id]!
+  expect(replayed.nc).not.toContain("G65 P98")
   const result = stores.probing.getState().results[cycle.id]!
   expect(result.outcome.contacts.length).toBeGreaterThanOrEqual(4)
-  expect(result.outcome.contacts.every((k) => k.line === undefined)).toBe(true)
+  expect(result.outcome.contacts.every((k) => k.line !== undefined)).toBe(true)
 })
 
 test("only the posts the probing routes write are sent with a simulation", async () => {

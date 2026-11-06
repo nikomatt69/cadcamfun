@@ -8,14 +8,17 @@ import type { ElementToolpath } from "./multiToolpath.ts"
 import type { CadElement } from "./job.ts"
 
 type Setup = cam.program.Setup
+type Workpiece = cam.program.Workpiece
 type Operation = cam.program.Operation
 type ToolKind = cam.Tool["kind"]
 
 const KINDS: Readonly<Record<string, ToolKind>> = { endmill: "endmill", ballnose: "ballnose", drill: "drill", vbit: "vbit", chamfer: "vbit" }
 
 /** The tool of a toolpath: the library tool when the settings name none is a generic one per type, diameter and flute count. */
-export const toolOfToolpath = (toolpath: ElementToolpath): cam.Tool => {
-  const s = toolpath.toolpathSettings
+export const toolOfToolpath = (toolpath: ElementToolpath): cam.Tool => toolOfSettings(toolpath.toolpathSettings)
+
+/** The generic tool of a set of toolpath settings (one per type, diameter and flute count). */
+export const toolOfSettings = (s: ElementToolpath["toolpathSettings"]): cam.Tool => {
   const kind = KINDS[s.toolType] ?? "endmill"
   return {
     id: `${s.toolType}-${s.toolDiameter}-${s.flutes}`,
@@ -32,21 +35,243 @@ export interface SetupChoices {
   readonly grouping: cam.program.SetupGrouping
   readonly retractBeforeToolChange: boolean
   readonly workOffset: Setup["workOffset"]
+  /** The parts of the fixture; empty = the setup's one workpiece under `workOffset`. */
+  readonly workpieces: ReadonlyArray<cam.program.Workpiece>
+  readonly workpieceOrder: cam.program.WorkpieceOrder
+  /** Pockets the tool magazine holds; 0 = not stated. */
+  readonly magazineSize: number
+  /** Clamps, jaws and plates, as boxes in the frame of the first part's datum. */
+  readonly fixtures: ReadonlyArray<cam.program.FixtureBox>
+  /** The machine's travel in the same frame: the placed blanks must lie inside it. Absent = not stated. */
+  readonly envelope: Setup["envelope"] | undefined
+  /** Named cycles of operations (rough, semi-finish, finish) and the features they are applied to. */
+  readonly templates: ReadonlyArray<cam.program.OperationTemplate>
+  readonly uses: ReadonlyArray<cam.program.TemplateUse>
+  /** The datum probe of every part, generated as its own program with `probePart`. */
+  readonly partProbe: Setup["partProbe"] | undefined
+  /** Ask the sidecar for the part probe program with the cutting programs. */
+  readonly probePart: boolean
 }
 
 export const DEFAULT_SETUP_CHOICES: SetupChoices = {
-  name: "Setup", post: cam.program.DEFAULT_POST_CONFIG, grouping: "single", retractBeforeToolChange: true, workOffset: "G54"
+  name: "Setup", post: cam.program.DEFAULT_POST_CONFIG, grouping: "single", retractBeforeToolChange: true, workOffset: "G54", workpieces: [], workpieceOrder: "toolFirst", magazineSize: 0,
+  fixtures: [], envelope: undefined, templates: [], uses: [], partProbe: undefined, probePart: false
+}
+
+const REGISTERS: ReadonlyArray<Setup["workOffset"]> = ["G54", "G55", "G56", "G57", "G58", "G59"]
+/** The most parts one fixture holds: six on G54-G59, the rest on G54.1 P1 to P42 (extended registers). */
+export const MAX_WORKPIECES = 48
+
+/** A register a part can run under: G54-G59, then the extended `G54.1 Pn`. The base `workOffset` of an extended register is G54 (the schema asks for one); the ref decides. */
+export interface RegisterChoice { readonly key: string; readonly workOffset: Setup["workOffset"]; readonly ref?: Workpiece["workOffsetRef"] }
+export const REGISTER_CHOICES: ReadonlyArray<RegisterChoice> = [
+  ...REGISTERS.map((workOffset): RegisterChoice => ({ key: workOffset, workOffset })),
+  ...Array.from({ length: MAX_WORKPIECES - REGISTERS.length }, (_, i): RegisterChoice => ({ key: `G54.1 P${i + 1}`, workOffset: "G54", ref: { kind: "extended", p: i + 1 } }))
+]
+
+/** The register of a part or a toolpath as one key: its extended ref when it has one, else G54-G59. */
+export const registerKey = (x: { readonly workOffset: Setup["workOffset"]; readonly workOffsetRef?: Workpiece["workOffsetRef"] | undefined }): string =>
+  x.workOffsetRef !== undefined ? cam.probing.formatOffsetRef(x.workOffsetRef) : x.workOffset
+
+/** The part with its register changed to the choice `key`. */
+export const withRegister = (wp: Workpiece, key: string): Workpiece => {
+  const choice = REGISTER_CHOICES.find((c) => c.key === key)
+  if (choice === undefined) return wp
+  const { workOffsetRef: _old, ...rest } = wp
+  return { ...rest, workOffset: choice.workOffset, ...(choice.ref !== undefined ? { workOffsetRef: choice.ref } : {}) }
+}
+
+/** The next workpiece of the fixture: the first register no workpiece holds, or nothing once the fixture is full. */
+export const nextWorkpiece = (existing: ReadonlyArray<cam.program.Workpiece>, name: (n: number) => string): cam.program.Workpiece | undefined => {
+  const taken = new Set(existing.map(registerKey))
+  const choice = REGISTER_CHOICES.find((c) => !taken.has(c.key))
+  if (choice === undefined || existing.length >= MAX_WORKPIECES) return undefined
+  let n = existing.length + 1
+  while (existing.some((wp) => wp.id === `wp-${n}`)) n++
+  return withRegister({ id: `wp-${n}`, name: name(n), workOffset: "G54" }, choice.key)
+}
+
+// ---------------------------------------------------------------- fixtures: clamps, jaws and the machine's travel
+
+/** A new clamp box to the left of the first part (the frame of its datum), for the user to move and size. */
+export const nextFixture = (existing: ReadonlyArray<cam.program.FixtureBox>, name: (n: number) => string): cam.program.FixtureBox => {
+  let n = existing.length + 1
+  while (existing.some((box) => box.id === `fx-${n}`)) n++
+  const shift = (n - 1) * 30
+  return { id: `fx-${n}`, name: name(n), min: { x: -80, y: -30 + shift, z: -20 }, max: { x: -60, y: 0 + shift, z: 0 } }
+}
+
+/** The clamp with one corner coordinate changed: the box stays a box (max is kept above min by the schema's own issue, shown next to the row). */
+export const withFixtureCorner = (box: cam.program.FixtureBox, corner: "min" | "max", axis: "x" | "y" | "z", value: number): cam.program.FixtureBox =>
+  ({ ...box, [corner]: { ...box[corner], [axis]: value } })
+
+/** The machine travel a setup starts from when it is switched on: 1 m by 1 m by 600 mm around the first part's datum, top face at Z0 plus the head's room. */
+export const DEFAULT_ENVELOPE: NonNullable<Setup["envelope"]> = { min: { x: -500, y: -500, z: -400 }, max: { x: 500, y: 500, z: 200 } }
+
+/** A drawable box of the clamps and the travel: the corner and the size, in the viewport's frame. */
+export interface DrawnBox { readonly name: string; readonly origin: Vec3; readonly size: Vec3 }
+const drawn = (name: string, b: { readonly min: Vec3; readonly max: Vec3 }): DrawnBox => ({ name, origin: b.min, size: { x: b.max.x - b.min.x, y: b.max.y - b.min.y, z: b.max.z - b.min.z } })
+export const clampBoxes = (fixtures: ReadonlyArray<cam.program.FixtureBox>): ReadonlyArray<DrawnBox> =>
+  fixtures.filter((box) => box.max.x > box.min.x && box.max.y > box.min.y && box.max.z > box.min.z).map((box) => drawn(box.name, box))
+export const travelBox = (envelope: Setup["envelope"] | undefined): DrawnBox | undefined =>
+  envelope === undefined || !(envelope.max.x > envelope.min.x && envelope.max.y > envelope.min.y && envelope.max.z > envelope.min.z) ? undefined : drawn("travel", envelope)
+
+// ---------------------------------------------------------------- operation templates
+
+/** The id a new template, step or use takes: the first `${prefix}-n` the list does not hold. */
+export const freshId = (prefix: string, taken: ReadonlyArray<string>): string => {
+  let n = taken.length + 1
+  while (taken.includes(`${prefix}-${n}`)) n++
+  return `${prefix}-${n}`
+}
+
+/** A step of a template from toolpath settings (the generator's, or a toolpath's): its tool is the generic one of those settings. */
+export const stepOfSettings = (id: string, name: string, settings: ElementToolpath["toolpathSettings"], dependsOn?: ReadonlyArray<string>): cam.program.OperationTemplateStep => ({
+  id, name, params: settings, tool: toolOfSettings(settings), ...(dependsOn !== undefined && dependsOn.length > 0 ? { dependsOn } : {})
+})
+
+/** The step with some of its settings changed (a depth, a stepdown, a diameter): the tool follows the settings. */
+export const withStepSettings = (step: cam.program.OperationTemplateStep, patch: Partial<ElementToolpath["toolpathSettings"]>): cam.program.OperationTemplateStep => {
+  const params = { ...step.params, ...patch }
+  return { ...step, params, tool: toolOfSettings(params) }
+}
+
+/** The steps of a template after step `id` switched waiting for step `other`; none left = no dependency key. */
+export const toggleStepDependency = (template: cam.program.OperationTemplate, id: string, other: string): cam.program.OperationTemplate => ({
+  ...template,
+  steps: template.steps.map((step) => {
+    if (step.id !== id) return step
+    const { dependsOn: _old, ...rest } = step
+    const next = toggleDependency(step.dependsOn, other)
+    return next === undefined ? rest : { ...rest, dependsOn: next }
+  })
+})
+
+/** The template without step `id`: the steps that waited for it no longer do. Nothing changes when it is the last step. */
+export const withoutStep = (template: cam.program.OperationTemplate, id: string): cam.program.OperationTemplate => {
+  if (template.steps.length <= 1) return template
+  return { ...template, steps: template.steps.filter((step) => step.id !== id).map((step) => {
+    const { dependsOn, ...rest } = step
+    const next = (dependsOn ?? []).filter((other) => other !== id)
+    return next.length === 0 ? rest : { ...rest, dependsOn: next }
+  }) }
+}
+
+/** A template applied to elements: one instance per element, steps in step order (each tool loaded once) unless the user chose feature order. */
+export const useOf = (id: string, template: cam.program.OperationTemplate, elementIds: ReadonlyArray<string>, over: Partial<cam.program.TemplateUse> = {}): cam.program.TemplateUse =>
+  ({ id, templateId: template.id, elementIds, perElement: true, order: "perStep", ...over })
+
+/** The operations the setup runs after its template uses are expanded, as the plan shows them: name, tool and element names. */
+export const expandedOperations = (setup: Setup): ReadonlyArray<{ readonly id: string; readonly name: string; readonly tool: string; readonly elementIds: ReadonlyArray<string> }> => {
+  if ((setup.uses ?? []).length === 0) return []
+  const base = new Set(setup.operations.map((op) => op.id))
+  return cam.program.expandSetup(setup).setup.operations.filter((op) => !base.has(op.id)).map((op) => ({ id: op.id, name: op.name, tool: op.tool.name, elementIds: op.elementIds }))
+}
+
+// ---------------------------------------------------------------- the datum probe of every part
+
+export type PartProbeCycle = cam.program.PartProbeCycle
+export type ProbeCycleKind = PartProbeCycle["kind"]
+export const PROBE_KINDS: ReadonlyArray<ProbeCycleKind> = ["z-surface", "bore", "boss", "edge", "corner", "web", "pocket", "rectangle", "edge-angle"]
+export const MAX_PROBE_CYCLES = 4
+
+/** The cycle a kind starts from, for the user to adjust: where each part's datum is expected, in the part's own frame. */
+export const defaultProbeCycle = (kind: ProbeCycleKind): PartProbeCycle => {
+  switch (kind) {
+    case "z-surface": return { kind, at: { x: 0, y: 0 }, expectedZ: 0 }
+    case "bore": return { kind, centre: { x: 0, y: 0 }, diameter: 10, depth: 5 }
+    case "boss": return { kind, centre: { x: 0, y: 0 }, diameter: 20, depth: 5 }
+    case "edge": return { kind, at: { x: 0, y: 0, z: -5 }, normal: { x: 1, y: 0 } }
+    case "corner": return { kind, corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5 }
+    case "web": case "pocket": return { kind, centre: { x: 0, y: 0 }, width: kind === "web" ? 10 : 20, angle: 0, depth: 5 }
+    case "rectangle": return { kind, inside: false, centre: { x: 0, y: 0 }, size: { x: 40, y: 30 }, depth: 5 }
+    case "edge-angle": return { kind, start: { x: 0, y: 0 }, along: { x: 1, y: 0 }, pitch: 20, normal: { x: 0, y: 1 }, depth: 5 }
+  }
+}
+
+/** The numeric fields of a cycle, as `[label key, read, write]`: one editor for every kind. */
+export type ProbeFieldKey = "x" | "y" | "z" | "expectedZ" | "diameter" | "depth" | "normalX" | "normalY" | "width" | "angle" | "sizeX" | "sizeY" | "pitch"
+export const probeFields = (cycle: PartProbeCycle): ReadonlyArray<{ readonly key: ProbeFieldKey; readonly value: number; readonly set: (value: number) => PartProbeCycle }> => {
+  switch (cycle.kind) {
+    case "z-surface": return [
+      { key: "x", value: cycle.at.x, set: (v) => ({ ...cycle, at: { ...cycle.at, x: v } }) },
+      { key: "y", value: cycle.at.y, set: (v) => ({ ...cycle, at: { ...cycle.at, y: v } }) },
+      { key: "expectedZ", value: cycle.expectedZ, set: (v) => ({ ...cycle, expectedZ: v }) }
+    ]
+    case "bore": case "boss": return [
+      { key: "x", value: cycle.centre.x, set: (v) => ({ ...cycle, centre: { ...cycle.centre, x: v } }) },
+      { key: "y", value: cycle.centre.y, set: (v) => ({ ...cycle, centre: { ...cycle.centre, y: v } }) },
+      { key: "diameter", value: cycle.diameter, set: (v) => ({ ...cycle, diameter: v > 0 ? v : cycle.diameter }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+    case "edge": return [
+      { key: "x", value: cycle.at.x, set: (v) => ({ ...cycle, at: { ...cycle.at, x: v } }) },
+      { key: "y", value: cycle.at.y, set: (v) => ({ ...cycle, at: { ...cycle.at, y: v } }) },
+      { key: "z", value: cycle.at.z, set: (v) => ({ ...cycle, at: { ...cycle.at, z: v } }) },
+      { key: "normalX", value: cycle.normal.x, set: (v) => ({ ...cycle, normal: { ...cycle.normal, x: Math.max(-1, Math.min(1, v)) } }) },
+      { key: "normalY", value: cycle.normal.y, set: (v) => ({ ...cycle, normal: { ...cycle.normal, y: Math.max(-1, Math.min(1, v)) } }) }
+    ]
+    case "corner": return [
+      { key: "x", value: cycle.corner.x, set: (v) => ({ ...cycle, corner: { ...cycle.corner, x: v } }) },
+      { key: "y", value: cycle.corner.y, set: (v) => ({ ...cycle, corner: { ...cycle.corner, y: v } }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+    case "web": case "pocket": return [
+      { key: "x", value: cycle.centre.x, set: (v) => ({ ...cycle, centre: { ...cycle.centre, x: v } }) },
+      { key: "y", value: cycle.centre.y, set: (v) => ({ ...cycle, centre: { ...cycle.centre, y: v } }) },
+      { key: "width", value: cycle.width, set: (v) => ({ ...cycle, width: v > 0 ? v : cycle.width }) },
+      // The core takes radians; the editor shows degrees.
+      { key: "angle", value: Math.round(cycle.angle * 180 / Math.PI * 1e4) / 1e4, set: (v) => ({ ...cycle, angle: v * Math.PI / 180 }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+    case "rectangle": return [
+      { key: "x", value: cycle.centre.x, set: (v) => ({ ...cycle, centre: { ...cycle.centre, x: v } }) },
+      { key: "y", value: cycle.centre.y, set: (v) => ({ ...cycle, centre: { ...cycle.centre, y: v } }) },
+      { key: "sizeX", value: cycle.size.x, set: (v) => ({ ...cycle, size: { ...cycle.size, x: v > 0 ? v : cycle.size.x } }) },
+      { key: "sizeY", value: cycle.size.y, set: (v) => ({ ...cycle, size: { ...cycle.size, y: v > 0 ? v : cycle.size.y } }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+    case "edge-angle": return [
+      { key: "x", value: cycle.start.x, set: (v) => ({ ...cycle, start: { ...cycle.start, x: v } }) },
+      { key: "y", value: cycle.start.y, set: (v) => ({ ...cycle, start: { ...cycle.start, y: v } }) },
+      { key: "pitch", value: cycle.pitch, set: (v) => ({ ...cycle, pitch: v > 0 ? v : cycle.pitch }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+  }
+}
+
+/** The blank of the page's stock as a setup block: its corner, its size, its top face at `origin.z` (the frame of the generator's stock). */
+export const blockOfStock = (stock: cam.generator.Stock): NonNullable<Setup["stock"]> => {
+  const x = stock.radius > 0 ? 2 * stock.radius : stock.width, y = stock.radius > 0 ? 2 * stock.radius : stock.height
+  return { x, y, z: stock.depth, origin: { x: stock.x - x / 2, y: stock.y - y / 2, z: stock.topZ }, material: stock.material ?? "aluminum" }
 }
 
 /** The setup of the panel's toolpaths, in execution order. A toolpath that is hidden is not machined. */
-export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choices: SetupChoices = DEFAULT_SETUP_CHOICES): Setup => ({
+export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choices: SetupChoices = DEFAULT_SETUP_CHOICES, stock?: cam.generator.Stock): Setup => {
+  // Clamps and travel are checked against the placed blanks: the first part is placed at the datum, a fixture of one part is listed as that part, and the blank is the page's stock.
+  const placed = choices.fixtures.length > 0 || choices.envelope !== undefined
+  const parts: ReadonlyArray<Workpiece> = choices.workpieces.length > 1 ? choices.workpieces
+    : placed ? [choices.workpieces[0] ?? { id: "wp-1", name: "Workpiece 1", workOffset: choices.workOffset }] : []
+  const listed = parts.map((wp, index) => (placed && index === 0 && wp.placement === undefined ? { ...wp, placement: { x: 0, y: 0, z: 0 } } : wp))
+  const block = placed && stock !== undefined ? blockOfStock(stock) : undefined
+  return {
   id: "desktop-setup",
   name: choices.name,
   machineType: "mill",
-  workOffset: choices.workOffset,
+  // A fixture of one part runs under that part's register.
+  workOffset: choices.workpieces.length === 1 ? choices.workpieces[0]!.workOffset : choices.workOffset,
+  ...(choices.magazineSize > 0 ? { magazineSize: choices.magazineSize } : {}),
   post: choices.post,
   grouping: choices.grouping,
   retractBeforeToolChange: choices.retractBeforeToolChange,
+  // One workpiece is the setup itself: the list is sent only when the fixture holds several (or clamps need the part placed), so a stored setup stays what it was.
+  ...(listed.length > 0 ? { workpieces: listed, workpieceOrder: choices.workpieceOrder } : {}),
+  ...(block !== undefined ? { stock: block } : {}),
+  ...(choices.fixtures.length > 0 ? { fixtures: choices.fixtures } : {}),
+  ...(choices.envelope !== undefined ? { envelope: choices.envelope } : {}),
+  ...(choices.templates.length > 0 ? { templates: choices.templates } : {}),
+  ...(choices.uses.length > 0 ? { uses: choices.uses } : {}),
+  ...(choices.partProbe !== undefined ? { partProbe: choices.partProbe } : {}),
   // A probe cycle is not a cutting operation: it has its own program (`camProbing.emit`) and never joins the cutting setup.
   operations: [...toolpaths].filter((toolpath) => toolpath.probe === undefined).sort((a, b) => a.order - b.order).map((toolpath): Operation => ({
     id: toolpath.id,
@@ -55,13 +280,18 @@ export const setupOfToolpaths = (toolpaths: ReadonlyArray<ElementToolpath>, choi
     params: toolpath.toolpathSettings,
     tool: toolOfToolpath(toolpath),
     enabled: toolpath.visible,
-    fromPreviousStock: false
+    fromPreviousStock: false,
+    // Only on a fixture of several parts, and only when the toolpath is limited to some of them.
+    ...(toolpath.dependsOn !== undefined && toolpath.dependsOn.length > 0 ? { dependsOn: toolpath.dependsOn } : {}),
+    ...(choices.workpieces.length > 1 && toolpath.workpieceIds !== undefined ? { workpieceIds: toolpath.workpieceIds.filter((id) => choices.workpieces.some((wp) => wp.id === id)) } : {})
   }))
-})
+  }
+}
 
 /** The elements the setup's operations name, by id, for the generate request. An element no longer in the drawing is left out (the sidecar answers with which). */
 export const elementsOfSetup = (setup: Setup, elements: ReadonlyArray<CadElement>): Record<string, CadElement> => {
-  const wanted = new Set(setup.operations.flatMap((op) => op.elementIds))
+  // The template uses are operations too: their elements are wanted by the generate request.
+  const wanted = new Set(cam.program.expandSetup(setup).setup.operations.flatMap((op) => op.elementIds))
   const out: Record<string, CadElement> = {}
   for (const element of elements) {
     const id = String(element["id"])
@@ -76,7 +306,9 @@ export const programFileName = (program: { readonly name: string; readonly progr
 
 /** The choices a saved setup was written with, so loading it puts the panel back as it was saved. */
 export const choicesOfSetup = (setup: Setup): SetupChoices => ({
-  name: setup.name, post: setup.post, grouping: setup.grouping, retractBeforeToolChange: setup.retractBeforeToolChange, workOffset: setup.workOffset
+  name: setup.name, post: setup.post, grouping: setup.grouping, retractBeforeToolChange: setup.retractBeforeToolChange, workOffset: setup.workOffset,
+  workpieces: setup.workpieces ?? [], workpieceOrder: setup.workpieceOrder ?? "toolFirst", magazineSize: setup.magazineSize ?? 0,
+  fixtures: setup.fixtures ?? [], envelope: setup.envelope, templates: setup.templates ?? [], uses: setup.uses ?? [], partProbe: setup.partProbe, probePart: setup.partProbe !== undefined
 })
 
 export interface RestoredToolpaths {
@@ -105,8 +337,286 @@ export const toolpathsOfSetup = (setup: Setup, elements: ReadonlyArray<CadElemen
     toolpaths.push({
       id: op.id, elementId, elementType: String(element?.["type"] ?? ""), elementName: op.name,
       toolpathSettings: op.params, gcode: "", color: colors[toolpaths.length % Math.max(1, colors.length)] ?? "#888888",
-      visible: op.enabled && element !== undefined, toolpathPoints: [], selected: false, order: toolpaths.length, estimatedTime: 0, distance: 0
+      visible: op.enabled && element !== undefined, toolpathPoints: [], selected: false, order: toolpaths.length, estimatedTime: 0, distance: 0,
+      ...(op.workpieceIds !== undefined ? { workpieceIds: op.workpieceIds } : {}),
+      ...(op.dependsOn !== undefined ? { dependsOn: op.dependsOn } : {})
     })
   }
   return { toolpaths, missingElementIds: missing, skippedOperationIds: skipped }
+}
+
+// ---------------------------------------------------------------- several workpieces, as the viewport shows them
+
+/*
+ * Display only: the NC of a multi-part program carries the same moves under another work offset register for each part, and
+ * the viewport has no registers. `Workpiece.placement` (where a part's datum lies from the first part's) moves the IR's moves
+ * for drawing and never reaches the program text.
+ */
+type Move = cam.Move
+type Vec3 = { readonly x: number; readonly y: number; readonly z: number }
+export interface StockBox { readonly origin: Vec3; readonly size: Vec3 }
+
+const ZERO: Vec3 = { x: 0, y: 0, z: 0 }
+const add = (p: Vec3, d: Vec3): Vec3 => ({ x: p.x + d.x, y: p.y + d.y, z: p.z + d.z })
+const isZero = (d: Vec3): boolean => d.x === 0 && d.y === 0 && d.z === 0
+
+/** The move moved by `d`. Moves in machine coordinates (G53) and moves with no position stay as they are. */
+export const translateMove = (move: Move, d: Vec3): Move => {
+  switch (move._tag) {
+    case "Rapid":
+      return move.machine === true ? move : { ...move, to: add(move.to, d) }
+    case "Linear":
+    case "Probe":
+      return { ...move, to: add(move.to, d) }
+    case "Arc":
+      return { ...move, to: add(move.to, d), center: { x: move.center.x + d.x, y: move.center.y + d.y } }
+    case "Spline":
+      return { ...move, to: add(move.to, d), controls: move.controls.map((c) => ({ x: c.x + d.x, y: c.y + d.y })) }
+    case "Cycle":
+      return { ...move, to: add(move.to, d), retractHeight: move.retractHeight + d.z }
+    default:
+      return move
+  }
+}
+
+/** Where a part's datum lies from the first part's: the placements are both measured from the fixture, so the difference. */
+export const shiftOf = (workpiece: Workpiece, first: Workpiece | undefined): Vec3 => {
+  const own = workpiece.placement ?? ZERO, base = first?.placement ?? ZERO
+  return { x: own.x - base.x, y: own.y - base.y, z: own.z - base.z }
+}
+
+/** Degrees a part's rotary index turns it by, about X (A), Y (B) and Z (C). */
+export interface Turn { readonly a: number; readonly b: number; readonly c: number }
+const isNoTurn = (t: Turn): boolean => t.a === 0 && t.b === 0 && t.c === 0
+const RAD = Math.PI / 180
+
+/** A point turned about the part's datum: A about X, then B about Y, then C about Z (rounded so a quarter turn stays exact). */
+export const turnPoint = (p: Vec3, t: Turn): Vec3 => {
+  const round = (n: number): number => Math.round(n * 1e9) / 1e9
+  let { x, y, z } = p
+  if (t.a !== 0) { const c = Math.cos(t.a * RAD), s = Math.sin(t.a * RAD); [y, z] = [y * c - z * s, y * s + z * c] }
+  if (t.b !== 0) { const c = Math.cos(t.b * RAD), s = Math.sin(t.b * RAD); [x, z] = [x * c + z * s, -x * s + z * c] }
+  if (t.c !== 0) { const c = Math.cos(t.c * RAD), s = Math.sin(t.c * RAD); [x, y] = [x * c - y * s, x * s + y * c] }
+  return { x: round(x), y: round(y), z: round(z) }
+}
+
+/**
+ * The index of a part from the first part's: the viewport's own stock box and frame are the first part's, so every other part is
+ * drawn turned by the difference (the table turns each face to its angles before its toolpaths).
+ */
+export const turnOf = (workpiece: Workpiece, first: Workpiece | undefined): Turn => ({
+  a: (workpiece.index?.a ?? 0) - (first?.index?.a ?? 0), b: (workpiece.index?.b ?? 0) - (first?.index?.b ?? 0), c: (workpiece.index?.c ?? 0) - (first?.index?.c ?? 0)
+})
+
+/**
+ * A move turned about the datum. A turn about Z alone keeps the XY plane, so arcs and splines stay what they are; a tilt takes them
+ * out of it. `placedProgram` samples those finely (`turnedMoves`); this alone, with no start point, joins their end points.
+ */
+export const turnMove = (move: Move, t: Turn): Move => {
+  if (isNoTurn(t)) return move
+  const flat = t.a === 0 && t.b === 0
+  switch (move._tag) {
+    case "Rapid":
+      return move.machine === true ? move : { ...move, to: turnPoint(move.to, t) }
+    case "Linear":
+      return { ...move, to: turnPoint(move.to, t) }
+    case "Probe":
+      return { ...move, to: turnPoint(move.to, t), direction: turnPoint(move.direction, t) }
+    case "Arc": {
+      if (!flat) return { _tag: "Linear", to: turnPoint(move.to, t), feed: move.feed }
+      const center = turnPoint({ ...move.center, z: 0 }, t)
+      return { ...move, to: turnPoint(move.to, t), center: { x: center.x, y: center.y } }
+    }
+    case "Spline": {
+      if (!flat) return { _tag: "Linear", to: turnPoint(move.to, t), feed: move.feed }
+      return { ...move, to: turnPoint(move.to, t), controls: move.controls.map((c) => { const q = turnPoint({ ...c, z: 0 }, t); return { x: q.x, y: q.y } }) }
+    }
+    case "Cycle":
+      return flat ? { ...move, to: turnPoint(move.to, t) } : { _tag: "Linear", to: turnPoint(move.to, t), feed: move.feed }
+    default:
+      return move
+  }
+}
+
+/** Chordal tolerance, mm, of the segments an arc becomes when its part is tilted out of the XY plane. */
+export const TILT_ARC_TOLERANCE = 0.01
+
+/**
+ * The points after `from` of an arc, within `tolerance` of the curve, the last exactly `move.to`. The radius and the height change
+ * linearly from the start to the end, so a helix and an arc whose ends are not quite on one circle are followed, not snapped.
+ */
+export const arcPoints = (from: Vec3, move: Extract<Move, { readonly _tag: "Arc" }>, tolerance = TILT_ARC_TOLERANCE): ReadonlyArray<Vec3> => {
+  const r0 = Math.hypot(from.x - move.center.x, from.y - move.center.y), r1 = Math.hypot(move.to.x - move.center.x, move.to.y - move.center.y)
+  const sweep = cam.arcSweepBetween(from, move.to, move.center, move.clockwise)
+  const a0 = Math.atan2(from.y - move.center.y, from.x - move.center.x)
+  const r = Math.max(r0, r1)
+  const step = r <= tolerance ? Math.PI / 2 : 2 * Math.acos(Math.max(0, 1 - tolerance / r))
+  const n = Math.min(720, Math.max(2, Math.ceil(sweep / step)))
+  const sign = move.clockwise ? -1 : 1
+  const out: Vec3[] = []
+  for (let i = 1; i < n; i++) {
+    const k = i / n, angle = a0 + sign * sweep * k, radius = r0 + (r1 - r0) * k
+    out.push({ x: move.center.x + radius * Math.cos(angle), y: move.center.y + radius * Math.sin(angle), z: from.z + (move.to.z - from.z) * k })
+  }
+  out.push(move.to)
+  return out
+}
+
+/**
+ * The moves of a toolpath turned out of the XY plane by a tilt: cycles and splines are expanded to their motion and every arc becomes
+ * line segments within `TILT_ARC_TOLERANCE` (the viewport has no arc in a tilted plane), then each point is turned. `start` is where the
+ * tool stands when the toolpath begins, in the part's own frame.
+ */
+const tiltedMoves = (moves: ReadonlyArray<Move>, turn: Turn, start: Vec3): Move[] => {
+  const out: Move[] = []
+  let at = start
+  for (const move of cam.expandMoves(moves, start)) {
+    if (move._tag === "Arc") for (const to of arcPoints(at, move)) out.push({ _tag: "Linear", to: turnPoint(to, turn), feed: move.feed })
+    else out.push(turnMove(move, turn))
+    if (move._tag !== "Rapid" || move.machine !== true) at = cam.moveTarget(move) ?? at
+  }
+  return out
+}
+
+/**
+ * The program as the viewport draws it: each toolpath turned to its part's index and moved to the place of the workpiece whose
+ * register it runs under. A program with one workpiece (or none placed or indexed) is returned as it is.
+ */
+export const placedProgram = (program: cam.Program, workpieces: ReadonlyArray<Workpiece>): cam.Program => {
+  if (workpieces.length < 2) return program
+  const places = new Map(workpieces.map((wp) => [registerKey(wp), { shift: shiftOf(wp, workpieces[0]), turn: turnOf(wp, workpieces[0]) }] as const))
+  if ([...places.values()].every((p) => isZero(p.shift) && isNoTurn(p.turn))) return program
+  // Where the tool stands as each toolpath begins, in the program's own coordinates: the sampled arcs of a tilted part start there.
+  let at: Vec3 = ZERO
+  return {
+    ...program,
+    toolpaths: program.toolpaths.map((tp) => {
+      const start = at
+      for (const move of tp.moves) if (move._tag !== "Rapid" || move.machine !== true) at = cam.moveTarget(move) ?? at
+      const place = places.get(registerOf(tp, program))
+      if (place === undefined || (isZero(place.shift) && isNoTurn(place.turn))) return tp
+      const tilted = place.turn.a !== 0 || place.turn.b !== 0
+      const turned = tilted ? tiltedMoves(tp.moves, place.turn, start) : tp.moves.map((move) => turnMove(move, place.turn))
+      return { ...tp, moves: turned.map((move) => translateMove(move, place.shift)) }
+    })
+  }
+}
+
+/** The register a toolpath runs under: its own, else the program's. */
+const registerOf = (tp: cam.Toolpath, program: cam.Program): string =>
+  tp.workOffsetRef !== undefined || tp.workOffset !== undefined ? registerKey({ workOffset: tp.workOffset ?? program.workOffset, workOffsetRef: tp.workOffsetRef }) : registerKey(program)
+
+/**
+ * The stock box of every part but the first (that one is the viewport's own stock box), moved to its place. A part with a blank of its
+ * own gets that blank (its corner is relative to the part's datum, its top face at `origin.z`); the others get the viewport's stock.
+ */
+export const extraStocks = (stock: StockBox | undefined, workpieces: ReadonlyArray<Workpiece>): ReadonlyArray<StockBox> => {
+  if (stock === undefined || workpieces.length < 2) return []
+  return workpieces.slice(1).map((wp) => {
+    const shift = shiftOf(wp, workpieces[0]), turn = turnOf(wp, workpieces[0])
+    const own: StockBox = wp.stock === undefined ? stock
+      : { origin: { x: wp.stock.origin.x, y: wp.stock.origin.y, z: wp.stock.origin.z - wp.stock.z }, size: { x: wp.stock.x, y: wp.stock.y, z: wp.stock.z } }
+    return { origin: add(turnedBox(own, turn).origin, shift), size: turnedBox(own, turn).size }
+  })
+}
+
+/** The box that holds a stock box after its part turned: exact for quarter turns, the enclosing box for any other angle. */
+const turnedBox = (box: StockBox, turn: Turn): StockBox => {
+  if (isNoTurn(turn)) return box
+  const { origin: o, size: s } = box
+  const corners = [0, 1].flatMap((i) => [0, 1].flatMap((j) => [0, 1].map((k) => turnPoint({ x: o.x + i * s.x, y: o.y + j * s.y, z: o.z + k * s.z }, turn))))
+  const min = { x: Math.min(...corners.map((c) => c.x)), y: Math.min(...corners.map((c) => c.y)), z: Math.min(...corners.map((c) => c.z)) }
+  const max = { x: Math.max(...corners.map((c) => c.x)), y: Math.max(...corners.map((c) => c.y)), z: Math.max(...corners.map((c) => c.z)) }
+  return { origin: min, size: { x: max.x - min.x, y: max.y - min.y, z: max.z - min.z } }
+}
+
+/** The work offsets a program runs under, in order of first use. */
+export const offsetsOf = (program: cam.Program): ReadonlyArray<string> => {
+  const seen: string[] = []
+  for (const tp of program.toolpaths) { const o = registerOf(tp, program); if (!seen.includes(o)) seen.push(o) }
+  return seen
+}
+
+/**
+ * The workpieces a toolpath runs on after one of them is switched: all of them is "unrestricted" (no list), and the last one cannot be
+ * switched off (an operation on no part cannot be generated).
+ */
+export const toggleToolpathWorkpiece = (fixture: ReadonlyArray<Workpiece>, current: ReadonlyArray<string> | undefined, id: string): ReadonlyArray<string> | undefined => {
+  const on = new Set(current ?? fixture.map((wp) => wp.id))
+  if (on.has(id)) on.delete(id)
+  else on.add(id)
+  if (on.size === 0) return current
+  const next = fixture.filter((wp) => on.has(wp.id)).map((wp) => wp.id)
+  return next.length === fixture.length ? undefined : next
+}
+
+/** The operations a toolpath waits for after one of them is switched; none left is "no dependency" (the key is left out). */
+export const toggleDependency = (current: ReadonlyArray<string> | undefined, id: string): ReadonlyArray<string> | undefined => {
+  const next = (current ?? []).includes(id) ? (current ?? []).filter((other) => other !== id) : [...(current ?? []), id]
+  return next.length === 0 ? undefined : next
+}
+
+/** A toolpath's list after a workpiece left the fixture: what is left of it, or unrestricted when nothing is left or one part remains. */
+export const withoutWorkpiece = (current: ReadonlyArray<string> | undefined, removed: string, remaining: number): ReadonlyArray<string> | undefined => {
+  if (current === undefined || remaining <= 1) return undefined
+  const next = current.filter((id) => id !== removed)
+  return next.length === 0 ? undefined : next
+}
+
+/**
+ * The fixture of a selection of parts (imported or drawn): one workpiece per part, on the next free registers G54 to G59, the first
+ * part where the datum is and each of the others placed by how far its box lies from the first's. Parts beyond the six registers
+ * are left out and counted by the caller from the lengths.
+ */
+export const workpiecesFromElements = (elements: ReadonlyArray<Record<string, unknown>>, name: (n: number) => string): ReadonlyArray<Workpiece> => {
+  const boxes = elements.slice(0, MAX_WORKPIECES).map((element) => cam.generator.elementBounds(element as never))
+  const origin = boxes[0]?.min
+  return boxes.map((box, index): Workpiece => {
+    const element = elements[index]!
+    const label = typeof element["name"] === "string" && element["name"] !== "" ? element["name"] : name(index + 1)
+    const base = withRegister({ id: `wp-${index + 1}`, name: label, workOffset: "G54" }, REGISTER_CHOICES[index]!.key)
+    if (index === 0 || origin === undefined || !Object.values(box.min).every(Number.isFinite)) return base
+    return { ...base, placement: { x: box.min.x - origin.x, y: box.min.y - origin.y, z: box.min.z - origin.z } }
+  })
+}
+
+// ---------------------------------------------------------------- the replay of a generated program
+
+export type SetupEvidence = cam.program.SetupEvidence
+const RELEASES: ReadonlyArray<string> = ["blocked", "preview", "verified-program"]
+
+/**
+ * The replay evidence of a program, as plain data from the generate route or a stored document, when it is about these very bytes:
+ * evidence of other NC text (an edited program) is not evidence, and anything that does not look like one is left out.
+ */
+export const evidenceOfProgram = (raw: unknown, gcode: string): SetupEvidence | undefined => {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined
+  const value = raw as Record<string, unknown>
+  if (typeof value["release"] !== "string" || !RELEASES.includes(value["release"]) || value["programHash"] !== cam.kernel.sha256(gcode)) return undefined
+  if (!Array.isArray(value["registers"]) || !Array.isArray(value["notes"])) return undefined
+  return value as unknown as SetupEvidence
+}
+
+/** One box of the parts seen together: a part's blank, how far its own register's cuts reached, and whether a cut crossed into it or out of it. */
+export interface FixtureBox {
+  readonly name: string
+  readonly origin: Vec3
+  readonly size: Vec3
+  /** "crossed": a cut of another part's register entered this blank, or this part's register cut into another blank. */
+  readonly state: "part" | "crossed"
+  readonly reach?: { readonly origin: Vec3; readonly size: Vec3 }
+}
+
+const boxOf = (b: { readonly min: Vec3; readonly max: Vec3 }): { readonly origin: Vec3; readonly size: Vec3 } =>
+  ({ origin: b.min, size: { x: b.max.x - b.min.x, y: b.max.y - b.min.y, z: b.max.z - b.min.z } })
+
+/** The parts of a program with several registers in one frame, for the viewport; nothing when the evidence has no such view. */
+export const fixtureBoxes = (evidence: SetupEvidence | undefined): ReadonlyArray<FixtureBox> => {
+  const fixture = evidence?.fixture
+  if (fixture === undefined || fixture.parts.length < 2) return []
+  const crossed = new Set(fixture.crossings.flatMap((c) => [c.register, c.other]))
+  return fixture.parts.map((part): FixtureBox => ({
+    name: part.name, ...boxOf(part.blank), state: crossed.has(part.register) ? "crossed" : "part",
+    ...(part.reach !== undefined ? { reach: boxOf(part.reach) } : {})
+  }))
 }

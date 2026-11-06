@@ -3,6 +3,11 @@ import { GenerationBudgetError, MAX_LEVELS, cutLevels, f3, passCount, spend, typ
 import type { LatheOperationType, ToolpathSettings } from "./schema.ts"
 import type { TurnedProfile } from "./history-features.ts"
 
+/** A validly decoded quick-generator request that cannot safely produce the requested lathe operation. */
+export class LatheInputError extends Error {
+  override readonly name = "LatheInputError"
+}
+
 /** Distance kept between the tool and the chuck jaws, mm. */
 export const JAW_CLEARANCE = 2
 
@@ -66,20 +71,18 @@ const latheTurning = (s: ToolpathSettings): string => {
     for (let cut = 0, n = passCount(s.depth, s.stepdown, "The depth at this stepdown"); n > 0 && cut < s.depth; cut += s.stepdown, n--) {
       const currentDepth = Math.min(s.depth, cut + s.stepdown)
       const diameter = d - currentDepth * 2
-      gcode += `G0 X${f3(diameter + 1)} ; Rapid to diameter\n`
       gcode += `G1 X${f3(diameter)} F${s.feedrate / 2} ; Plunge to depth\n`
       gcode += `G1 Z${f3(-length)} F${s.feedrate} ; Turn along -Z, towards the chuck\n`
       gcode += `G0 X${f3(d + 2)} ; Retract\n`
       gcode += "G0 Z0 ; Return to face\n"
     }
   } else if (s.turningOperation === "internal") {
-    const hole = d / 2
+    const hole = s.stockBore
     gcode += `G0 X${f3(hole - 1)} Z2 ; Position tool\n`
     gcode += "G0 Z0 ; Move to face\n"
     for (let cut = 0, n = passCount(s.depth, s.stepdown, "The depth at this stepdown"); n > 0 && cut < s.depth; cut += s.stepdown, n--) {
       const currentDepth = Math.min(s.depth, cut + s.stepdown)
       const diameter = hole + currentDepth * 2
-      gcode += `G0 X${f3(diameter - 1)} ; Rapid to diameter\n`
       gcode += `G1 X${f3(diameter)} F${s.feedrate / 2} ; Plunge to depth\n`
       gcode += `G1 Z${f3(-internalZ)} F${s.feedrate} ; Turn along -Z, towards the chuck\n`
       gcode += `G0 X${f3(hole - 1)} ; Retract\n`
@@ -90,7 +93,7 @@ const latheTurning = (s: ToolpathSettings): string => {
 }
 
 const latheBoring = (s: ToolpathSettings): string => {
-  const start = s.stockDiameter! * 0.3
+  const start = s.stockBore
   const boreZ = Math.min(s.stockLength! * 0.5, latheReach(s))
   let gcode = "\n; Boring operation\n" + reachNote(s, s.stockLength! * 0.5)
   gcode += `G0 X${f3(start - 1)} Z2 ; Position tool\n`
@@ -107,15 +110,15 @@ const latheBoring = (s: ToolpathSettings): string => {
 
 const latheThreading = (s: ToolpathSettings): string => {
   const d = s.stockDiameter!
-  const pitch = 1.5
+  const pitch = s.threadPitch
   const startZ = 2
   const endZ = Math.max(startZ - s.stockLength! * 0.7, -latheReach(s))
   let gcode = "\n; Threading operation\n" + reachNote(s, s.stockLength! * 0.7 - startZ)
   gcode += `G0 X${f3(d + 5)} Z${f3(startZ)} ; Position tool\n`
-  const passes = Math.round(s.depth / 0.1)
+  const passes = Math.max(1, Math.ceil(s.depth / 0.1 - 1e-9))
   spend(passes * 4, "The thread at this depth")
   for (let i = 1; i <= passes; i++) {
-    gcode += `G0 X${f3(d - i * 0.1 * 2)} ; Rapid to thread diameter\n`
+    gcode += `G0 X${f3(d - Math.min(s.depth, i * 0.1) * 2)} ; Rapid to thread diameter\n`
     gcode += `G32 Z${f3(endZ)} F${pitch} ; Thread cutting move\n`
     gcode += `G0 X${f3(d + 2)} ; Retract\n`
     gcode += `G0 Z${f3(startZ)} ; Return to start\n`
@@ -183,6 +186,14 @@ export const shiftLatheZ = (gcode: string, dz: number): string =>
 export const generateLatheGCode = (s: ToolpathSettings, options: GenerateOptions = {}, profile?: TurnedProfile): string => {
   // A turned part needs bar for the chuck to hold beyond its own length: the whole profile then lies in front of the jaws.
   if (profile !== undefined) s = { ...s, stockDiameter: Math.max(s.stockDiameter ?? 0, profile.maxDiameter), stockLength: Math.max(s.stockLength ?? 0, profile.end - profile.start + s.gripLength + JAW_CLEARANCE), toolType: "turning" }
+  if (s.applyToolCompensation) throw new LatheInputError("Tool nose radius compensation is not supported by the quick lathe generator. Turn it off or use a turning planner that supports compensation.")
+  if (s.stockLength <= s.gripLength + JAW_CLEARANCE) throw new LatheInputError(`The ${s.stockLength} mm bar must extend more than ${JAW_CLEARANCE} mm beyond the ${s.gripLength} mm chuck grip.`)
+  if (s.operationType === "threading" && (Number(f3(s.threadPitch)) <= 0 || Math.abs(Number(f3(s.threadPitch)) - s.threadPitch) > 1e-9)) throw new LatheInputError("The thread pitch must be representable to 0.001 mm per revolution in the generated NC.")
+  const internal = s.operationType === "boring" || s.operationType === "turning" && s.turningOperation === "internal"
+  if (internal) {
+    if (s.stockBore <= 1) throw new LatheInputError("Internal turning and boring require a declared pilot bore greater than 1 mm.")
+    if (s.stockBore + 2 * s.depth >= s.stockDiameter) throw new LatheInputError("The pilot bore and radial cut depth must leave material inside the stock diameter.")
+  }
   let gcode = ""
   gcode += "; CAD/CAM SYSTEM - Generated Lathe G-code with AI assistance\n"
   gcode += `; Operation: ${s.operationType}\n`
@@ -204,9 +215,10 @@ export const generateLatheGCode = (s: ToolpathSettings, options: GenerateOptions
   const op = ops[s.operationType as LatheOperationType]
   let body = ""
   if (profile !== undefined) body += profileTurning(s, profile)
+  else if (s.operationType === "turning" && s.turningOperation === "face") body += latheFacing(s)
   else if (op) body += op(s)
   body += "\n; End of program\n"
-  body += profile !== undefined ? `G0 X${f3(s.stockDiameter! + 2)}\nG0 Z50 ; Retract to safe position\n` : "G0 X50 Z50 ; Retract to safe position\n"
+  body += `G0 X${f3(Math.max(50, s.stockDiameter! + 2))} ; Radial retract\nG0 Z50 ; Retract to safe position\n`
   if (s.latheZero === "chuck") {
     gcode += `; Z zero is the chuck face: Z grows towards the front face of the ${f3(s.stockLength!)} mm stock\n`
     body = shiftLatheZ(body, s.stockLength!)

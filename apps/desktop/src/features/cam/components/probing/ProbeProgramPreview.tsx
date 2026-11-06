@@ -9,7 +9,7 @@ import { Box, ClipboardCopy, FileInput, Play, RefreshCw } from "lucide-solid"
 import { t } from "../../../../i18n/index.ts"
 import { Field, Note } from "../../../../shared/components/panel/ui.tsx"
 import { NumberField } from "../../../cad/components/property-inputs/NumberField.tsx"
-import type { NativeStatus } from "../../lib/probing/native.ts"
+import GCodeViewer from "../GCodeViewer.tsx"
 import type { Misplacement, ProbeProgram, ProbingBusy } from "../../store/probingStore.ts"
 
 export interface DialectOption { readonly id: string; readonly label: string }
@@ -27,12 +27,13 @@ export interface ProbeProgramPreviewProps {
   /** Where the simulated part really sits: what Simulate finds. */
   readonly misplacement: Misplacement
   onMisplacement(patch: Partial<Misplacement>): void
+  /** How the machine calls its own cycles; `inline` or absent: it has none to call. */
+  readonly nativeStyle: string | undefined
+  readonly native: boolean
+  onNative(native: boolean): void
   /** No cycle is selected or it is refused: nothing can be written. */
   readonly disabled: boolean
   onDialect(id: string): void
-  /** The control's own cycle: whether it is asked for and whether the machine's package can write it (the core's answer). */
-  readonly native?: { readonly checked: boolean; readonly status: NativeStatus } | undefined
-  onNative?(checked: boolean): void
   onGenerate(): void
   onSimulate(): void
   onShow3d(show: boolean): void
@@ -50,27 +51,10 @@ export function ProbeProgramPreview(props: ProbeProgramPreviewProps): JSX.Elemen
           <For each={props.dialects}>{(d) => <option value={d.id}>{d.label}</option>}</For>
         </select>
       </Field>
-      <Show when={props.native}>{(native) => {
-        const status = () => native().status
-        const word = () => { const s = status(); return s.ok ? s.word : undefined }
-        // A cycle asked for native that the machine cannot write stays checked, so the refusal is visible until it is cleared.
-        const usable = () => status().ok || native().checked
-        return (
-          <div class="probing-native" data-testid="probe-native">
-            <label class="probing-native__toggle">
-              <input type="checkbox" data-testid="probe-native-toggle" checked={native().checked} disabled={!usable()} onChange={(event) => props.onNative?.(event.currentTarget.checked)} />
-              <span>{t("cam.probing.native.label")}</span>
-            </label>
-            <Show when={word()}>{(w) => <p class="panel-hint" data-testid="probe-native-word">{t("cam.probing.native.writes", { word: w() })}</p>}</Show>
-            <Show when={!status().ok}>
-              <p class="panel-hint" data-testid="probe-native-reason">{(() => { const s = status(); return s.ok ? "" : s.reason === "noPackage" ? t("cam.probing.native.noPackage") : t("cam.probing.native.refused", { reason: s.detail ?? "" }) })()}</p>
-            </Show>
-            <Show when={native().checked}>
-              <Note kind="info" testId="probe-native-sim"><p>{t("cam.probing.native.unconditional")}</p><p>{t("cam.probing.native.simulated")}</p></Note>
-            </Show>
-          </div>
-        )
-      }}</Show>
+      <label class="probing-native">
+        <input type="checkbox" data-testid="probe-native" checked={props.native} disabled={props.nativeStyle === undefined || props.nativeStyle === "inline"} onChange={(event) => props.onNative(event.currentTarget.checked)} />
+        <span>{t("cam.probing.program.native")}</span>
+      </label>
       <fieldset class="probing-misplace" data-testid="probe-misplace">
         <legend class="panel-hint">{t("cam.probing.program.misplace")}</legend>
         <For each={["x", "y", "z", "c"] as const}>{(axis) => (
@@ -94,8 +78,9 @@ export function ProbeProgramPreview(props: ProbeProgramPreviewProps): JSX.Elemen
         {(program) => (
           <>
             <Show when={props.stale}><Note kind="warn" testId="probe-program-stale">{t("cam.probing.program.stale")}</Note></Show>
+            <Show when={program().native}>{(word) => <Note kind="warn" testId="probe-program-native">{t("cam.probing.program.nativeClaim", { word: word() })}</Note>}</Show>
             <For each={program().warnings}>{(warning) => <Note kind="warn" testId="probe-program-warning">{warning}</Note>}</For>
-            <Show when={program().native}>{(word) => <p class="panel-hint" data-testid="probe-program-native">{t("cam.probing.native.written", { word: word() })}</p>}</Show>
+            <GCodeViewer width="100%" height="220px" gcode={program().nc} isSimulating={false} />
             <pre class="panel-code probing-code" data-testid="probe-nc" tabindex="0" aria-label={t("cam.probing.program.code")}>
               <For each={lines()}>{(line, index) => (
                 <span class="probing-code__line" data-contact={props.contactLines?.has(index() + 1) === true}>

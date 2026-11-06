@@ -6,7 +6,7 @@
 import { cam } from "@cadcamfun/core"
 import type { Vec3 } from "@cadcamfun/core"
 import { probeOverlayModel, type ProbeOverlayModel } from "../../../../viewport/view3d/probe-overlay.ts"
-import { contactTimesOnTimeline } from "./contact-times.ts"
+import { contactTimesOnTimeline, offsetTimeOnTimeline } from "./contact-times.ts"
 import { getPath, type CycleSpec } from "./cycle-fields.ts"
 import { refWire, type ProbeOperation, type TiltedFrame } from "./operation.ts"
 import { offsetChange, type ProbeRunResult } from "./result.ts"
@@ -34,6 +34,7 @@ const spheresOf = (op: ProbeOperation, result: ProbeRunResult): ProbeOverlayMode
   const diameter = Number(getPath(op.cycle, "sphere.diameter") ?? 0)
   if (!(diameter > 0)) return []
   const measured: Array<{ centre: Vec3; diameter: number }> = []
+  if (result.calibration?.kind === "rotary" && result.calibration.centres !== undefined) return result.calibration.centres.map((centre) => ({ centre, diameter }))
   for (let i = 0; ; i++) {
     const x = result.outcome.results[`cal_${i}_x`], y = result.outcome.results[`cal_${i}_y`], z = result.outcome.results[`cal_${i}_z`]
     if (x === undefined || y === undefined || z === undefined) break
@@ -49,15 +50,23 @@ export const overlayModelOf = (input: {
   readonly deviationScale: number
   /** The timeline the program plays on: places the contacts in time. */
   readonly timeline?: { readonly moves: ReadonlyArray<{ readonly start: number; readonly duration: number; readonly state: { readonly line?: number | undefined } }> } | undefined
+  /** When the timeline plays a run's own text: the line of the written program of each of its lines (the contacts name those). */
+  readonly sourceLines?: ReadonlyArray<number> | undefined
   readonly triadLength?: number
 }): ProbeOverlayModel => {
-  const { result, operation } = input
+  const { result, operation, sourceLines } = input
+  const timeline = input.timeline === undefined || sourceLines === undefined ? input.timeline : {
+    ...input.timeline,
+    moves: input.timeline.moves.map((m) => ({ ...m, state: { line: m.state.line === undefined ? undefined : sourceLines[m.state.line - 1] } }))
+  }
   const change = offsetChange(result.outcome, refWire(operation.workOffset))
-  const times = input.timeline !== undefined ? contactTimesOnTimeline(result.outcome.contacts, input.timeline) : undefined
+  const times = timeline !== undefined ? contactTimesOnTimeline(result.outcome.contacts, timeline) : undefined
+  const offsetAt = timeline !== undefined ? offsetTimeOnTimeline(result.outcome.updates, timeline) : undefined
   const frame = operation.frame
   return probeOverlayModel({
     outcome: result.outcome, expected: result.expected, deviationScale: input.deviationScale,
     ...(times !== undefined ? { times } : {}),
+    ...(offsetAt !== undefined ? { offsetAt } : {}),
     ...(change !== undefined ? { before: change.before, after: change.after } : {}),
     ...(frame !== undefined ? { frames: [{ origin: anchorOf(operation.cycle), ...(({ x, y }) => ({ x, y }))(frameAxesOfAbc(frame)) }] } : {}),
     spheres: spheresOf(operation, result),
