@@ -122,7 +122,7 @@
   "cad.importExport.selectFile": "Sélectionner un fichier CAD",
   "cad.importExport.upload": "Téléverser un fichier",
   "cad.importExport.orDrag": "ou glissez-déposez",
-  "cad.importExport.formats": "Fichiers JSON, STL, OBJ, PLY, STEP, IGES ou CAD/CAM FUN",
+  "cad.importExport.formats": "STEP, IGES, DXF, SVG, STL, OBJ, PLY, 3MF, GLB, JSON, CAD, CADCAM",
   "cad.importExport.attention": "Attention",
   "cad.importExport.importWarning": "Importer un fichier remplace votre dessin actuel. Assurez-vous d'enregistrer votre travail avant l'import.",
   "cad.importExport.fileName": "Nom du fichier",
@@ -1259,5 +1259,16 @@
   "cad.param.groupName": "Group name",
   "cad.param.ungroup": "Ungroup",
   "cad.param.expandGroup": "Expand",
-  "cad.param.collapseGroup": "Collapse"
+  "cad.param.collapseGroup": "Collapse",
+  "cad.importExport.selectFiles": "Sélectionner des fichiers CAD ou un dossier",
+  "cad.importExport.chooseFiles": "Choisir des fichiers",
+  "cad.importExport.chooseFolder": "Choisir un dossier",
+  "cad.importExport.importing": "Importation de {current} sur {total}…",
+  "cad.importExport.importAdditive": "Les fichiers sont ajoutés au dessin actuel. Les sous-dossiers sont inclus.",
+  "cad.importExport.importSummary": "{files} fichiers importés ({elements} éléments) ; {failed} fichiers non importés.",
+  "cad.importExport.importSuccess": "{count} éléments importés",
+  "cad.importExport.importFailed": "Importation impossible",
+  "cad.importExport.importWarnings": "Avertissements",
+  "cad.importExport.importNoLayer": "Aucun calque actif. Rien n’a été ajouté.",
+  "cad.importExport.importDone": "Terminé"
 }

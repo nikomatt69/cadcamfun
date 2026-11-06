@@ -3,13 +3,14 @@
  * editor shows them, the core records the typed client encodes) and a `CamProbingSimulation` read back as the `ProbeRunResult` the
  * inspection list and the 3D overlay use. The wire carries degrees; the run record is in core units, like a local run.
  */
-import type { CamProbingFrame, CamProbingSettingsInput, CamProbingSimulation, CamRotaryCalibrationResult } from "@cadcamfun/api"
+import type { CamProbeCalibration, CamProbingFrame, CamProbingSettingsInput, CamProbingSimulation, CamRotaryCalibrationResult } from "@cadcamfun/api"
 import { Schema } from "effect"
-import { parseOffsetRef, probing, type InspectionVerdict, type MachineRotaryCalibration, type OffsetAxis, type ProbeAction, type ProbeContact, type ProbeSimOutcome, type ProbeSimUpdate, type MachineProbing } from "./contract.ts"
+import { parseOffsetRef, probing, type InspectionVerdict, type OffsetAxis, type ProbeAction, type ProbeContact, type ProbeSimOutcome, type ProbeSimUpdate } from "./contract.ts"
 import { cycleOfSpec } from "./cycle-fields.ts"
 import { actionsOf, characteristicOf, type ProbeOperation } from "./operation.ts"
 import { resolveSettings, type ResolveInput } from "./resolve.ts"
-import { fingerprintOf, verdictOfRun, type ProbeRunResult } from "./result.ts"
+import { offsetFamilyOf } from "./work-offsets.ts"
+import { fingerprintOf, type ProbeRunResult, type RunCalibration } from "./result.ts"
 
 const DEG = Math.PI / 180
 
@@ -19,10 +20,13 @@ export interface OperationRequest {
   readonly frame?: CamProbingFrame
   readonly actions?: ReadonlyArray<ProbeAction>
   readonly checks?: ReadonlyArray<import("./contract.ts").Characteristic>
+  readonly native?: boolean
+  readonly macroStyle?: import("./contract.ts").MacroStyle
+  readonly assumed?: { readonly layout: "table-AC" | "table-BC"; readonly pivot: { readonly x: number; readonly y: number; readonly z: number } }
 }
 
 /** The request of an operation, or why the core refuses it. `machineConfig` names a stored machine: the sidecar reads its probe and setter. */
-export const requestOf = (op: ProbeOperation, input: ResolveInput & { readonly machineConfig?: string | undefined }): OperationRequest | { readonly refused: string } => {
+export const requestOf = (op: ProbeOperation, input: ResolveInput & { readonly machineConfig?: string | undefined; readonly dialect?: string | undefined }): OperationRequest | { readonly refused: string } => {
   const decoded = cycleOfSpec(op.cycle)
   if (!decoded.ok) return { refused: decoded.issues[0] ?? "invalid cycle" }
   const s = resolveSettings({ ...input, overrides: op.overrides, workOffset: op.workOffset })
@@ -34,9 +38,15 @@ export const requestOf = (op: ProbeOperation, input: ResolveInput & { readonly m
     ...(input.machineConfig !== undefined ? { machineConfig: input.machineConfig } : {})
   }
   // The inspect action of the wire list is sent as `checks`: the sidecar compiles both the same way and records the characteristics.
-  const actions = Schema.decodeUnknownSync(Schema.Array(probing.ProbeActionSchema))(actionsOf(op).filter((a) => a["kind"] !== "inspect"))
+  const actions = Schema.decodeUnknownSync(Schema.Array(probing.ProbeActionSchema))(actionsOf(op, input.dialect !== undefined ? offsetFamilyOf({ post: input.dialect as never, controller: undefined as never }) : undefined).filter((a) => a["kind"] !== "inspect"))
+  const macroStyle = input.profile?.probing?.macroStyle
+  const rotary = input.profile?.rotary
+  const pivot = rotary?.calibration?.pivotMeasured ?? rotary?.pivot
   return {
     operation: decoded.cycle, settings,
+    ...(op.native === true ? { native: true } : {}),
+    ...(macroStyle !== undefined ? { macroStyle } : {}),
+    ...(rotary !== undefined && pivot !== undefined ? { assumed: { layout: rotary.layout, pivot } } : {}),
     ...(op.frame !== undefined ? { frame: op.frame } : {}),
     ...(actions.length > 0 ? { actions } : {}),
     ...(op.checks.length > 0 ? { checks: op.checks.map(characteristicOf) } : {})
@@ -44,6 +54,17 @@ export const requestOf = (op: ProbeOperation, input: ResolveInput & { readonly m
 }
 
 const angular = (axis: string): boolean => axis === "A" || axis === "B" || axis === "C" || axis === "R"
+
+/**
+ * The planned touch of each contact. A double touch reports the fast and the slow contact of one planned touch, so there can be a whole
+ * number of contacts per planned touch; anything else is not matched rather than matched wrongly.
+ */
+export const expectedOfContacts = (contacts: number, expected: ReadonlyArray<ProbeContact>): ReadonlyArray<ProbeContact> => {
+  if (contacts === expected.length || expected.length === 0) return expected
+  const each = contacts / expected.length
+  if (!Number.isInteger(each)) return []
+  return expected.flatMap((e) => Array.from({ length: each }, () => e))
+}
 
 /** A simulated report read as a run of one operation; `expected` are the planned touches (the overlay's deviation arrows). */
 export const resultOfSimulation = (sim: CamProbingSimulation, input: {
@@ -56,7 +77,7 @@ export const resultOfSimulation = (sim: CamProbingSimulation, input: {
     const ref = parseOffsetRef(u.offset)
     if (ref === undefined) return []
     const k = angular(u.axis) ? DEG : 1
-    return [{ ref, axis: u.axis as OffsetAxis, before: u.before * k, after: u.after * k }]
+    return [{ ref, axis: u.axis as OffsetAxis, before: u.before * k, after: u.after * k, ...(u.line !== undefined ? { line: u.line } : {}) }]
   })
   const verdicts: ReadonlyArray<InspectionVerdict> = report.checks.map((c) => {
     const k = c.kind === "angle" ? DEG : 1
@@ -70,43 +91,36 @@ export const resultOfSimulation = (sim: CamProbingSimulation, input: {
     inspections: verdicts, alarms: (run?.alarms ?? []).map((a, moveIndex) => ({ code: a.code, text: a.text, moveIndex, ...(a.line !== undefined ? { line: a.line } : {}) })),
     reports: [], ...(run?.stopped !== undefined ? { stopped: run.stopped } : {}), path: []
   }
+  const measuredAt = input.at ?? new Date().toISOString()
+  const record = calibrationOfRecord(run?.calibration, measuredAt)
   return {
-    operationId: input.operationId, source: "simulated", outcome, expected: input.expected, verdicts, verdict: report.verdict, measuredAt: input.at ?? new Date().toISOString(),
+    operationId: input.operationId, source: "simulated", outcome: record.refused !== undefined && outcome.stopped === undefined ? { ...outcome, stopped: record.refused } : outcome,
+    expected: expectedOfContacts(run?.contacts.length ?? 0, input.expected), verdicts, verdict: report.verdict, measuredAt,
     workOffset: input.operation.workOffset, fingerprint: fingerprintOf(input.operation),
+    ...(record.calibration !== undefined ? { calibration: record.calibration } : {}),
     ...(input.runId !== undefined ? { runId: input.runId } : {}), ...(input.programHash !== undefined ? { programHash: input.programHash } : {})
   }
 }
 
-/** A rotary calibration read as a run: the ball's centre at each angle in `cal_<i>_*` (what the overlay draws). */
+/** A table simulated off its pivot, read as a run: the fit and the ball's centre at each angle (what the overlay draws). */
 export const resultOfCalibration = (out: CamRotaryCalibrationResult, input: { readonly operationId: string; readonly operation: ProbeOperation; readonly at?: string }): ProbeRunResult => {
-  const results: Record<string, number> = {}
-  out.centres.forEach((c, i) => { results[`cal_${i}_x`] = c.x; results[`cal_${i}_y`] = c.y; results[`cal_${i}_z`] = c.z })
-  const outcome: ProbeSimOutcome = { contacts: [], variables: {}, results, offsets: {}, updates: [], tools: [], inspections: [], alarms: [], reports: [], ...(out.refused !== undefined ? { stopped: out.refused } : {}), path: [] }
+  const outcome: ProbeSimOutcome = { contacts: [], variables: {}, results: {}, offsets: {}, updates: [], tools: [], inspections: [], alarms: [], reports: [], ...(out.refused !== undefined ? { stopped: out.refused } : {}), path: [] }
   const measuredAt = input.at ?? new Date().toISOString()
   const fit = out.calibration
   return {
     operationId: input.operationId, source: "simulated", outcome, expected: [], verdicts: [], verdict: fit === undefined ? "incomplete" : "pass", measuredAt, fingerprint: fingerprintOf(input.operation),
-    ...(fit !== undefined ? { calibration: { kind: "rotary" as const, rotary: { pivotMeasured: fit.pivot, axisDirection: fit.axisDirection, axisError: Math.abs(fit.axisTilt), rms: fit.rms, at: measuredAt } } } : {})
+    ...(fit !== undefined ? { calibration: { kind: "rotary" as const, centres: out.centres, rotary: { pivotMeasured: fit.pivot, axisDirection: fit.axisDirection, axisError: Math.abs(fit.axisTilt), rms: fit.rms, at: measuredAt } } } : {})
   }
 }
 
-export type RunCalibration =
-  | { readonly kind: "rotary"; readonly rotary: MachineRotaryCalibration }
-  | { readonly kind: "stylus"; readonly stylus: NonNullable<MachineProbing["calibration"]> }
-
-/** What a stylus calibration measured, as the machine stores it: the mean radius and the radius per direction (angle degrees from +X). */
-export const stylusCalibrationOf = (result: ProbeRunResult, operation: ProbeOperation): RunCalibration | undefined => {
-  if (operation.cycle.kind !== "stylus-calibrate" || result.verdict === "fail" || result.verdict === "missed" || result.verdict === "incomplete") return undefined
-  const r = result.outcome.results
-  const radius = r["radius"]
-  if (radius === undefined) return undefined
-  const named = Object.keys(r).filter((key) => /^r\d+$/.test(key)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)))
-  return {
-    kind: "stylus",
-    stylus: {
-      effectiveRadius: radius, calibratedAt: result.measuredAt.slice(0, 40),
-      ...(named.length > 0 ? { directional: named.map((key, k) => ({ angle: 360 * k / named.length, radius: r[key]! })) } : {}),
-      ...(r["zTrigger"] !== undefined ? { zTrigger: r["zTrigger"] } : {})
-    }
+/** A calibration record of a report as the machine stores it; `refused` names why the run gave none. */
+export const calibrationOfRecord = (record: CamProbeCalibration | undefined, at: string): { readonly calibration?: RunCalibration; readonly refused?: string } => {
+  if (record === undefined) return {}
+  if (record.kind === "refused") return { refused: record.reason }
+  if (record.kind === "rotary") {
+    const fit = record.rotary
+    return { calibration: { kind: "rotary", centres: record.centres, rotary: { pivotMeasured: fit.pivot, axisDirection: fit.axisDirection, axisError: Math.abs(fit.axisTilt), rms: fit.rms, at } } }
   }
+  const { ballDiameter: _ball, artefact: _artefact, ...stylus } = record.stylus
+  return { calibration: { kind: "stylus", stylus: { ...stylus, calibratedAt: at.slice(0, 40) } } }
 }

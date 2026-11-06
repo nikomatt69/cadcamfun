@@ -23,6 +23,7 @@ import vcs from "./vcs.json" with { type: "json" }
 import manuals from "./manuals.json" with { type: "json" }
 import keys from "./keys.json" with { type: "json" }
 import sim from "./sim.json" with { type: "json" }
+import cloud from "./cloud.json" with { type: "json" }
 
 /** The tables of the Arabic language, merged. */
-export default { ...base, ...shell, ...library, ...org, ...cad, ...cam, ...ai, ...plugins, ...legacy, ...settings, ...viewport, ...system, ...pricing, ...detail, ...companion, ...vcs, ...manuals, ...keys, ...sim }
+export default { ...base, ...shell, ...library, ...org, ...cad, ...cam, ...ai, ...plugins, ...legacy, ...settings, ...viewport, ...system, ...pricing, ...detail, ...companion, ...vcs, ...manuals, ...keys, ...sim, ...cloud }

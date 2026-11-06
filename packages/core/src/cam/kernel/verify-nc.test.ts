@@ -82,3 +82,39 @@ describe("verifyNc: NC the kernel did not write, replayed against the part and t
     expect(verifyNc(request(ring(2.9)))).toEqual(verifyNc(request(ring(2.9))))
   })
 })
+
+describe("verifyNc: a program that machines several workpieces is replayed once per register", () => {
+  // Part 1 on G54 is cleared 3 mm from the wall, part 2 on G55 is cut 0.1 mm into it: the same blank in each register's own frame.
+  const two = (): string => {
+    const [head, ...rest] = ring(3).split("\n")
+    const second = ring(2.9).split("\n").slice(2, -1)
+    return [head, ...rest.slice(0, -1), "G55", "G0 X-3 Y-3 Z15", ...second.slice(2), "M30"].join("\n")
+  }
+
+  test("each register is judged against its own blank: the clean part passes, the overcut one is named with its line", () => {
+    const nc = two()
+    const first = verifyNc(request(nc, { register: "G54" }))
+    const second = verifyNc(request(nc, { register: "G55" }))
+    expect(first.verdict).toBe("clean")
+    expect(first.gouge.depth).toBe(0)
+    expect(second.verdict).toBe("faults")
+    expect(second.gouge.depth).toBeGreaterThan(0.08)
+    expect(second.findings.find((f) => f.kind === "gouge")?.line).toBeGreaterThan(first.moves)
+    // Each blank loses its own material: the same 20 x 20 ring is cut in both frames, so both took out about the same volume of their own blank.
+    expect(first.stockVolume).toBeCloseTo(26 * 26 * 10, -2)
+    expect(first.removedVolume).toBeGreaterThan(1000)
+    expect(Math.abs(first.removedVolume - second.removedVolume) / first.removedVolume).toBeLessThan(0.1)
+    // Without a register the whole text is replayed against one blank: the two parts' cuts add up on it.
+    expect(verifyNc(request(nc)).feedMoves).toBe(first.feedMoves + second.feedMoves)
+  })
+
+  test("a register the program never selects is reported, and a replay without a finished part says so", () => {
+    const missing = verifyNc(request(two(), { register: "G56" }))
+    expect(missing.verdict).toBe("incomplete")
+    expect(missing.reasons.join(" ")).toMatch(/no move under G56/)
+    const bare = verifyNc(request(ring(3), { part: [] }))
+    expect(bare.verdict).toBe("incomplete")
+    expect(bare.reasons.join(" ")).toMatch(/no finished part/)
+    expect(bare.gouge.depth).toBe(0)
+  })
+})

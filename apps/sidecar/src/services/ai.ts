@@ -9,10 +9,10 @@ import {
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, drawing as sheets, pmi, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
-import { ACTION_CONTRACTS, PERSISTENT_EFFECTS, PROBE_FORMAT, CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
+import { ACTION_CONTRACTS, PERSISTENT_EFFECTS, PROBE_FORMAT, CamKernelArtifact, CamKernelRequest, CamProgramDocument, CamTurningPlan, ToolpathRow, setupProgramDocument, stockOfSetup, CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { Database, schema } from "@cadcamfun/db"
 import { eq } from "drizzle-orm"
-import { drawingRevision, jobOfRequest } from "./cam-program.ts"
+import { drawingRevision, failedReplay, jobOfRequest, setupReplayPlan } from "./cam-program.ts"
 import { camProgressReporter } from "./cam-progress.ts"
 import { LiveEvents } from "./live-events.ts"
 import { z } from "zod"
@@ -148,8 +148,15 @@ const toolHandlers = Effect.gen(function*() {
   const sceneJob = async <O extends keyof CadSceneResult>(input: Extract<CadSceneInput, { readonly op: O }>): Promise<CadSceneResult[O]> =>
     (await runOwnedKernelJob("cad-scene", input)) as CadSceneResult[O]
   /** Runs the kernel in its worker, announcing the run on the project's live stream (desktop and phone follow the same progress). */
+  /** The job a stored program belongs to when it is one setup of several (`data.setupJob`, written with the program): its release, coverage and sibling setups. */
+  const setupJobOf = (data: Record<string, unknown>): { readonly setupId: string; readonly release: "blocked" | "preview" | "verified-program"; readonly setups: ReadonlyArray<string>; readonly coverage: unknown; readonly stockCarried: boolean } | undefined => {
+    const job = record(data["setupJob"])
+    const release = job["release"]
+    if (typeof job["setupId"] !== "string" || (release !== "blocked" && release !== "preview" && release !== "verified-program")) return undefined
+    return { setupId: job["setupId"], release, setups: Array.isArray(job["setups"]) ? job["setups"].map(String) : [], coverage: job["coverage"], stockCarried: job["stockCarried"] === true }
+  }
   /** The setup sheet data of the kernel program stored under an operation (the same for the read action and the HTML export). */
-  const setupSheetOf = async (projectId: string, operationId: string): Promise<{ ok: true; sheet: Exclude<ReturnType<typeof cam.kernel.setupSheetData>, string> } | { ok: false; error: string }> => {
+  const setupSheetOf = async (projectId: string, operationId: string): Promise<{ ok: true; sheet: Exclude<ReturnType<typeof cam.kernel.setupSheetData>, string>; job?: ReturnType<typeof setupJobOf> } | { ok: false; error: string }> => {
     const loaded = await load(projectId)
     const stored = await run(toolpaths.find(acting().id, operationId))
     if (!stored || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
@@ -158,13 +165,41 @@ const toolHandlers = Effect.gen(function*() {
     try {
       const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(artifactData)
       const sheet = cam.kernel.setupSheetData(artifact, { title: stored.row.name, titleBlock: sheets.completeTitleBlock(loaded.data["titleBlock"], { name: loaded.name, ...(acting().name ? { author: acting().name! } : {}) }) })
-      return typeof sheet === "string" ? { ok: false, error: sheet } : { ok: true, sheet }
+      const job = setupJobOf(record(stored.row.data))
+      return typeof sheet === "string" ? { ok: false, error: sheet } : { ok: true, sheet, ...(job !== undefined ? { job } : {}) }
     } catch (error) { return { ok: false, error: `The stored program does not match the contract: ${error instanceof Error ? error.message : String(error)}` } }
   }
   const manufactureRun = async (projectId: string, job: Parameters<typeof runKernelJob<"cam-manufacture">>[1], signal?: AbortSignal) => {
     const runId = crypto.randomUUID()
     const report = camProgressReporter(liveEvents, projectId, runId)
     const result = await runOwnedKernelJob("cam-manufacture", job, { ...(signal !== undefined ? { signal } : {}), onProgress: report }).catch(cancelled)
+    report(result.status === "failed" && result.issues.some((i) => i.tag === "Cancelled") ? "cancelled" : "done")
+    return result
+  }
+
+  /** The same run for a job that lists setups (`runSetups`): one artifact per setup and the job's coverage and release. */
+  /**
+   * The replay of a program a saved setup generated: the program text once per workpiece register against that workpiece's blank, each run a
+   * kernel job (a worker, a deadline, cancellation). A replay that cannot finish is not a pass: the program stays a preview and says why.
+   */
+  const replaySetupProgram = async (setup: cam.program.Setup, program: cam.program.GeneratedProgram, geometryOf: (op: cam.program.Operation) => cam.generator.GeometryInput, configured: cam.generator.Stock | undefined): Promise<cam.program.SetupEvidence> => {
+    const plan = setupReplayPlan(setup, program, geometryOf, configured)
+    const results: cam.kernel.VerifyNcResult[] = []
+    for (const job of plan.jobs) {
+      try {
+        const outcome = await runOwnedKernelJob("cam-verify-nc", job)
+        if ("error" in outcome) results.push(failedReplay(outcome.error))
+        else results.push(outcome)
+      } catch (cause) {
+        results.push(failedReplay(cause instanceof Error ? cause.message : String(cause)))
+      }
+    }
+    return plan.finish(results)
+  }
+  const manufactureSetupsRun = async (projectId: string, job: Parameters<typeof runKernelJob<"cam-setups">>[1], signal?: AbortSignal) => {
+    const runId = crypto.randomUUID()
+    const report = camProgressReporter(liveEvents, projectId, runId)
+    const result = await runOwnedKernelJob("cam-setups", job, { ...(signal !== undefined ? { signal } : {}), onProgress: report }).catch(cancelled)
     report(result.status === "failed" && result.issues.some((i) => i.tag === "Cancelled") ? "cancelled" : "done")
     return result
   }
@@ -286,6 +321,17 @@ const toolHandlers = Effect.gen(function*() {
   }
   const decodePrinter = (input: Record<string, unknown>) => Schema.decodeUnknownSync(cam.generator.PrinterExtrasSchema)(input)
 
+  /** What the assistant reads of a multi-setup run: the job's release, coverage and claims, then each setup's own release, datum and program size. */
+  const setupsAnswer = (a: cam.kernel.SetupsArtifact, stockNote: string) => ({
+    ok: true, stockNote, jobId: a.jobId, release: a.release, coverage: a.coverage, claims: a.claims.map((c) => ({ id: c.id, status: c.status, detail: c.detail, ...(c.setup !== undefined ? { setup: c.setup } : {}) })),
+    issues: a.issues.slice(0, 30), notes: a.notes, cycleTimeSeconds: a.cycleTimeSeconds, stockCarried: a.stockCarried, removedVolume: a.removedVolume,
+    setups: a.setups.map((r) => ({
+      id: r.id, orientation: r.orientation, workOffset: r.workOffset, release: r.artifact.release, cycleTimeSeconds: r.artifact.cycleTimeSeconds, identity: r.artifact.identity,
+      tools: r.artifact.tools.map((t) => ({ number: t.number, id: t.id, name: t.name, diameter: t.diameter })), operations: r.artifact.operations.map((o) => ({ id: o.id, name: o.name, strategy: o.strategy, status: o.status })),
+      ncLines: r.artifact.nc.split("\n").length
+    }))
+  })
+
   const manufacturingJob = (loaded: Awaited<ReturnType<typeof load>>, input: typeof CamManufactureInput.Type):
     { readonly ok: true; readonly job: Parameters<typeof runKernelJob<"cam-manufacture">>[1]; readonly stockNote: string } | { readonly ok: false; readonly error: string } => {
       const elements = loaded.elements.filter((e) => e.type !== "workpiece")
@@ -299,8 +345,12 @@ const toolHandlers = Effect.gen(function*() {
         return { ok: false, error: `The machine configuration '${input.machineConfig.name}' is not a machine the kernel can run: ${cam.kernel.machineRefusal(input.machineConfig) ?? "it needs a kind it machines (mill, lathe or filament printer)"}.` }
       }
       if (input.machine !== undefined && machine === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}'. Known: ${cam.kernel.MACHINE_CATALOGUE.map((m) => m.id).join(", ")}` }
+      // Patterns become numbered copies on the next free registers; the job (and the stored request) keeps the expanded list.
+      const expanded = input.setups === undefined ? undefined : cam.kernel.expandSetupPatterns(input.setups as ReadonlyArray<cam.kernel.PatternedSetup>)
+      if (expanded?.status === "failed") return { ok: false, error: expanded.issues.map((i) => i.message).join("; ") }
       const job: Parameters<typeof runKernelJob<"cam-manufacture">>[1] = {
         schemaVersion: 1, id: `${loaded.id}:${drawingRevision(loaded)}`, name: "CAM kernel job", material: input.material,
+        ...(expanded !== undefined ? { setups: expanded.value } : {}), ...(input.carryStock === true ? { carryStock: true } : {}),
         ...(input.setupOrientation !== undefined ? { setupOrientation: input.setupOrientation } : {}),
         ...(input.workOffset !== undefined ? { workOffset: input.workOffset } : {}),
         part: { kind: "elements", elements: elements as never }, ...(stored !== undefined ? { stockFromPartBottom: { x: stored.x, y: stored.y, width: stored.width, height: stored.height, depth: stored.depth } } : {}),
@@ -411,6 +461,12 @@ const toolHandlers = Effect.gen(function*() {
       const built = manufacturingJob(loaded, input)
       if (!built.ok) return { ...built, ...where(loaded) }
       const { job, stockNote } = built
+      if (job.setups !== undefined) {
+        if (input.planOnly === true) return { ok: false, error: "planOnly plans one setup. Plan a multi-setup job with cam job (op plan), or send one setup.", ...where(loaded) }
+        const ran = await manufactureSetupsRun(projectId, job, signal)
+        if (ran.status === "failed") return { ok: false, error: "The kernel could not machine this job; see issues.", issues: ran.issues, ...where(loaded) }
+        return { ...setupsAnswer(ran.value, stockNote), mutated: false, note: "Read-only: nothing was stored. The job is verified-program only when every setup is and the whole surface faces a spindle in one of them.", ...where(loaded) }
+      }
       if (input.planOnly === true) {
         const plan = await runOwnedKernelJob("cam-plan", job, signal === undefined ? {} : { signal }).catch(cancelled)
         return plan.status === "ok" ? { ok: true, mutated: false, stockNote, ...plan.value, ...where(loaded) } : { ok: false, error: "The kernel could not plan this job; see issues.", issues: plan.issues, ...where(loaded) }
@@ -443,6 +499,38 @@ const toolHandlers = Effect.gen(function*() {
       if (input.expectedRevision !== undefined && input.expectedRevision !== revision) return { ok: false, status: "stale", error: "The drawing changed. Inspect the current part before manufacturing." }
       const built = manufacturingJob(loaded, input)
       if (!built.ok) return { ...built, ...where(loaded) }
+      if (built.job.setups !== undefined) {
+        // One program per setup, each with its own NC, claims and datum; the job's release and coverage travel with every one of them.
+        // A blocked setup blocks the job and nothing is stored: half a job is not a job.
+        const ran = await manufactureSetupsRun(projectId, built.job, signal)
+        if (ran.status === "failed") return { ok: false, error: "The kernel could not machine this job; nothing was stored.", issues: ran.issues, ...where(loaded) }
+        if (ran.value.release === "blocked") {
+          return { ok: false, error: `Setup ${ran.value.setups.filter((r) => r.artifact.release === "blocked").map((r) => r.id).join(", ") || "(none)"} is blocked by its own replay claims; nothing was stored.`, release: "blocked", issues: ran.value.issues, claims: ran.value.claims, ...where(loaded) }
+        }
+        const base = {
+          ...input, schemaVersion: 1, id: built.job.id, name: built.job.name,
+          elements: JSON.parse(JSON.stringify(built.job.part.kind === "elements" ? built.job.part.elements : [])),
+          setups: built.job.setups, ...(built.job.carryStock === true ? { carryStock: true } : {}),
+          ...(loaded.data["stock"] !== undefined ? { stock: loaded.data["stock"] } : {})
+        }
+        const prepared = ran.value.setups.map((r) => ({ run: r, artifact: Schema.decodeUnknownSync(CamKernelArtifact)(r.artifact), kernelRequest: Schema.decodeUnknownSync(CamKernelRequest)({ ...base, setupId: r.id }) }))
+        const now = await run(drawings.find(acting().id, loaded.id))
+        const stored = record(now?.data)
+        if (!now || drawingRevision({ id: now.id, data: stored, elements: elementsOf(stored) }) !== revision) return { ok: false, status: "stale", error: "The drawing changed during manufacturing. Generate again." }
+        await assertWrite(loaded.projectId)
+        const setupJob = { release: ran.value.release, coverage: ran.value.coverage, stockCarried: ran.value.stockCarried, setups: ran.value.setups.map((r) => r.id), claim: ran.value.claims.find((c) => c.id === "part-coverage" && c.setup === undefined) }
+        const programs: Array<{ programId: string; setupId: string; workOffset: string; orientation: string; release: string; nc: string }> = []
+        for (const p of prepared) {
+          const row = await run(toolpaths.create(acting().id, {
+            name: `Native CAM ${p.run.id} (${p.run.workOffset}, ${p.run.orientation})`, description: `Setup ${p.run.id} of ${prepared.length} of one job, generated by the native CAM kernel`,
+            projectId: loaded.projectId, drawingId: loaded.id, type: "mill", operationType: "kernel", gcode: p.artifact.nc,
+            data: { kernelArtifact: p.artifact, kernelRequest: p.kernelRequest, sourceRevision: revision, setupJob: { ...setupJob, setupId: p.run.id } }
+          }))
+          programs.push({ programId: row.id, setupId: p.run.id, workOffset: p.run.workOffset, orientation: p.run.orientation, release: p.artifact.release, nc: p.artifact.identity.nc })
+        }
+        await audit(loaded.projectId, "ai.cam.program_saved", { drawingId: loaded.id, operationIds: programs.map((p) => p.programId), release: ran.value.release, setups: programs.map((p) => `${p.setupId}:${p.workOffset}`) })
+        return { ok: true, operationId: programs[0]!.programId, release: ran.value.release, identity: prepared[0]!.artifact.identity, programIds: Object.fromEntries(programs.map((p) => [p.setupId, p.programId])), workOffsets: Object.fromEntries(programs.map((p) => [p.setupId, p.workOffset])), releases: Object.fromEntries(programs.map((p) => [p.setupId, p.release])), coverage: ran.value.coverage, stockCarried: ran.value.stockCarried, notes: ran.value.notes, ...where(loaded) }
+      }
       const result = await manufactureRun(projectId, built.job, signal)
       if (result.status === "failed") return { ok: false, error: "The kernel could not machine this job; nothing was stored.", issues: result.issues, ...where(loaded) }
       if (result.value.release === "blocked") return { ok: false, error: "The program is blocked by its own replay claims; nothing was stored.", release: "blocked", issues: result.value.issues, claims: result.value.claims, ...where(loaded) }
@@ -515,7 +603,8 @@ const toolHandlers = Effect.gen(function*() {
         ok: true, operationId, release: sheet.release, ...(sheet.titleBlock !== undefined ? { titleBlock: sheet.titleBlock } : {}),
         tools: sheet.tools.slice(0, 40), toolsTotal: sheet.tools.length, operations: sheet.operations.slice(0, 60), operationsTotal: sheet.operations.length,
         totals: sheet.totals, setup: { ...sheet.setup, material: sheet.material, machine: sheet.machine },
-        claims: sheet.claims.map((c) => ({ id: c.id, status: c.status })), htmlBytes: cam.kernel.setupSheetHtml(sheet).length
+        claims: sheet.claims.map((c) => ({ id: c.id, status: c.status })), htmlBytes: cam.kernel.setupSheetHtml(sheet).length,
+        ...(made.job !== undefined ? { job: made.job } : {})
       }
     },
     operationSetupSheet: async (projectId, operationId) => {
@@ -566,13 +655,27 @@ const toolHandlers = Effect.gen(function*() {
         const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(data["kernelArtifact"])
         const revision = drawingRevision(loaded)
         const stale = data["sourceRevision"] !== revision || stored.row.gcode !== artifact.nc || cam.kernel.sha256(artifact.nc) !== artifact.identity.nc
-        const status = stale ? "stale" : artifact.release === "verified-program" ? "pass" : artifact.release
+        // One setup of a job is verified only as far as the job is: a setup that passed alone in a job whose coverage is incomplete is a preview.
+        const job = setupJobOf(data)
+        const release = job === undefined || job.release === "verified-program" || artifact.release === "blocked" ? artifact.release : job.release === "blocked" ? "blocked" : "preview"
+        const status = stale ? "stale" : release === "verified-program" ? "pass" : release
         // Why the program is out of date, from the elements it was made from (spec 59 A2): a rename is not a model change, a moved part is not a resized one.
         const modelChange = cam.kernel.programStatus({ request: data["kernelRequest"] }, { elements: loaded.elements })
-        return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision, verifiedRevision: data["sourceRevision"], release: artifact.release,
+        return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision, verifiedRevision: data["sourceRevision"], release,
+          ...(job !== undefined ? { setupId: job.setupId, job: { release: job.release, setups: job.setups, coverage: job.coverage, stockCarried: job.stockCarried, ownRelease: artifact.release } } : {}),
           claims: artifact.claims, issues: artifact.issues, stock: artifact.stock, identity: artifact.identity, modelChange, note: "Evidence covers the original native-kernel NC and its modelled capabilities; no program was regenerated." }
       }
-      if (data["format"] === "cadcamfun-cam") return { ok: false, status: "unverified", operationId, identity: { nc: cam.kernel.sha256(stored.row.gcode ?? "") }, note: "Saved or edited G-code has no current native verification." }
+      if (data["format"] === "cadcamfun-cam") {
+        // A program a saved setup generated carries the replay of its text, one verdict per workpiece register.
+        const replayed = record(data["setupEvidence"])
+        const hash = cam.kernel.sha256(stored.row.gcode ?? "")
+        if (typeof replayed["release"] === "string") {
+          const stale = data["sourceRevision"] !== drawingRevision(loaded) || replayed["programHash"] !== hash
+          const status = stale ? "stale" : replayed["release"] === "verified-program" ? "pass" : String(replayed["release"])
+          return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision: drawingRevision(loaded), verifiedRevision: data["sourceRevision"], release: replayed["release"], setupId: data["setupId"], identity: { nc: hash }, registers: replayed["registers"], notes: replayed["notes"], note: replayed["basis"] }
+        }
+        return { ok: false, status: "unverified", operationId, identity: { nc: hash }, note: "Saved or edited G-code has no current native verification." }
+      }
       const found = await operation(projectId, operationId)
       if ("error" in found) return { ok: false, error: found.error }
       const evidence = record(data["verification"])
@@ -587,7 +690,7 @@ const toolHandlers = Effect.gen(function*() {
     setupList: async (projectId) => {
       { const denied = await refused(projectId); if (denied) return denied }
       const saved = await run(camSetups.list(projectId))
-      return { ok: true, projectId, setups: saved.map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, operations: doc.setup.operations.length, grouping: doc.setup.grouping, machineType: doc.setup.machineType })) }
+      return { ok: true, projectId, setups: saved.map((doc) => ({ id: doc.id, name: doc.name, updatedAt: doc.updatedAt, operations: cam.program.expandSetup(doc.setup).setup.operations.length, workpieces: doc.setup.workpieces?.length ?? 1, grouping: doc.setup.grouping, machineType: doc.setup.machineType })) }
     },
     setupSave: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }
@@ -600,6 +703,57 @@ const toolHandlers = Effect.gen(function*() {
       if (updated === undefined) return { ok: false, error: "Setup not found in this project." }
       if (updated === "conflict") return { ok: false, status: "stale", error: "The setup was saved elsewhere since it was read. Nothing was overwritten; read cam setup_list and retry with its updatedAt." }
       return { ok: true, projectId, setupId: updated.id, name: updated.name, updatedAt: updated.updatedAt, created: false }
+    },
+    setupGenerate: async (projectId, input) => {
+      { const denied = await refused(projectId); if (denied) return denied }
+      await assertWrite(projectId)
+      const found = await run(camSetups.get(projectId, input.setupId))
+      if (found === undefined) return { ok: false, error: "Setup not found in this project." }
+      const loaded = await load(projectId, true)
+      const revision = drawingRevision(loaded)
+      if (input.expectedRevision !== undefined && input.expectedRevision !== revision) return { ok: false, status: "stale", revision, error: "The drawing or stock changed. Inspect the part before generating the setup." }
+      // Template uses are operations by the time the setup is checked and generated.
+      const expansion = cam.program.expandSetup(found.setup)
+      const setup = expansion.setup
+      if (expansion.issues.length > 0) return { ok: false, error: `The setup's templates cannot be expanded: ${expansion.issues.map((issue) => issue.message).join("; ")}`, issues: expansion.issues }
+      const byId: Record<string, Record<string, unknown>> = Object.fromEntries(loaded.elements.map((element) => [element.id, element]))
+      const missing = setup.operations.filter((op) => op.enabled).flatMap((op) => op.elementIds.filter((id) => byId[id] === undefined).map((id) => `${op.name}: ${id}`))
+      if (missing.length > 0) return { ok: false, error: `The drawing has no element for ${missing.join(", ")}. Update the setup's elementIds from cad inspect.` }
+      const configured = loaded.data["stock"] === undefined ? undefined : Schema.decodeUnknownSync(cam.generator.StockSchema)(loaded.data["stock"])
+      const stock = stockOfSetup(setup, configured)
+      if (stock === undefined) return { ok: false, error: "The programs are stored with a stock: set one with cam_edit stock_set or give the setup a stock block." }
+      const generated = cam.program.generateSetup(setup, (op) => cam.program.geometryFor(op, byId, configured))
+      if (generated.programs.length === 0) return { ok: false, error: "The setup generated no program.", issues: generated.issues, warnings: generated.warnings }
+      // The datum probe of the parts, when asked for: a program of the probe tool, run before the cuts; it has nothing to replay.
+      const probe = input.probePart === true ? cam.program.partProbeFor(setup, generated) : undefined
+      if (probe !== undefined && probe.program === undefined && probe.inline !== true) return { ok: false, error: `probePart: ${probe.refused}` }
+      // Each stored text is replayed once per workpiece register against that workpiece's own blank, in the kernel worker: the release level and the findings are stored with it.
+      const evidences = new Map<cam.program.GeneratedProgram, cam.program.SetupEvidence>()
+      for (const program of generated.programs) evidences.set(program, await replaySetupProgram(setup, program, (op) => cam.program.geometryFor(op, byId, configured), configured))
+      // Recheck the drawing after the computation, right before the write, as the manufacture path does.
+      const current = await run(drawings.find(acting().id, loaded.id))
+      if (!current || drawingRevision({ id: current.id, data: record(current.data), elements: elementsOf(record(current.data)) }) !== revision) return { ok: false, status: "stale", error: "The drawing changed while the setup was generated. Generate again." }
+      const stored: Array<{ operationId: string; name: string; programNumber: number; toolNumbers: ReadonlyArray<number>; operations: number; toolpaths: number; lines: number; release?: string; evidence?: cam.program.SetupEvidence; kind?: "probe" }> = []
+      if (probe?.program !== undefined) {
+        const program = probe.program
+        const document = Schema.encodeSync(CamProgramDocument)(setupProgramDocument({ program, setup, stock }))
+        const row = await run(toolpaths.create(acting().id, {
+          name: program.name, description: `Datum probe of the parts of the saved setup "${found.name}": run it before the cuts`, projectId: loaded.projectId, drawingId: loaded.id,
+          type: "mill", operationType: "setup", gcode: program.gcode, data: { ...document, setupId: found.id, sourceRevision: revision, probe: probe.plan }
+        }))
+        stored.push({ operationId: row.id, name: program.name, programNumber: program.programNumber, toolNumbers: program.toolNumbers, operations: program.operationIds.length, toolpaths: program.program.toolpaths.length, lines: program.gcode.split("\n").length, kind: "probe" })
+      }
+      for (const program of generated.programs) {
+        const document = Schema.encodeSync(CamProgramDocument)(setupProgramDocument({ program, setup, stock }))
+        const evidence = evidences.get(program)!
+        const row = await run(toolpaths.create(acting().id, {
+          name: program.name, description: `Generated from the saved setup "${found.name}"`, projectId: loaded.projectId, drawingId: loaded.id,
+          type: "mill", operationType: "setup", gcode: program.gcode, data: { ...document, setupId: found.id, sourceRevision: revision, setupEvidence: evidence }
+        }))
+        stored.push({ operationId: row.id, name: program.name, programNumber: program.programNumber, toolNumbers: program.toolNumbers, operations: program.operationIds.length, toolpaths: program.program.toolpaths.length, lines: program.gcode.split("\n").length, release: evidence.release, evidence })
+      }
+      await audit(loaded.projectId, "ai.cam.setup_generated", { drawingId: loaded.id, setupId: found.id, programs: stored.map((p) => p.operationId), toolChanges: generated.totals.toolChanges })
+      return { ok: true, projectId: loaded.projectId, setupId: found.id, programs: stored, totals: generated.totals, ...(probe !== undefined ? { probe: probe.plan } : {}), ...(generated.toolLife.length > 0 ? { toolLife: generated.toolLife } : {}), warnings: generated.warnings }
     },
     stock: async (projectId, input) => {
       { const denied = await refused(projectId); if (denied) return denied }

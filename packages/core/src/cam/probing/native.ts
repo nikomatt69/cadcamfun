@@ -4,9 +4,9 @@
  * executor and every other post see the inline touches, and the cycle's own post writes the cycle instead when `nativeCycles` is on.
  *
  * A native cycle is the vendor's code, which this project does not hold: it is not replayed, so the `probing` claim of a job that uses
- * one stays `unresolved` ("native cycle not replayed"). The cycle numbers, parameter rows and result behaviour are read from the vendor
- * manuals as the author reads them, not run on a control; a machine's cycle package may differ (Siemens: the classic `_MVAR` parameter
- * form, not the positional form of newer cycle versions).
+ * one stays `unresolved` ("native cycle not replayed"). The words below were checked against the vendors' manuals (spec 73 §5.9): Heidenhain
+ * iTNC 530 cycle manual, SINUMERIK measuring cycles 06.00 and 02/2012, Renishaw Inspection Plus 2008. None was run on a control, and a
+ * machine's cycle package may differ (Siemens: the classic `_MVAR` parameter form, not the positional form of newer cycle versions).
  *
  * What a cycle cannot express is refused, and the operation fails with the reason (it does not fall back to the inline touches on its
  * own: a program that differs from the one asked for is the caller's choice, by clearing `native`): a cycle writes the datum itself, so at most one `set-offset`
@@ -28,6 +28,8 @@ export interface NativeContext {
   readonly clearance: number
   /** A tilted plane is in force. */
   readonly tilted?: boolean
+  /** The post the program is for: the Renishaw S word of an extended offset depends on the control. */
+  readonly post?: string
 }
 
 export interface NativeCycle {
@@ -69,6 +71,7 @@ const datumOf = (cycle: ProbeCycle, actions: ReadonlyArray<ProbeAction>): { read
   const sets = actions.filter((a): a is Extract<ProbeAction, { readonly kind: "set-offset" }> => a.kind === "set-offset")
   if (sets.length > 1) return refuse("a native cycle writes one datum")
   const set = sets[0]
+  if (set?.reads !== undefined) return refuse("a native cycle sets the datum to the nominal: it cannot make a result read another value")
   if (set === undefined) return {}
   if (set.policy.mode !== "set" || set.policy.deadband !== undefined || set.policy.limit !== undefined) return refuse("a native cycle writes the datum unconditionally: an update policy with a tolerance, a deadband or a limit needs the inline touches")
   const axes = datumAxes(cycle)
@@ -95,11 +98,16 @@ const heidenhain = (cycle: ProbeCycle, ref: WorkOffsetRef | undefined, actions: 
     if ("refused" in a) return refuse(a.refused)
     row = ref.kind === "preset" ? ref.row : ref.kind === "g5x" ? Number(ref.code.slice(1)) - 53 : 0
   }
+  // Q305 = 0 sets the datum in the display at once, whatever Q303 says (TNC cycle manual, "Saving the calculated datum"), so a measurement that
+  // must not move the datum cannot use these cycles. Q303 = 1 writes the preset table; -1 is only the mark of an old program, and an error.
+  const toolCycle = cycle.kind === "tool-length" || cycle.kind === "tool-radius" || cycle.kind === "broken-tool"
+  const movesTheDatum = !toolCycle && (ref === undefined || (row === 0 && ref.kind !== "preset"))
   const clear = { Q320: ctx.clearance, Q260: ctx.safeZ }
-  const write = { Q305: row, Q303: ref === undefined ? -1 : 1 }
+  const write = { Q305: row, Q303: 1 }
   const circleOrRect = { Q301: 1, Q381: 0, Q382: 0, Q383: 0, Q384: 0, Q333: 0 }
-  const mk = (number: number, name: string, params: Record<string, number>, x: number, y: number): Marked =>
-    ({ family: "heidenhain", number, name, word: `TCH PROBE ${number}`, params: { ...params, x, y } })
+  const mk = (number: number, name: string, params: Record<string, number>, x: number, y: number): Marked | { readonly refused: string } => movesTheDatum
+    ? refuse("cycles 408 to 419 always write a datum and with Q305 = 0 they move the active one: give the cycle a set-offset, or clear native for the inline touches")
+    : ({ family: "heidenhain", number, name, word: `TCH PROBE ${number}`, params: { ...params, x, y } })
   switch (cycle.kind) {
     case "bore": case "boss": {
       if (cycle.angles !== undefined) return refuse("touches at given angles need the inline touches: cycles 412 and 413 space their touches evenly")
@@ -154,12 +162,14 @@ const startOf = (cycle: ProbeCycle, ctx: NativeContext): { readonly x: number; r
 const renishaw = (cycle: ProbeCycle, ref: WorkOffsetRef | undefined, ctx: NativeContext): Marked | { readonly refused: string } => {
   const start = startOf(cycle, ctx)
   if (start === undefined) return refuse(`no Renishaw macro for ${cycle.kind} is written here`)
-  // S: 1..6 are G54..G59, 100 + p is G54.1 P<p>; without S the macro only measures.
+  // S: 1..6 are G54..G59, 154.pp is G154 P<pp> on Haas (Inspection Plus manual); without S the macro only measures. The manual at hand does not
+  // give the word for G54.1 P<p> on the other controls, so that is refused rather than guessed.
   let S: { S?: number } = {}
   if (ref !== undefined) {
     if (ref.kind === "g5x") S = { S: Number(ref.code.slice(1)) - 53 }
-    else if (ref.kind === "extended") S = { S: 100 + ref.p }
-    else return refuse("the macro's S word names G54..G59 or G54.1 P")
+    else if (ref.kind === "extended" && ctx.post === "haas" && ref.p <= 99) S = { S: 154 + ref.p / 100 }
+    else if (ref.kind === "extended") return refuse("the macro's S word for this extended offset is only known on Haas (S154.01 to S154.99): use G54..G59, or clear native")
+    else return refuse("the macro's S word names G54..G59 or G154 P")
   }
   const end = { x: start.x, y: start.y, z: ctx.safeZ, f: ctx.probe.feeds.positioning }
   const mk = (number: number, name: string, params: Record<string, number>): Marked => ({ family: "renishaw", number, name, word: `G65 P${number}`, params: { ...params, ...S, ...end }, start })
@@ -191,24 +201,26 @@ const siemens = (cycle: ProbeCycle, ref: WorkOffsetRef | undefined, ctx: NativeC
     if ("refused" in a) return refuse(a.refused)
     knum = ref.kind === "g5x" ? Number(ref.code.slice(1)) - 53 : ref.kind === "frame" ? ref.n : 0
   }
+  const variant = (element: number): number => (ref === undefined ? element : 100 + element)
   const common = { _KNUM: knum, _PRNUM: 1, _FA: ctx.clearance * 2, _VMS: 0, _NMSP: 1 }
   const end = { x: start.x, y: start.y, z: ctx.safeZ }
   const zt = (top: number | undefined, depth: number): number => contactZ(top, depth) - ctx.probe.stylus.ballDiameter / 2
   const mk = (number: number, name: string, params: Record<string, number>): Marked => ({ family: "siemens", number, name, word: `CYCLE${number}`, params: { ...params, ...common, ...end }, start })
   switch (cycle.kind) {
-    case "z-surface": return mk(978, "SURFACE", { _MVAR: 100, _SETVAL: cycle.expectedZ, _MA: 3 })
+    // _MD: 0 positive, 1 negative direction of travel; the hundreds of _MVAR is 1 for a work offset correction, 0 for a measurement alone.
+    case "z-surface": return mk(978, "SURFACE", { _MVAR: variant(0), _SETVAL: cycle.expectedZ, _MA: 3, _MD: 1 })
     case "edge": {
       const a = axisOf(cycle.normal)
       if (a === undefined) return refuse("CYCLE978 measures along an axis, not an angled face")
-      return mk(978, "SURFACE", { _MVAR: 100, _SETVAL: a.axis === "X" ? cycle.at.x : cycle.at.y, _MA: a.axis === "X" ? 1 : 2 })
+      return mk(978, "SURFACE", { _MVAR: variant(0), _SETVAL: a.axis === "X" ? cycle.at.x : cycle.at.y, _MA: a.axis === "X" ? 1 : 2, _MD: a.sign > 0 ? 1 : 0 })
     }
     case "bore": case "boss":
       if (cycle.angles !== undefined) return refuse("touches at given angles need the inline touches")
-      return mk(977, cycle.kind === "bore" ? "HOLE" : "SHAFT", { _MVAR: cycle.kind === "bore" ? 101 : 102, _SETVAL: cycle.diameter, ...(cycle.kind === "boss" ? { _ID: zt(cycle.top, cycle.depth) - start.z } : {}) })
+      return mk(977, cycle.kind === "bore" ? "HOLE" : "SHAFT", { _MVAR: variant(cycle.kind === "bore" ? 1 : 2), _SETVAL: cycle.diameter, ...(cycle.kind === "boss" ? { _ID: zt(cycle.top, cycle.depth) - start.z } : {}) })
     case "web": case "pocket": {
       const a = axisOf({ x: Math.cos(cycle.angle), y: Math.sin(cycle.angle) })
       if (a === undefined) return refuse("CYCLE977 measures along an axis, not across an angled slot")
-      return mk(977, cycle.kind === "pocket" ? "GROOVE" : "WEB", { _MVAR: cycle.kind === "pocket" ? 103 : 104, _SETVAL: cycle.width, _MA: a.axis === "X" ? 1 : 2, ...(cycle.kind === "web" ? { _ID: zt(cycle.top, cycle.depth) - start.z } : {}) })
+      return mk(977, cycle.kind === "pocket" ? "GROOVE" : "WEB", { _MVAR: variant(cycle.kind === "pocket" ? 3 : 4), _SETVAL: cycle.width, _MA: a.axis === "X" ? 1 : 2, ...(cycle.kind === "web" ? { _ID: zt(cycle.top, cycle.depth) - start.z } : {}) })
     }
     default: return refuse(`no Siemens measuring cycle for ${cycle.kind} is written here`)
   }

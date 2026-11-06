@@ -12,7 +12,7 @@
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
-import { Bell, Cpu, Crosshair, Globe, Keyboard, Lock, Shield, Smartphone, User } from "lucide-solid"
+import { Bell, Cloud, Cpu, Crosshair, Globe, Keyboard, Lock, Shield, Smartphone, User } from "lucide-solid"
 import { LOCALE_CODES, localeInfo, t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { endSession } from "../../../shared/state/session.ts"
@@ -23,13 +23,14 @@ import { SessionManagement } from "../components/session-management.tsx"
 import { PasskeySettings } from "../components/passkey-settings.tsx"
 import { AISettingsPanel } from "../components/ai-settings-panel.tsx"
 import { CompanionPanel } from "../../companion/screens/companion.tsx"
+import { CloudPanel } from "../../cloud/screens/cloud.tsx"
 import { LanguageSelector } from "../components/language-selector.tsx"
 import { AutosaveSettings } from "../components/autosave-settings.tsx"
 import { KeybindingsSettings } from "../components/keybindings-settings.tsx"
 import { ProbingSettings } from "../components/probing-settings.tsx"
 import { checkForUpdates, inDesktopShell, openReleaseNotes } from "../../../app/updates.ts"
 
-type TabId = "profile" | "account" | "security" | "notifications" | "ai" | "devices" | "machining" | "keyboard" | "language"
+type TabId = "profile" | "account" | "security" | "notifications" | "ai" | "devices" | "cloud" | "machining" | "keyboard" | "language"
 
 interface Tab {
   readonly id: TabId
@@ -64,6 +65,7 @@ export function SettingsScreen(): JSX.Element {
     { id: "notifications", name: t("settings.tab.notifications"), Icon: Bell },
     { id: "ai", name: t("settings.tab.ai"), Icon: Cpu },
     { id: "devices", name: t("settings.tab.devices"), Icon: Smartphone },
+    { id: "cloud", name: t("settings.tab.cloud"), Icon: Cloud },
     { id: "machining", name: t("settings.tab.machining"), Icon: Crosshair },
     { id: "keyboard", name: t("settings.tab.keyboard"), Icon: Keyboard },
     { id: "language", name: t("settings.tab.language"), Icon: Globe }
@@ -135,6 +137,8 @@ export function SettingsScreen(): JSX.Element {
       </Show>
 
       <Show when={tab === "devices"}><CompanionPanel /></Show>
+
+      <Show when={tab === "cloud"}><CloudPanel /></Show>
 
       <Show when={tab === "machining"}><ProbingSettings /></Show>
 

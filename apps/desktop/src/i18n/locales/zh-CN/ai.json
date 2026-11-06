@@ -599,6 +599,8 @@
   "ai.catalog.write": "写入",
   "ai.catalog.destructive": "破坏性",
   "ai.catalog.tools": "{count} 个工具",
+  "ai.toolTitle.cad": "读取图纸",
+  "ai.toolTitle.cad_edit": "编辑图纸",
   "ai.catalog.actions": "{count} 个操作",
   "ai.catalog.empty": "目录尚不可用。",
   "ai.catalog.unavailable": "主机没有响应。",

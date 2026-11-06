@@ -38,6 +38,8 @@ import { assignmentProblem } from "../../lib/elementJob.ts"
 import { generateForElement } from "../../lib/elementGenerate.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useCamStore } from "../../store/camStore.ts"
+import { useSetupStore } from "../../store/setupStore.ts"
+import { workpiecesFromElements } from "../../lib/setup.ts"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { assignMaterial, assignTool, assignmentOf, materialOf, paramsOf, storeToolpath, toolOf, toolpathOf, updateParam, type ElementParams, type ElementToolpathData } from "./assignments.ts"
 import { t, type Key } from "../../../../i18n/index.ts"
@@ -154,6 +156,18 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
     cad.setWorkpieceFromElement(id)
     camStore.syncWorkpieceFromCAD()
     toast.success(t("cam.explorer.nowWorkpiece", { name: String(element["name"] ?? element["type"]) }))
+  }
+
+  /** Several selected parts (imported or drawn) become the fixture of the setup: one workpiece each, the first one is also the raw piece. */
+  const useSelectionAsWorkpieces = (): void => {
+    const picked = selection.selectedElementIds.map((id) => elements.elements.find(candidate => candidate.id === id)).filter((element): element is NonNullable<typeof element> => element !== undefined)
+    const fixture = workpiecesFromElements(picked, (n) => t("cam.workpieces.defaultName", { n }))
+    if (fixture.length < 2) return
+    useSetupStore.getState().setChoices({ workpieces: [...fixture] })
+    cad.setWorkpieceFromElement(picked[0]!.id)
+    camStore.syncWorkpieceFromCAD()
+    toast.success(t("cam.explorer.nowWorkpieces", { count: fixture.length, offsets: fixture.map((wp) => wp.workOffset).join(" ") }))
+    if (picked.length > fixture.length) toast(t("cam.explorer.workpiecesLimit", { count: fixture.length }))
   }
 
   const deleteSelected = (): void => {
@@ -338,6 +352,11 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
             >
               <Code size={14} class="mr-1" />{t("cam.explorer.generate")}
             </button>
+            <Show when={selection.selectedElementIds.length > 1}>
+              <button type="button" class={`${BTN} col-span-2`} data-testid="cam-use-selection-as-workpieces" title={t("cam.explorer.useAsWorkpiecesTitle")} onClick={useSelectionAsWorkpieces}>
+                <Box size={14} class="mr-1" />{t("cam.explorer.useAsWorkpieces")}
+              </button>
+            </Show>
             <button type="button" class={`${BTN} col-span-2 text-[color:var(--panel-bad)]`} title={t("cam.explorer.deleteSelected")} onClick={deleteSelected}><Trash2 size={14} class="mr-1" />{t("browser.delete")}</button>
           </div>
         </div>

@@ -104,3 +104,89 @@ test("save, plan, load back and a refused stale save resolved by the user", asyn
     expect(useSetupStore.getState().saved).toBeUndefined()
   } finally { dispose() }
 })
+
+const change = (el: Element, type = "change") => el.dispatchEvent(new window.Event(type, { bubbles: true }))
+const typeInto = (name: string, value: string) => {
+  const field = document.querySelector<HTMLInputElement>(`input[name='${name}']`)!
+  field.value = value; change(field, "input"); change(field)
+}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 30))
+
+test("clamps, the machine travel, a template of two steps and the part probe are edited on the panel, stored by the sidecar and planned expanded", async () => {
+  const project = await app.state.runtime.run(app.client.projects.create({ payload: { name: "Workholding" } }))
+  useElementsStore.setState({ elements: drawing, selectedElement: null })
+  useDocumentStore.getState().setDocument({ projectId: project.id, drawingId: "d2" })
+  panelToolpaths()
+  const { useSelectionStore } = await import("../src/features/cad/store/selectorStore.ts")
+  const { dispose } = await mount()
+  try {
+    // A clamp: a new box beside the first part, edited; a box that is not a box is said so on its own row.
+    ;(await button("cam-setup-fixture-add")).click()
+    await app.wait(() => document.querySelector("[data-testid='cam-setup-fixture']"))
+    typeInto("camFixturemaxx-fx-1", "-90")
+    await tick()
+    expect(useSetupStore.getState().choices.fixtures[0]).toMatchObject({ id: "fx-1", min: { x: -80 }, max: { x: -90 } })
+    expect(document.querySelector("[data-testid='cam-setup-fixture-issue']")?.textContent).toMatch(/max must be larger than min/)
+    typeInto("camFixturemaxx-fx-1", "-60")
+    await tick()
+    expect(document.querySelector("[data-testid='cam-setup-fixture-issue']")).toBeNull()
+
+    // The machine travel is switched on with a default box and edited.
+    const travel = document.querySelector<HTMLInputElement>("input[name='camSetupEnvelope']")!
+    travel.checked = true; change(travel)
+    await app.wait(() => document.querySelector("[data-testid='cam-setup-envelope']"))
+    typeInto("camEnvelopemaxz", "150")
+    await tick()
+    expect(useSetupStore.getState().choices.envelope).toMatchObject({ min: { x: -500 }, max: { z: 150 } })
+
+    // A template of two steps (rough, then finish), applied to the two selected elements: four expanded operations, listed in the plan.
+    ;(await button("cam-setup-template-add")).click()
+    await app.wait(() => document.querySelector("[data-testid='cam-setup-template']"))
+    ;(await button("cam-setup-template-step-add")).click()
+    await app.wait(() => document.querySelectorAll("[data-testid='cam-setup-template-step']").length === 2)
+    typeInto("camTemplatetoolDiameter-tpl-1-step-2", "2")
+    await tick()
+    const template = useSetupStore.getState().choices.templates[0]!
+    expect(template.steps.map((step) => step.tool.diameter)).toEqual([base.toolDiameter, 2])
+    ;(await button("cam-setup-template-depends")).click()
+    await tick()
+    expect(useSetupStore.getState().choices.templates[0]!.steps[1]!.dependsOn).toEqual(["step-1"])
+    useSelectionStore.getState().selectMultiple(["plate", "hole"])
+    await tick()
+    ;(await button("cam-setup-template-apply")).click()
+    await app.wait(() => document.querySelector("[data-testid='cam-setup-template-use']"))
+    expect(useSetupStore.getState().choices.uses[0]).toMatchObject({ templateId: "tpl-1", elementIds: ["plate", "hole"], perElement: true, order: "perStep" })
+    await app.wait(() => document.querySelectorAll("[data-testid='cam-setup-expanded-operation']").length === 4)
+
+    // The part probe: one z-surface cycle by default, a bore added.
+    const probe = document.querySelector<HTMLInputElement>("input[name='camSetupProbePart']")!
+    probe.checked = true; change(probe)
+    await app.wait(() => document.querySelector("[data-testid='cam-setup-probe-cycle']"))
+    ;(await button("cam-setup-probe-cycle-add")).click()
+    await app.wait(() => document.querySelectorAll("[data-testid='cam-setup-probe-cycle']").length === 2)
+    expect(useSetupStore.getState().choices.partProbe!.cycles.map((cycle) => cycle.kind)).toEqual(["z-surface", "bore"])
+    expect(useSetupStore.getState().choices.probePart).toBe(true)
+
+    // The sidecar stores all of it, and the plan reads the expanded operations (the tools of the template steps are in the tool table).
+    typeInto("camSetupName", "Vise")
+    ;(await button("cam-setup-save")).click()
+    await app.wait(() => useSetupStore.getState().saved !== undefined, 30_000)
+    const stored = await app.state.runtime.run(app.client.camSetup.get({ params: { id: project.id, setupId: useSetupStore.getState().saved!.id } }))
+    expect(stored.setup.fixtures).toHaveLength(1)
+    expect(stored.setup.envelope?.max.z).toBe(150)
+    expect(stored.setup.templates).toHaveLength(1)
+    expect(stored.setup.uses?.[0]?.elementIds).toEqual(["plate", "hole"])
+    expect(stored.setup.partProbe?.cycles).toHaveLength(2)
+    ;(await button("cam-setup-plan")).click()
+    const rows = await app.wait(() => { const found = document.querySelectorAll<HTMLElement>("[data-testid='cam-setup-tool-row']"); return found.length > 0 ? found : null }, 30_000)
+    expect(rows.length).toBeGreaterThanOrEqual(3)
+
+    // Loaded back onto an emptied panel, the choices are as they were saved.
+    useMultiToolpathStore.getState().clearAllToolpaths()
+    useSetupStore.getState().setChoices({ fixtures: [], envelope: undefined, templates: [], uses: [], partProbe: undefined, probePart: false })
+    ;(await button("cam-setup-load")).click()
+    await app.wait(() => useSetupStore.getState().choices.templates.length === 1, 30_000)
+    expect(useSetupStore.getState().choices).toMatchObject({ fixtures: [{ id: "fx-1" }], probePart: true })
+    expect(useSetupStore.getState().choices.envelope?.max.z).toBe(150)
+  } finally { dispose() }
+})

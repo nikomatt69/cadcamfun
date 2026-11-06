@@ -44,7 +44,7 @@ export * from "./tool-library.ts"
 export * from "./linking.ts"
 export * from "./setup-sheet.ts"
 export { SETUP_ORIENTATIONS, setupTransform, type SetupOrientation } from "../setup.ts"
-export { CutterSchema, OperationSpecSchema, PrintRequirementSchema, SetupOrientationSchema } from "./schema.ts"
+export { CutterSchema, JobSetupSchema, OperationSpecSchema, PrintRequirementSchema, SetupOrientationSchema } from "./schema.ts"
 export {
   CalibrationArtefactSchema, CharacteristicSchema, DegreesSchema, KernelProbingSchema, ProbeActionSchema, ProbeCycleSchema, ProbeDeviceSchema, ToolSetterSchema,
   OffsetEntrySchema, UpdatePolicySchema, WorkOffsetRefSchema, WorkOffsetTableSchema

@@ -8,6 +8,9 @@ import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import type { ToolpathSettings } from "../../lib/elementJob.ts"
 import { formatDuration } from "../../lib/multiToolpath.ts"
 import { useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
+import { useSetupStore } from "../../store/setupStore.ts"
+import { registerKey, setupOfToolpaths, toggleDependency, toggleToolpathWorkpiece } from "../../lib/setup.ts"
+import { cam } from "@cadcamfun/core"
 import { t } from "../../../../i18n/index.ts"
 
 export interface ElementSelectorProps {
@@ -31,6 +34,16 @@ const icon = (type: string): JSX.Element => {
 export default function ElementSelector(props: ElementSelectorProps): JSX.Element {
   const elements = useElementsStore()
   const store = useMultiToolpathStore()
+  const setupChoices = useSetupStore()
+  const fixture = () => setupChoices.choices.workpieces
+  /** What the setup says is wrong, by operation: a dependency that runs later, a pocket the magazine lacks, a missing part. */
+  const issuesOf = (id: string): ReadonlyArray<string> =>
+    store.toolpaths.length === 0 ? [] : cam.program.validateSetup(setupOfToolpaths(store.toolpaths, setupChoices.choices)).filter((issue) => issue.operationId === id).map((issue) => issue.message)
+  /** The operations before this one, in the machining order: only those can be run first. */
+  const earlier = (id: string) => {
+    const ordered = [...store.toolpaths].filter((candidate) => candidate.probe === undefined).sort((a, b) => a.order - b.order)
+    return ordered.slice(0, Math.max(0, ordered.findIndex((candidate) => candidate.id === id)))
+  }
   const [selectedForGeneration, setSelectedForGeneration] = createSignal<ReadonlySet<string>>(new Set<string>())
 
   // Elements that can carry a toolpath.
@@ -188,7 +201,29 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                     <span>{toolpath.toolpathSettings.operationType}</span>
                     <Show when={toolpath.distance > 0}><span class="tabular-nums" title={t("cam.multi.statDistance")}>{(toolpath.distance / 1000).toFixed(2)} m</span></Show>
                     <Show when={toolpath.estimatedTime > 0}><span class="tabular-nums" title={t("cam.multi.statTime")}>{formatDuration(toolpath.estimatedTime)}</span></Show>
+                    <Show when={fixture().length > 1}>
+                      <span class="flex flex-wrap gap-1" role="group" aria-label={t("cam.workpieces.runsOn")} title={t("cam.workpieces.runsOn")} data-testid="toolpath-workpieces">
+                        <For each={fixture()}>{(wp) => {
+                          const on = () => toolpath.workpieceIds === undefined || toolpath.workpieceIds.includes(wp.id)
+                          return <button type="button" aria-pressed={on()} data-workpiece={wp.id} title={wp.name}
+                            class={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${on() ? "bg-blue-700 text-white" : "bg-gray-700 text-gray-400"}`}
+                            onClick={() => store.updateToolpath(toolpath.id, { workpieceIds: toggleToolpathWorkpiece(fixture(), toolpath.workpieceIds, wp.id) })}>{registerKey(wp)}</button>
+                        }}</For>
+                      </span>
+                    </Show>
+                    <Show when={earlier(toolpath.id).length > 0}>
+                      <span class="flex flex-wrap items-center gap-1" role="group" aria-label={t("cam.workpieces.dependsOn")} title={t("cam.workpieces.dependsOn")} data-testid="toolpath-depends-on">
+                        <span class="text-[10px] text-gray-500">{t("cam.workpieces.dependsOn")}</span>
+                        <For each={earlier(toolpath.id)}>{(other) => {
+                          const on = () => toolpath.dependsOn?.includes(other.id) === true
+                          return <button type="button" aria-pressed={on()} data-depends-on={other.id} title={other.elementName}
+                            class={`max-w-24 truncate rounded px-1.5 py-0.5 text-[10px] transition-colors ${on() ? "bg-amber-700 text-white" : "bg-gray-700 text-gray-400"}`}
+                            onClick={() => store.updateToolpath(toolpath.id, { dependsOn: toggleDependency(toolpath.dependsOn, other.id) })}>{other.elementName}</button>
+                        }}</For>
+                      </span>
+                    </Show>
                   </div>
+                  <For each={issuesOf(toolpath.id)}>{(message) => <p class="mt-1 text-xs text-red-400" role="alert" data-testid="toolpath-issue">{message}</p>}</For>
 
                   {/* Progress bar once the G-code exists */}
                   <Show when={toolpath.gcode}>

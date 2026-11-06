@@ -101,6 +101,9 @@ describe("generator panel for a 3D printer", () => {
       expect(document.querySelector('[data-testid="kernel-claim-wall-coverage"]')).not.toBeNull()
       expect(useCamStore.getState().kernelArtifact?.release).toBe("verified-program")
       expect(useCamStore.getState().gcode).toContain("M104 S200")
+      expect(document.querySelector('[data-testid="kernel-print-stale"]')).toBeNull()
+      useGeneratorStore.getState().updateSettings("layerHeight", 0.15)
+      await app.wait(() => document.querySelector('[data-testid="kernel-print-stale"]'), 5000)
     } finally { dispose() }
   }, 120000)
 

@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { emitProbeSteps, planProbe, runProbeSteps, type ProbeAxis, type ProbeSettings, type ProbeWorld } from "./probing.ts"
+import { DEFAULT_PROBE_SETTINGS, deviceOfSettings } from "../probing/device.ts"
+import { planProbeCycle } from "../probing/cycles.ts"
+import { compileActions } from "../probing/actions.ts"
+import { runProbeMoves } from "../probing/simulate.ts"
+import { boxWorld } from "../probing/world.ts"
+import type { ProbeContext } from "../probing/types.ts"
+import { kernelProbe, planProbe, runProbeSteps, type ProbeOperation, type ProbeSettings, type ProbeWorld } from "./probing.ts"
 
 const settings: ProbeSettings = { stylusDiameter: 6, feed: 100, search: 8, workOffset: "G54", safeZ: 50 }
 const r = 3
@@ -86,35 +92,32 @@ describe("probing plans against a modelled part", () => {
   })
 })
 
-describe("probing emission", () => {
-  const plan = planProbe({ cycle: "bore", centre: { x: 30, y: 20 }, diameter: 12, depth: 4 }, settings)
-  const axes: ProbeAxis[] = ["X", "Y"]
-  test("Fanuc uses G31 and writes the work offset variable", () => {
-    const nc = emitProbeSteps(plan.steps, settings, "fanuc")
-    expect(nc).toContain("G91 G31 X-")
-    // The midpoint is bracketed as a whole: `[a+b]/2 - 30` would be read as a half of the sum less 30 only by luck of precedence.
-    expect(nc).toMatch(/#5221 = #5221 \+ \[\[#524\+#525\]\/2\] - 30\.000/)
-    expect(nc).not.toMatch(/\[#524 \+ #525\] \/ 2/)
-    // A touch that finds nothing is an alarm, and the descent near the part is armed.
-    expect(nc).toMatch(/IF \[ABS\[#5061-\[#530\+/)
-    expect(nc).toContain("THEN #3000=191 (PROBE MISS)")
-    expect(nc).toMatch(/G31 Z-4\.000 F100\nIF \[ABS\[#5063-\[-4\.000\]\] GT 0\.002\] THEN #3000=192/)
-    expect(nc).not.toMatch(/\nG0 Z-4\.000/)
-    // The size is in a register, not only a comment.
-    expect(nc).toMatch(/#540 = ABS\[#525 - #524\] \+ 6\.000 ; bore diameter X/)
-    expect(nc).toContain("M5")
-    expect(nc).not.toMatch(/\bM3\b/)
-    expect(axes.length).toBe(2)
+/** The block of `block` as the kernel's world: the legacy operation through the real cycle, action and executor. */
+describe("a legacy operation in the kernel", () => {
+  const device = deviceOfSettings({ ...DEFAULT_PROBE_SETTINGS, stylusDiameter: settings.stylusDiameter })
+  const ctx: ProbeContext = { probe: device, safeZ: settings.safeZ, clearance: 3, search: settings.search, prefix: "p" }
+  const world = boxWorld({ x: 10, y: 5, z: -20 }, { x: 60, y: 45, z: 0.37 })
+  const offsetOf = (op: ProbeOperation) => {
+    const { cycle, actions } = kernelProbe(op, settings)
+    const routine = planProbeCycle(cycle, ctx)
+    if ("refused" in routine) throw new Error(routine.refused)
+    const out = runProbeMoves(compileActions(routine, actions, ctx), world, { offsets: { entries: {} }, active: { kind: "g5x", code: "G54" }, probe: device, start: { x: 0, y: 0, z: settings.safeZ } }, { results: routine.results, units: routine.units })
+    expect(out.alarms).toEqual([])
+    return out.offsets["G54"] ?? { x: 0, y: 0, z: 0 }
+  }
+  // The zero lands where the neutral steps put it: these are the same figures `runProbeSteps` finds on the same block.
+  test("a surface, an edge and a corner set the zero the steps set", () => {
+    const z: ProbeOperation = { cycle: "z-surface", at: { x: 30, y: 25 }, expectedZ: 0 }
+    expect(offsetOf(z).z).toBeCloseTo(runProbeSteps(planProbe(z, settings).steps, block, settings).offset.Z!, 6)
+    const edge: ProbeOperation = { cycle: "edge", axis: "X", direction: 1, at: { x: 0, y: 25 }, depth: 4, expectedEdge: 10 }
+    expect(offsetOf(edge).x).toBeCloseTo(runProbeSteps(planProbe(edge, settings).steps, block, settings).offset.X!, 6)
+    const corner: ProbeOperation = { cycle: "corner", corner: { x: 10, y: 5 }, sx: 1, sy: 1, depth: 4 }
+    const steps = runProbeSteps(planProbe(corner, settings).steps, block, settings).offset
+    expect(offsetOf(corner).x).toBeCloseTo(steps.X!, 6)
+    expect(offsetOf(corner).y).toBeCloseTo(steps.Y!, 6)
   })
-  test("LinuxCNC uses G38.2 and G10 L2; Siemens uses MEAS=1 and the frame", () => {
-    expect(emitProbeSteps(plan.steps, settings, "linuxcnc")).toMatch(/G38\.2 X-/)
-    expect(emitProbeSteps(plan.steps, settings, "linuxcnc")).toMatch(/G10 L2 P1 X\[#5221 \+/)
-    const s = emitProbeSteps(plan.steps, settings, "siemens")
-    expect(s).toContain("MEAS=1 G91 G1")
-    expect(s).toContain("$P_UIFR[1,X,TR]=$P_UIFR[1,X,TR]+(R14+R15)/2-30.000")
-    expect(s).toMatch(/\$P_UIFR\[1,Y,TR\]=[^\n]*\nG54/)
-    expect(s).not.toContain("$P_UIFR[1]:X")
-    expect(s).toContain("G0 X=(R10+R11)/2")
-    expect(s).toContain("PROBEMISS")
+  test("`zero` is what the surface reads afterwards, and the action says so", () => {
+    expect(offsetOf({ cycle: "z-surface", at: { x: 30, y: 25 }, expectedZ: 0, zero: 0.37 }).z).toBeCloseTo(0, 6)
+    expect(offsetOf({ cycle: "z-surface", at: { x: 30, y: 25 }, expectedZ: 0.37 }).z).toBeCloseTo(0.37, 6)
   })
 })

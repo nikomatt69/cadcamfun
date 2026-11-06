@@ -205,9 +205,18 @@ export type CamProbingFeatureRef = typeof CamProbingFeatureRef.Type
 
 const CAMKINDS = cam.probing.PROBE_CYCLE_KINDS
 
+/** What the control believes about the table (default: the machine configuration's rotary). */
+export const CamProbingRotaryAssumption = Schema.Struct({ layout: Schema.Literals(["table-AC", "table-BC"]), pivot: point3 })
+
 const planCommon = {
   settings: Schema.optionalKey(CamProbingSettingsInput),
   frame: Schema.optionalKey(CamProbingFrame),
+  /** Write the control's own cycle instead of the inline touches; refused with the reason for a cycle or control that has none. */
+  native: Schema.optionalKey(Schema.Boolean),
+  /** How the control calls its cycles (default: the machine's). */
+  macroStyle: Schema.optionalKey(Schema.Literals(cam.probing.MACRO_STYLES)),
+  /** A rotary-axis cycle needs the table (default: the machine configuration's rotary). */
+  assumed: Schema.optionalKey(CamProbingRotaryAssumption),
   /** Characteristics measured by the cycle and checked against their limits (PMI, ISO 286 fits). */
   checks: Schema.optionalKey(Schema.Array(k.CharacteristicSchema).check(Schema.isMaxLength(50))),
   /** What the program does with the results (offsets, tool table, reports); inspection checks are `checks`. */
@@ -240,6 +249,8 @@ export const CamProbingPlan = Schema.Struct({
   checks: Schema.Array(k.CharacteristicSchema),
   /** Result name -> value on a part exactly as drawn (mm; degrees for angles). */
   nominal: Schema.Record(Schema.String, Schema.Finite),
+  /** What the post writes for a native cycle (`TCH PROBE 412`, `G65 P9814`, `CYCLE977`). */
+  native: Schema.optionalKey(Schema.String),
   notes: Schema.Array(Schema.String),
   warnings: Schema.Array(Schema.String)
 })
@@ -269,6 +280,8 @@ export const CamProbingProgram = Schema.Struct({
   identity: Schema.Struct({ nc: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)) }),
   /** The number of lines of `nc`. */
   lines: Schema.Int,
+  /** The native word, when the program calls the control's own cycle: its `probing` claim is then unresolved (not replayed as written). */
+  native: Schema.optionalKey(Schema.String),
   steps: Schema.Array(CamProbingStep),
   notes: Schema.Array(Schema.String),
   warnings: Schema.Array(Schema.String)
@@ -297,6 +310,17 @@ export const CamProbingSimulateRequest = Schema.Struct({
   /** The offsets the control holds before the run (key -> row); default zero. */
   workOffsets: Schema.optionalKey(Schema.Record(Schema.String, CamOffsetEntry)),
   misplacement: Schema.optionalKey(CamProbingMisplacement),
+  /** The point of the drawing that is work zero, for cycles planned in work coordinates; absent: the drawing's own coordinates. */
+  partOrigin: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
+  /** The stock as an element: what the probe touches when the drawing has no closed solid yet. */
+  stockElement: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  /** The control: the operations are posted as one program, and contacts and offset changes carry the line of their block in `program.nc`. */
+  dialect: Schema.optionalKey(CamProbingDialect),
+  /** Options of the post (a Siemens tilted plane's swivel data, the machine's probing words). */
+  post: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  options: Schema.optionalKey(CamProbingEmitOptions),
+  /** A rotary-axis operation needs the table (default: the machine configuration's rotary). */
+  assumed: Schema.optionalKey(CamProbingRotaryAssumption),
   progress: Schema.optionalKey(CamProbingProgressTarget)
 })
 export type CamProbingSimulateRequest = typeof CamProbingSimulateRequest.Type
@@ -305,6 +329,22 @@ const reportCheck = Schema.Struct({
   operationId: Schema.String, name: Schema.String, kind: Schema.Literals(["size", "position", "true-position", "flatness", "angle"]),
   measured: finite, nominal: finite, deviation: finite, lower: finite, upper: finite, status: Schema.Literals(["pass", "warn", "fail"])
 })
+
+/** A calibration record on the wire (degrees): the stylus as a machine keeps it, a rotary axis fit, or why the run gave none. */
+export const CamProbeCalibration = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("stylus"), stylus: Schema.Struct({
+    ballDiameter: finite, effectiveRadius: finite, directional: Schema.optionalKey(Schema.Array(Schema.Struct({ angle: finite, radius: finite }))),
+    zTrigger: Schema.optionalKey(finite), centreOffset: Schema.optionalKey(Schema.Struct({ x: finite, y: finite })),
+    artefact: Schema.optionalKey(Schema.Struct({ kind: Schema.Literals(["ring", "sphere", "height"]), diameter: Schema.optionalKey(finite), serial: Schema.optionalKey(Schema.String) })),
+    calibratedAt: Schema.optionalKey(Schema.String)
+  }) }),
+  Schema.Struct({
+    kind: Schema.Literal("rotary"), axis: Schema.Literals(["A", "B", "C"]), centres: Schema.Array(point3), angles: Schema.Array(finite),
+    rotary: Schema.Struct({ pivot: point3, axisDirection: point3, pivotError: point3, axisTilt: finite, radius: finite, rms: finite })
+  }),
+  Schema.Struct({ kind: Schema.Literal("refused"), reason: Schema.String })
+])
+export type CamProbeCalibration = typeof CamProbeCalibration.Type
 
 /** The core `ProbeReport` as JSON (degrees for angles): what a run touched, measured and changed, with one verdict. */
 export const CamProbeReportData = Schema.Struct({
@@ -319,10 +359,12 @@ export const CamProbeReportData = Schema.Struct({
     nominal: Schema.Record(Schema.String, Schema.Finite),
     units: Schema.Record(Schema.String, Schema.Literals(["mm", "deg"])),
     alarms: Schema.Array(Schema.Struct({ code: Schema.Int, text: Schema.String, line: Schema.optionalKey(Schema.Int) })),
-    stopped: Schema.optionalKey(Schema.String)
+    stopped: Schema.optionalKey(Schema.String),
+    /** What a calibration cycle found: reported, never written to a machine parameter. */
+    calibration: Schema.optionalKey(CamProbeCalibration)
   })),
   checks: Schema.Array(reportCheck),
-  updates: Schema.Array(Schema.Struct({ operationId: Schema.String, offset: Schema.String, axis: Schema.String, before: finite, after: finite })),
+  updates: Schema.Array(Schema.Struct({ operationId: Schema.String, offset: Schema.String, axis: Schema.String, before: finite, after: finite, line: Schema.optionalKey(Schema.Int) })),
   tools: Schema.Array(Schema.Struct({ operationId: Schema.String, tool: Schema.Int, quantity: Schema.Literals(["length", "radius"]), part: Schema.Literals(["geometry", "wear"]), before: finite, after: finite })),
   offsets: Schema.Record(Schema.String, CamOffsetEntry)
 })
@@ -330,6 +372,11 @@ export type CamProbeReportData = typeof CamProbeReportData.Type
 
 /** A simulated run: the report, the offset table it leaves (key -> row) and the identity of what was simulated. */
 export const CamProbingSimulation = Schema.Struct({
+  /** The program the report's `line` numbers refer to; absent without a dialect, or when the post refused (`warnings` says why). */
+  program: Schema.optionalKey(Schema.Struct({ dialect: CamProbingDialect, nc: Schema.String, lines: Schema.Int, identity: Schema.Struct({ nc: Schema.String }) })),
+  /** The program as this run went: macros resolved, touches ending at their contacts; `lines[i]` is the line of `program.nc` of line i + 1. */
+  played: Schema.optionalKey(Schema.Struct({ text: Schema.String, lines: Schema.Array(Schema.Int) })),
+  warnings: Schema.optionalKey(Schema.Array(Schema.String)),
   report: CamProbeReportData,
   offsetTable: Schema.optionalKey(Schema.Record(Schema.String, CamOffsetEntry)),
   identity: Schema.Struct({ elements: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)), operations: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)) })
@@ -346,7 +393,7 @@ export const CamRotaryCalibrationRequest = Schema.Struct({
   sphere: Schema.Struct({ centre: point3, diameter: positive }),
   angles: Schema.Array(Schema.Finite.check(Schema.isBetween({ minimum: -360, maximum: 360 }))).check(Schema.isMinLength(3), Schema.isMaxLength(10)),
   /** What the control believes about the table (default: the machine configuration's rotary). */
-  assumed: Schema.optionalKey(Schema.Struct({ layout: Schema.Literals(["table-AC", "table-BC"]), pivot: point3 })),
+  assumed: Schema.optionalKey(CamProbingRotaryAssumption),
   settings: Schema.optionalKey(CamProbingSettingsInput),
   /** A machine whose pivot is `pivot` (mm) and whose axis leans `tilt` degrees about X: the run is simulated against it. */
   truth: Schema.optionalKey(Schema.Struct({ pivot: Schema.optionalKey(point3), tilt: Schema.optionalKey(finite) })),

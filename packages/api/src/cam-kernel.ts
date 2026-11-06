@@ -56,6 +56,11 @@ export const CamKernelRequest = Schema.Struct({
   /** A post definition (spec 54 C1; library category "post") that writes the NC in place of the machine's post; checked by the kernel. */
   postDefinition: CamManufactureInput.fields.postDefinition,
   print: CamManufactureInput.fields.print,
+  /** Several fixings, expanded (no `pattern`): each stored program is one of them, named by `setupId`. */
+  setups: Schema.optionalKey(Schema.Array(cam.kernel.JobSetupSchema).check(Schema.isMinLength(1), Schema.isMaxLength(6))),
+  carryStock: CamManufactureInput.fields.carryStock,
+  /** The setup of `setups` this program is; the request re-runs the whole job and takes that setup's artifact. */
+  setupId: Schema.optionalKey(id),
   /** Release only when the tolerance budget is within `tolerance` (claim `tolerance`, spec 69 B4). */
   enforceTolerance: Schema.optionalKey(Schema.Boolean),
   /** Process physics and its evidence (`artifact.process`); see `CamProcessRequest`. */

@@ -121,7 +121,7 @@ export const geometryOf = (form: GeometryForm, sources: JobSources): cam.generat
 })
 
 /** Snapshot the selected parts and their Boolean operands, or the whole drawing when nothing is selected. */
-export const kernelRequestOf = (sources: JobSources, options: Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "machineConfig" | "origin" | "finishAllowance" | "scallop" | "tolerance" | "workOffset" | "resolution" | "subprograms" | "postDefinition" | "print">): CamKernelRequest => {
+export const kernelRequestOf = (sources: JobSources, options: Pick<CamKernelRequest, "setupOrientation" | "material" | "machine" | "machineConfig" | "origin" | "finishAllowance" | "scallop" | "tolerance" | "workOffset" | "resolution" | "subprograms" | "postDefinition" | "print" | "setups" | "carryStock">): CamKernelRequest => {
   const selected = selectedElements(sources)
   const roots = selected.length > 0 ? selected : sources.elements.filter((element) => !STOCK_TYPES.has(String(element["type"])))
   const byId = new Map(sources.elements.map((element) => [String(element["id"]), element]))
@@ -270,4 +270,44 @@ export const stockForSelection = (selection: ReadonlyArray<CadElement>, current:
     x: round((lo("x") + hi("x")) / 2), y: round((lo("y") + hi("y")) / 2), topZ: round(hi("z")), allowance,
     ...(current.material ? { material: current.material } : {})
   }
+}
+
+// ---------------------------------------------------------------- a job of several setups (the kernel's `setups[]`)
+
+export type JobSetup = NonNullable<CamKernelRequest["setups"]>[number]
+export const MAX_JOB_SETUPS = 6
+const JOB_OFFSETS: ReadonlyArray<cam.WorkOffset> = ["G54", "G55", "G56", "G57", "G58", "G59"]
+const RELEASES = ["blocked", "preview", "verified-program"] as const
+
+/**
+ * The setup list after "add": the first press turns the panel's single fixing (its orientation, G54) into the first setup and
+ * adds a second one on the next free register; later presses add one more. Each setup gets its own datum, as the post needs.
+ */
+export const addJobSetup = (existing: ReadonlyArray<JobSetup> | undefined, current: cam.kernel.SetupOrientation | undefined): ReadonlyArray<JobSetup> | undefined => {
+  const list: ReadonlyArray<JobSetup> = existing !== undefined && existing.length > 0 ? existing : [{ id: "setup-1", orientation: current ?? "+Z", workOffset: "G54" }]
+  if (list.length >= MAX_JOB_SETUPS) return undefined
+  const taken = new Set(list.map((setup) => setup.workOffset))
+  const workOffset = JOB_OFFSETS.find((offset) => !taken.has(offset))
+  if (workOffset === undefined) return undefined
+  let n = list.length + 1
+  while (list.some((setup) => setup.id === `setup-${n}`)) n++
+  return [...list, { id: `setup-${n}`, orientation: "+Z", workOffset }]
+}
+
+/** The list after one setup is removed; one setup left is no job (the panel's own orientation and register again). */
+export const removeJobSetup = (existing: ReadonlyArray<JobSetup>, id: string): ReadonlyArray<JobSetup> | undefined => {
+  const next = existing.filter((setup) => setup.id !== id)
+  return next.length > 1 ? next : undefined
+}
+
+/** A setup's fields changed; a register another setup holds is refused (the post would run two parts on one datum). */
+export const patchJobSetup = (existing: ReadonlyArray<JobSetup>, id: string, patch: Partial<Pick<JobSetup, "orientation" | "workOffset">>): ReadonlyArray<JobSetup> =>
+  patch.workOffset !== undefined && existing.some((setup) => setup.id !== id && setup.workOffset === patch.workOffset)
+    ? existing
+    : existing.map((setup) => (setup.id === id ? { ...setup, ...patch } : setup))
+
+/** The job's release as the panel can state it: the lowest release among its setups (the part coverage across setups is the sidecar's claim). */
+export const jobRelease = (releases: ReadonlyArray<string>): string | undefined => {
+  if (releases.length === 0) return undefined
+  return [...releases].sort((a, b) => RELEASES.indexOf(a as (typeof RELEASES)[number]) - RELEASES.indexOf(b as (typeof RELEASES)[number]))[0]
 }

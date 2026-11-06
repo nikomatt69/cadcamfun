@@ -14,7 +14,7 @@
  *  - a circular pocket steps out in rings (legacy: arcs that ended at the centre); G2/G3 labels match the code;
  *  - a cube is `width` (X) x `height` (Y) x `depth` (Z), as the CAD scene draws it (legacy mixed the two);
  *  - arc fitting uses the circumcentre and only fits circular runs; the compensation approach point is found;
- *  - lathe threading counts passes as `round(depth / 0.1)` (legacy float accumulation dropped the last one);
+ *  - lathe threading reaches the requested depth with a bounded final pass and uses its specified pitch;
  *  - composite 3D prints shrink their shells and clip the infill to the outline (legacy grew the shells and
  *    drew the bounding box without travelling to line starts);
  *  - a `component` is sliced as one unified geometry (`unified-geometry.ts`, the legacy `unifiedGeometryCalculator`; its
@@ -27,7 +27,7 @@ import { GenerationBudgetError, resetBudget } from "./common.ts"
 import { detectFixedCycles } from "./cycles.ts"
 import { analyseGcode } from "./analysis.ts"
 import { programRecord } from "./evidence.ts"
-import { generateLatheGCode } from "./lathe.ts"
+import { generateLatheGCode, LatheInputError } from "./lathe.ts"
 import { turnedProfileOf } from "./history-features.ts"
 import { generateMillGCode } from "./mill.ts"
 import { multiaxisProgram } from "./multiaxis.ts"
@@ -50,7 +50,7 @@ export { cutLevels, applyOriginOffset, GenerationBudgetError, MAX_LEVELS, MAX_MO
 export { orderPoints, pocketShape, elementOperation } from "./actions.ts"
 export { selectedToolpath, millToolpath, originShift, stockComment, stockInWork, withinStock } from "./dispatch.ts"
 export { generateMillGCode } from "./mill.ts"
-export { generateLatheGCode } from "./lathe.ts"
+export { generateLatheGCode, LatheInputError } from "./lathe.ts"
 export { elementToolpath } from "./element-paths.ts"
 export { generate3DPrinterGCodeForElement, generate3DPrinterProgram, calculateExtrusion, type PrinterProgram, type PrinterSettings } from "./printer.ts"
 export { adaptFeeds, convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
@@ -239,8 +239,8 @@ export const generateToolpath = (request: GenerateRequest, options: GenerateRunO
       return text(request)
     } catch (cause) {
       const tooLarge = cause instanceof GenerationBudgetError || (cause instanceof RangeError && /string length|array length|out of memory/i.test(cause.message))
-      if (!tooLarge) throw cause
-      const message = cause instanceof GenerationBudgetError ? cause.message : "The program is larger than the generator can hold: raise the stepdown or the stepover, or split the job"
+      if (!tooLarge && !(cause instanceof LatheInputError)) throw cause
+      const message = cause instanceof GenerationBudgetError || cause instanceof LatheInputError ? cause.message : "The program is larger than the generator can hold: raise the stepdown or the stepover, or split the job"
       return { gcode: `; Error: ${message}\n`, error: message } as ReturnType<typeof text>
     }
   })()

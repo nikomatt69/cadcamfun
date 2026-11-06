@@ -599,6 +599,8 @@
   "ai.catalog.write": "Write",
   "ai.catalog.destructive": "Destructive",
   "ai.catalog.tools": "{count} tools",
+  "ai.toolTitle.cad": "ड्रॉइंग पढ़ें",
+  "ai.toolTitle.cad_edit": "ड्रॉइंग संपादित करें",
   "ai.catalog.actions": "{count} actions",
   "ai.catalog.empty": "The catalogue is not available yet.",
   "ai.catalog.unavailable": "The host did not answer.",

@@ -42,7 +42,10 @@ Update modes (`update`): `set` writes the correction; `report` never writes (a r
 `frame {a, b, c}` runs the cycle in a tilted plane, degrees. The control's tilted plane (G68.2, CYCLE800, PLANE SPATIAL) must be declared on the machine (`tiltedPlane`). Probing a tilted face measures in the plane and transforms back to the base work offset: report what the base offset moved by, not the tilted figure.
 
 ## Rotary calibration
-A `rotary-axis` cycle measures a reference ball at several angles (at least three, spanning at least 20 degrees) and fits the true pivot and the axis direction. Give a `safeZ` above the ball at every angle. The result is written to the machine with `probe_apply`, never to a setup, and never to a machine parameter of the control: it replaces the pivot the kernel plans with. `calibrationError` on `probe_run` simulates a table that is not where the control believes.
+A `rotary-axis` cycle measures a reference ball at several angles (at least three, spanning at least 20 degrees) and fits the true pivot and the axis direction; it is an operation like any other, with its record in the report. Give a `safeZ` above the ball at every angle. The result is written to the machine with `probe_apply`, never to a setup, and never to a machine parameter of the control: it replaces the pivot the kernel plans with. `calibrationError` on `probe_run` simulates a table that is not where the control believes.
+
+## Stylus calibration
+A `stylus-calibrate` cycle on a ring gauge, sphere or height block records the effective radius per direction. `probe_apply` writes it to the machine's probe; every later cycle then compensates with it.
 
 ## Tool setter
 Tool cycles use `toolSetter` of the machine (top level, machine coordinates). Without one they are refused. A broken-tool check compares the length to the tool table within `brokenTolerance`.
@@ -58,8 +61,13 @@ Tool cycles use `toolSetter` of the machine (top level, machine coordinates). Wi
 
 A change of the drawing makes the operation stale: store it again, do not reuse the old report.
 
+## Native cycles
+`native: true` on `cam_edit probe` writes the control's own cycle instead of the inline touches: Renishaw Inspection Plus `G65 P98xx` (Fanuc family), Heidenhain `TCH PROBE 4xx`, Siemens `CYCLE97x`. The package is the machine's `probing.macroStyle` (`renishaw`, `heidenhain-ts`, `siemens-cycles`; `inline` means none), so name the machine with `machineConfig`. Ask for native only when the shop runs that package and wants its cycles in the program; inline touches are the default and are fully replayed.
+- The vendor cycle writes the datum unconditionally: use `update: set` (or a pure measurement without `workOffset`), no `tolerance`, no `checks`, no `frame`. Bore, boss, rectangle, pocket, web, axis-parallel edge and top face have native forms; corners, tilted planes, rotary calibration (451 / CYCLE996) do not. A refusal names the reason: clear `native` rather than working around it.
+- `probe_run` replays the inline touches the cycle stands for, never the vendor cycle; `cam review` says so in its note. Say it when you report the run.
+
 ## What a report proves
-A simulated report is the modelled part on the modelled machine, replayed from the program text. It is not a measurement of the real part and not controller acceptance: the vendor syntax is read from the manuals, not run on a control. Say so whenever you report it. Native cycles (Heidenhain 4xx, Siemens CYCLE97x, Renishaw G65) are not replayed.
+A simulated report is the modelled part on the modelled machine, replayed from the program text. It is not a measurement of the real part and not controller acceptance: the vendor syntax is read from the manuals, not run on a control. Say so whenever you report it. A native cycle (`native: true`: Heidenhain 4xx, Siemens CYCLE97x, Renishaw G65, by the machine's `macroStyle`) calls the control's own cycle: the replay reads its inline equivalent, so the `probing` claim stays `unresolved`. Say so.
 
 ## Dialects
 `fanuc`, `haas`, `mazak`, `mitsubishi`, `brother` (G31, skip variables), `okuma`, `siemens` (MEAS), `heidenhain` (TCH PROBE), `linuxcnc` (G38.2), `grbl` (G38.2 with L20). A dialect that cannot write what the cycle needs is refused by name.

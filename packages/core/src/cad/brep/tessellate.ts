@@ -37,6 +37,11 @@ export interface TessellateOptions {
   readonly faces?: ReadonlySet<number>
   /** Reuse the mesh of a face met before with the same surface, side, boundary and options (the Boolean's sequences). */
   readonly reuse?: boolean
+  /**
+   * Keep the normal's turn along a straight edge of a NURBS face within `angleTolDeg` (default true): what a display or export mesh needs to
+   * stay watertight there. The Boolean turns it off: it intersects the exact surfaces from a seed mesh, and these samples move its seeds.
+   */
+  readonly edgeNormalTurn?: boolean
 }
 
 export interface FaceMesh {
@@ -842,7 +847,7 @@ export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTe
   const warnings: string[] = []
   const pts = new Points()
   const vg = b.vertices.map((v) => pts.add(v.point))
-  const uses = angle > 0 ? normalUses(b) : []
+  const uses = angle > 0 && options.edgeNormalTurn !== false ? normalUses(b) : []
   const edges: EdgePolyline[] = b.edges.map((e, ei) => {
     const params = sampleNormalTurn(e, sampleEdge(e, chord, angle, maxEdge), uses[ei] ?? [], angle, ei, warnings)
     const points = params.map((t, i) => (i === 0 ? vg[e.v0]! : i === params.length - 1 ? vg[e.v1]! : pts.add(curvePoint(e.curve, t))))
@@ -852,7 +857,7 @@ export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTe
   const faces: FaceMesh[] = []
   const welded: number[] = []
   const triFace: number[] = []
-  const settings = `${chord}|${angle}|${maxEdge}|${maxPoints}|${options.paramStep ?? ""}`
+  const settings = `${chord}|${angle}|${maxEdge}|${maxPoints}|${options.paramStep ?? ""}|${options.edgeNormalTurn !== false}`
   b.faces.forEach((face, fi) => {
     if (options.faces !== undefined && !options.faces.has(fi)) return
     checkBudget()
@@ -956,7 +961,7 @@ export const faceBoundaries = (b: Brep, options: TessellateOptions = {}): FaceBo
   const warnings: string[] = []
   const pts = new Points()
   const vg = b.vertices.map((v) => pts.add(v.point))
-  const uses = angle > 0 ? normalUses(b) : []
+  const uses = angle > 0 && options.edgeNormalTurn !== false ? normalUses(b) : []
   const edges: EdgePolyline[] = b.edges.map((e, ei) => {
     const params = sampleNormalTurn(e, sampleEdge(e, chord, angle, maxEdge), uses[ei] ?? [], angle, ei, warnings)
     const points = params.map((t, i) => (i === 0 ? vg[e.v0]! : i === params.length - 1 ? vg[e.v1]! : pts.add(curvePoint(e.curve, t))))

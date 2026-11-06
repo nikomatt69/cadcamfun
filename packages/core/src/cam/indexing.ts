@@ -123,6 +123,51 @@ export const partToMachine = (point: Vec3, angles: RotaryAngles, layout: RotaryL
   return { x: r.x + pivot.x, y: r.y + pivot.y, z: r.z + pivot.z }
 }
 
+/** The tilt layout a part's index implies: B alone is `table-BC`, anything else `table-AC`. */
+export const indexLayoutOf = (index: { readonly a?: number; readonly b?: number }): RotaryLayout =>
+  (index.a === undefined || index.a === 0) && index.b !== undefined && index.b !== 0 ? "table-BC" : "table-AC"
+
+/** The rotation the table applies to a part indexed to `index` (degrees), about the part's datum. */
+export const indexMatrix = (index: { readonly a?: number; readonly b?: number; readonly c?: number }): Matrix =>
+  tableRotation({ ...(index.a !== undefined ? { a: index.a } : {}), ...(index.b !== undefined ? { b: index.b } : {}), c: index.c ?? 0 }, indexLayoutOf(index))
+
+/**
+ * The tilted work plane that is the same orientation as turning the table to `index`: the plane's axes in the part are the rows of the
+ * table's rotation (the table turns the part by R, so the part's axis that lands on machine +Z is the plane's z). Origin at the part's datum.
+ * An index of zeros is the work offset itself (the identity plane).
+ */
+export const indexPlane = (index: { readonly a?: number; readonly b?: number; readonly c?: number }): { readonly frame: WorkFrame; readonly layout: RotaryLayout } => {
+  const m = indexMatrix(index)
+  return {
+    frame: { origin: { x: 0, y: 0, z: 0 }, xAxis: { x: m[0], y: m[1], z: m[2] }, yAxis: { x: m[3], y: m[4], z: m[5] }, zAxis: { x: m[6], y: m[7], z: m[8] } },
+    layout: indexLayoutOf(index)
+  }
+}
+
+/** An axis-aligned box. */
+export interface Box3 { readonly min: Vec3; readonly max: Vec3 }
+
+/**
+ * A box of the fixture (the frame of the first part's datum) seen from a part indexed to `index` whose datum stands at `datum`: the table
+ * turns the whole fixture about that datum, so the tool of that part meets the box where `datum + R (corner - datum)` puts it. An axis
+ * aligned box turned by a quarter turn stays one; at any other angle the box returned is the bounding box of the turned one (it covers it,
+ * and a little more: conservative).
+ */
+export const boxInPartFrame = (box: Box3, datum: Vec3, index: { readonly a?: number; readonly b?: number; readonly c?: number } | undefined): Box3 => {
+  if (index === undefined) return box
+  const m = indexMatrix(index)
+  const lo = { x: Infinity, y: Infinity, z: Infinity }, hi = { x: -Infinity, y: -Infinity, z: -Infinity }
+  for (let k = 0; k < 8; k++) {
+    const p = { x: (k & 1 ? box.max.x : box.min.x) - datum.x, y: (k & 2 ? box.max.y : box.min.y) - datum.y, z: (k & 4 ? box.max.z : box.min.z) - datum.z }
+    const q = { x: m[0] * p.x + m[1] * p.y + m[2] * p.z + datum.x, y: m[3] * p.x + m[4] * p.y + m[5] * p.z + datum.y, z: m[6] * p.x + m[7] * p.y + m[8] * p.z + datum.z }
+    lo.x = Math.min(lo.x, q.x); lo.y = Math.min(lo.y, q.y); lo.z = Math.min(lo.z, q.z)
+    hi.x = Math.max(hi.x, q.x); hi.y = Math.max(hi.y, q.y); hi.z = Math.max(hi.z, q.z)
+  }
+  // Rounding of a quarter turn (1e-16) is not geometry.
+  const clean = (v: number): number => Math.round(v * 1e9) / 1e9
+  return { min: { x: clean(lo.x), y: clean(lo.y), z: clean(lo.z) }, max: { x: clean(hi.x), y: clean(hi.y), z: clean(hi.z) } }
+}
+
 /** A work frame whose z axis is `normal` and whose x axis is as close to `xHint` (default world X) as the plane allows. */
 export const frameFromNormal = (origin: Vec3, normal: Vec3, xHint: Vec3 = { x: 1, y: 0, z: 0 }): WorkFrame => {
   const z = normalised(normal)

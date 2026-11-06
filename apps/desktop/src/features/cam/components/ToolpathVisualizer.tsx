@@ -23,6 +23,7 @@ import { findingTimes, ncWindow, operationAt, readoutAt, stepMove, stepOperation
 import { COLOR_MODES, operationColor, type ColorMode, type LegendEntry } from "../../../viewport/view3d/toolpath-colors.ts"
 import { TOOL_COLORS, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
 import { gaugeOfTool, previewToolFor } from "../../../viewport/view3d/tool-models.ts"
+import { extraStocks, type DrawnBox, type FixtureBox } from "../lib/setup.ts"
 import type { StockInfo } from "../../../viewport/view3d/stock-simulation.ts"
 import "../../../styles/viewport-chrome.css"
 
@@ -47,6 +48,13 @@ export interface ToolpathVisualizerProps {
   readonly program: cam.Program
   readonly workpiece: Workpiece
   readonly stock?: cam.generator.Stock
+  /** The fixture of a multi-part program: the other parts' raw pieces are outlined where they lie. */
+  readonly workpieces?: ReadonlyArray<cam.program.Workpiece>
+  /** The parts of the program in the replay's one frame (a program with several registers whose replay was asked for): drawn together, switched in the settings. */
+  readonly fixtureView?: ReadonlyArray<FixtureBox>
+  /** The setup's clamps and jaws, and the machine travel, as boxes in the first part's datum frame: outlined in the view, switched in the settings. */
+  readonly clamps?: ReadonlyArray<DrawnBox>
+  readonly travel?: DrawnBox
   readonly playing: boolean
   readonly playbackTime: number
   readonly playbackRate: number
@@ -108,6 +116,9 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     try { globalThis.localStorage?.setItem(STATS_KEY, value ? "1" : "0") } catch { /* private window */ }
   }
   const [showDirection, setShowDirection] = createSignal(true)
+  const [showPathLines, setShowPathLines] = createSignal(true)
+  const [showFixture, setShowFixture] = createSignal(true)
+  const [showClamps, setShowClamps] = createSignal(true)
   const [showPoints, setShowPoints] = createSignal(false)
   const [showPointLabels, setShowPointLabels] = createSignal(false)
   const [pointFilter, setPointFilter] = createSignal<"all" | ToolpathPointKind>("all")
@@ -301,6 +312,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     setMode("shaded-edges")
     setGridVisible(true)
     setAxesVisible(true)
+    setShowPathLines(true)
+    setShowFixture(true)
     setShowPoints(false)
     setShowPointLabels(false)
     setPointFilter("all")
@@ -360,10 +373,14 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             playbackRate={props.playbackRate * rate()}
             onPlaybackTimeChange={props.onPlaybackTimeChange}
             stock={stock()}
+            extraStocks={showFixture() && (props.fixtureView?.length ?? 0) > 0 ? [] : extraStocks(stock(), props.workpieces ?? [])}
+            {...(showFixture() && (props.fixtureView?.length ?? 0) > 0 ? { fixtureBoxes: props.fixtureView! } : {})}
+            {...(showClamps() && (props.clamps?.length ?? 0) > 0 ? { clamps: props.clamps! } : {})}
+            {...(showClamps() && props.travel !== undefined ? { travel: props.travel } : {})}
             {...(props.probe !== undefined && (showPart() || props.probe.picking) && props.probe.part !== undefined ? { solids: props.probe.part } : {})}
             {...(props.probe?.model !== undefined ? { probeOverlay: { model: props.probe.model, layers: probeLayers(), highlight: props.probe.highlight, triadLength: 20 } } : {})}
             {...(props.probe !== undefined ? { surfacePick: { active: props.probe.picking, onHit: (hit: SurfaceHit) => props.probe?.onPick?.(hit) }, onProbeContact: setProbeContact } : {})}
-            toolpathDisplay={{ probeColors: props.probe?.model !== undefined, showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), showDirection: showDirection(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
+            toolpathDisplay={{ probeColors: props.probe?.model !== undefined, showPathLines: showPathLines(), showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), showDirection: showDirection(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder(), colorMode: colorMode(), progress: progress(), hiddenPaths: hidden(), operationNames: names(), ...(cycleLines() !== undefined ? { cycleLines: cycleLines()! } : {}) }}
             onPathLegend={setLegend}
             onStockInfo={setStockInfo}
             {...(effectiveMachine() !== undefined ? { machine: effectiveMachine()!, machineDisplay: machineDisplay(), machineOptions: machineOptions(), onMachineInfo: setMachineInfo } : {})}
@@ -613,6 +630,9 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             </div>
             <div class="space-y-3">
               {toggle(t("cam.visualizer.showStats"), showStats, setShowStats)}
+              {toggle(t("cam.visualizer.showPathLines"), showPathLines, setShowPathLines)}
+              <Show when={(props.fixtureView?.length ?? 0) > 0}>{toggle(t("cam.visualizer.showFixture"), showFixture, setShowFixture)}</Show>
+              <Show when={(props.clamps?.length ?? 0) > 0 || props.travel !== undefined}>{toggle(t("cam.visualizer.showClamps"), showClamps, setShowClamps)}</Show>
               {toggle(t("cam.visualizer.showDirection"), showDirection, setShowDirection)}
               <section class="space-y-2 border-t border-slate-700 pt-3">
                 <h4 class="text-xs font-semibold text-slate-300">{t("cam.visualizer.toolpathPoints")}</h4>

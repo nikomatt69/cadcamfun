@@ -40,3 +40,16 @@ export const contactTimesOnTimeline = (contacts: ReadonlyArray<ProbeSimContact>,
   }
   return contacts.map((contact) => (contact.line === undefined ? undefined : endOfLine.get(contact.line)))
 }
+
+/**
+ * When the run's offset changes: the last line that writes one. Assignments move nothing, so that block has no move of its own: the
+ * time is the start of the first move written after it (the program's end when none follows).
+ */
+export const offsetTimeOnTimeline = (updates: ReadonlyArray<{ readonly line?: number }>, timeline: Parameters<typeof contactTimesOnTimeline>[1] & { readonly duration?: number }): number | undefined => {
+  const lines = updates.flatMap((u) => (u.line === undefined ? [] : [u.line]))
+  if (lines.length === 0) return undefined
+  const last = Math.max(...lines)
+  for (const move of timeline.moves) if (move.state.line !== undefined && move.state.line >= last) return move.start
+  const end = timeline.moves.at(-1)
+  return timeline.duration ?? (end === undefined ? undefined : end.start + end.duration)
+}

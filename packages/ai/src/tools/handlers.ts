@@ -9,7 +9,7 @@ import { Context } from "effect"
 import type { cad, cam, drawing } from "@cadcamfun/core"
 import type { MachineProfile } from "../gcode-analysis.ts"
 import type { ActionConflict, ActionCommitted, ActionDenied, ActionInvalidInput, ActionInterrupted, CadExchangeInput } from "@cadcamfun/api"
-import type { CamManufactureOperationInput, CamProbeApplyInput, CamProbeInput, CamProbeRunInput, CamSetupSaveInput, CamTurningOperationInput } from "@cadcamfun/api"
+import type { CamManufactureOperationInput, CamProbeApplyInput, CamProbeInput, CamProbeRunInput, CamSetupGenerateInput, CamSetupSaveInput, CamTurningOperationInput } from "@cadcamfun/api"
 
 /** What the stock handlers answer with: the raw piece as it is stored, or the one just configured. */
 export type CamStockInput = { action: "inspect" } | { action: "set"; stock: typeof cam.generator.StockSchema.Type }
@@ -60,6 +60,8 @@ export interface ToolHandlersShape {
   setupList?(projectId: string): Promise<unknown>
   /** Saves a multi-operation setup in the project after write admission; with `setupId` and `baseUpdatedAt` it updates one, refusing a stale revision. */
   setupSave?(projectId: string, input: typeof CamSetupSaveInput.Type): Promise<unknown>
+  /** Generates a saved setup's programs from the drawing's elements (one post-emitted multi-tool program per group) and stores each as a program of the project. */
+  setupGenerate?(projectId: string, input: typeof CamSetupGenerateInput.Type): Promise<unknown>
   cadInspect?(projectId: string, input: CadInspectionInput): Promise<unknown>
   cadComponentRelations?(projectId: string, input: CadComponentRelationsInput): Promise<unknown>
   /** The exact B-rep kernel over the open drawing: per solid validity, mass properties, holes and how the CAM planner will machine it. */

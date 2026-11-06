@@ -66,6 +66,48 @@ test("simulate: the top of the plate is touched where the program believes it is
   expect(out.identity.elements).toMatch(/^[0-9a-f]{64}$/)
 })
 
+test("emit native: the control's own cycle is written for the named package; no package is a 400 that says so", async () => {
+  const native = await app.call("/api/cam/probing/emit", { method: "POST", json: { operation: bore, dialect: "fanuc", native: true, macroStyle: "renishaw" } })
+  expect(native.status).toBe(200)
+  const program = Schema.decodeUnknownSync(CamProbingProgram)(native.body)
+  expect(program.native).toMatch(/P98/)
+  expect(program.nc).toContain("G65")
+  expect(program.nc).not.toMatch(/(^|\s)M0?[34](\s|$)/m)
+  const heidenhain = Schema.decodeUnknownSync(CamProbingProgram)((await app.call("/api/cam/probing/emit", { method: "POST", json: { operation: bore, dialect: "heidenhain", native: true, macroStyle: "heidenhain-ts", actions: [{ kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { X: "x", Y: "y" }, policy: { mode: "set" } }] } })).body)
+  // Heidenhain 408-419 always write a datum: the cycle needs a set-offset to be written natively.
+  expect(heidenhain.native).toMatch(/TCH PROBE 4\d\d/)
+  // Without a package there is nothing native to write: refused, never a silent fall back to inline touches.
+  const none = await app.call("/api/cam/probing/emit", { method: "POST", json: { operation: bore, dialect: "fanuc", native: true } })
+  expect(none.status).toBe(400)
+  expect(JSON.stringify(none.body)).toContain("macroStyle")
+  // Inline stays the default and carries no native word.
+  const inline = Schema.decodeUnknownSync(CamProbingProgram)((await app.call("/api/cam/probing/emit", { method: "POST", json: { operation: bore, dialect: "fanuc" } })).body)
+  expect(inline.native).toBeUndefined()
+})
+
+test("simulate with a dialect: every contact carries the line of its touch block in the program it returns", async () => {
+  const out = Schema.decodeUnknownSync(CamProbingSimulation)((await app.call("/api/cam/probing/simulate", {
+    method: "POST", json: { elements: plate, operations: [{ id: "b1", operation: { kind: "z-surface", at: { x: 50, y: 30 }, expectedZ: 0 }, actions: [{ kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { Z: "z" }, policy: { mode: "set" } }] }], dialect: "fanuc", misplacement: { z: 0.2 } }
+  })).body)
+  expect(out.program?.dialect).toBe("fanuc")
+  const lines = (out.program?.nc ?? "").split("\n")
+  const contacts = out.report.operations[0]?.contacts ?? []
+  expect(contacts.length).toBeGreaterThan(0)
+  for (const c of contacts) {
+    expect(c.line).toBeDefined()
+    // The block on that line is an armed probe move (G31 on Fanuc).
+    expect(lines[c.line! - 1]).toContain("G31")
+  }
+  expect(out.report.updates.length).toBeGreaterThan(0)
+  expect(out.report.updates[0]?.after).toBeCloseTo(0.2, 3)
+  // Without a dialect nothing is posted: no program, no lines.
+  const bare = Schema.decodeUnknownSync(CamProbingSimulation)((await app.call("/api/cam/probing/simulate", {
+    method: "POST", json: { elements: plate, operations: [{ operation: { kind: "z-surface", at: { x: 50, y: 30 }, expectedZ: 0 } }] }
+  })).body)
+  expect(bare.program).toBeUndefined()
+  expect(bare.report.operations[0]?.contacts.every((c) => c.line === undefined)).toBe(true)
+})
+
 test("calibrate-rotary: measured centres are fitted; no assumed table and no machine is a 400", async () => {
   const angles = [0, 90, 180, 270]
   const measured = angles.map((d) => { const a = d * Math.PI / 180; return { x: 50 + 30 * Math.cos(a), y: 40 + 30 * Math.sin(a), z: 10 } })
@@ -119,4 +161,35 @@ test("tool setter cycles plan on a machine: the setter is reached through the ma
   const planned = await app.call("/api/cam/probing/plan", { method: "POST", json: plan })
   expect(planned.body).toMatchObject({ cycle: "tool-length" })
   expect(planned.status).toBe(200)
+})
+
+test("simulate with a dialect answers the program, and contacts and offset changes carry its lines", async () => {
+  const set = { kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { X: "x", Y: "y" }, policy: { mode: "set" } }
+  const response = await app.call("/api/cam/probing/simulate", { method: "POST", json: {
+    elements: plate, operations: [{ id: "top", operation: { kind: "z-surface", at: { x: 10, y: 10 }, expectedZ: 0 }, actions: [{ ...set, axes: { Z: "z" } }] }],
+    settings: { stylusDiameter: 4 }, dialect: "fanuc", misplacement: { z: 0.2 }
+  } })
+  expect(response.status).toBe(200)
+  const sim = Schema.decodeUnknownSync(CamProbingSimulation)(response.body)
+  expect(sim.program?.nc).toMatch(/G31/)
+  expect(sim.program?.identity.nc).toMatch(/^[0-9a-f]{64}$/)
+  const contact = sim.report.operations[0]!.contacts[0]!
+  expect(contact.line).toBeGreaterThan(0)
+  expect(sim.program!.nc.split("\n")[contact.line! - 1]).toMatch(/G31/)
+  expect(sim.report.updates[0]!.line).toBeGreaterThan(contact.line!)
+  // Without a dialect there is no text to number.
+  const plain = await app.call("/api/cam/probing/simulate", { method: "POST", json: { elements: plate, operations: [{ operation: { kind: "z-surface", at: { x: 10, y: 10 }, expectedZ: 0 } }], settings: { stylusDiameter: 4 } } })
+  expect(plain.body.program).toBeUndefined()
+})
+
+test("plan and emit: native writes the control's word for a macro style that has one, and refuses otherwise with the reason", async () => {
+  const body = { operation: bore, native: true, macroStyle: "renishaw", dialect: "fanuc", settings: { stylusDiameter: 4 } }
+  const emitted = Schema.decodeUnknownSync(CamProbingProgram)((await app.call("/api/cam/probing/emit", { method: "POST", json: body })).body)
+  expect(emitted.native).toContain("G65")
+  expect(emitted.nc).toContain("G65")
+  const planned = await app.call("/api/cam/probing/plan", { method: "POST", json: { operation: bore, native: true, macroStyle: "renishaw", settings: { stylusDiameter: 4 } } })
+  expect(planned.body.native).toContain("G65")
+  const refused = await app.call("/api/cam/probing/emit", { method: "POST", json: { ...body, macroStyle: "inline" } })
+  expect(refused.status).toBe(400)
+  expect(JSON.stringify(refused.body)).toContain("No native cycle")
 })

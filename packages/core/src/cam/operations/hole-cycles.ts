@@ -159,17 +159,51 @@ export const generateDeepHole = (i: HoleCycleInput): Toolpath => {
 export const BACK_BORE_CLEARANCE = 0.2
 
 /**
- * The oriented shift of a back-boring bar, mm: with the insert pointing to +X the bar is moved by -Q so that the insert side
- * (reach R - Q) and the body side (reach Q + body radius) both clear the pilot wall by `BACK_BORE_CLEARANCE`. The shift that gives both
- * the same room is Q = (R - body radius) / 2; undefined (with the reason) when the bar cannot pass the pilot at all.
+ * How far from the hole axis a back-boring bar reaches while it passes the pilot shifted by `-Q` along X (oriented so that insert 0 points
+ * to +X): the farthest corner of any insert about the shifted spindle axis, or the body (`Q` + body radius), whichever is more, mm.
+ * `flutes` inserts stand evenly about the axis, each `insertWidth` wide (a point when absent): a wider insert has corners to either side of
+ * its centre line, which reach farther from the hole axis than the tip alone.
+ */
+export const backBoreReach = (tool: Cutter, q: number): number => {
+  const R = tool.diameter / 2
+  const body = (tool.neckDiameter ?? 0) / 2
+  const teeth = Math.max(1, Math.round(tool.flutes))
+  const half = tool.insertWidth === undefined ? 0 : Math.asin(Math.min(1, tool.insertWidth / 2 / R))
+  let reach = body + q
+  for (let k = 0; k < teeth; k++) {
+    const centre = (2 * Math.PI * k) / teeth
+    for (const angle of half === 0 ? [centre] : [centre - half, centre + half]) reach = Math.max(reach, Math.hypot(R * Math.cos(angle) - q, R * Math.sin(angle)))
+  }
+  return reach
+}
+
+/**
+ * The oriented shift of a back-boring bar, mm: with insert 0 pointing to +X the bar is moved by -Q so that its reach about the hole axis
+ * (`backBoreReach`) is as small as it can be, then it clears the pilot wall by `BACK_BORE_CLEARANCE`. For one point insert that is
+ * Q = (R - body radius) / 2 (the insert side R - Q and the body side Q + body radius get the same room); more inserts or a wider insert
+ * reach farther and the shift is searched (the reach is convex in Q). Undefined, with the reason, when the bar cannot pass the pilot at all.
  */
 export const backBoreShift = (tool: Cutter, pilotDiameter: number): { readonly shift: number } | { readonly reason: string } => {
   const R = tool.diameter / 2
   const body = (tool.neckDiameter ?? 0) / 2
   if (!(body > 0)) return { reason: `${tool.id} has no body diameter (neckDiameter)` }
   const room = pilotDiameter / 2 - BACK_BORE_CLEARANCE
-  if ((R + body) / 2 > room + 1e-9) return { reason: `the Ø${tool.diameter} bar on a Ø${tool.neckDiameter} body (needs ${(R + body).toFixed(2)} mm of pilot width plus ${(2 * BACK_BORE_CLEARANCE).toFixed(1)} mm clearance) does not pass the Ø${pilotDiameter} pilot hole` }
-  return { shift: (R - body) / 2 }
+  const simple = Math.round(tool.flutes) <= 1 && tool.insertWidth === undefined
+  let q = (R - body) / 2
+  if (!simple) {
+    let lo = 0, hi = R
+    for (let i = 0; i < 80; i++) {
+      const a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3
+      if (backBoreReach(tool, a) <= backBoreReach(tool, b)) hi = b; else lo = a
+    }
+    q = (lo + hi) / 2
+  }
+  const reach = simple ? (R + body) / 2 : backBoreReach(tool, q)
+  if (reach > room + 1e-9) {
+    const what = simple ? `the Ø${tool.diameter} bar on a Ø${tool.neckDiameter} body (needs ${(R + body).toFixed(2)} mm of pilot width` : `the Ø${tool.diameter} bar with ${Math.round(tool.flutes)} insert${Math.round(tool.flutes) > 1 ? "s" : ""}${tool.insertWidth !== undefined ? ` ${tool.insertWidth} mm wide` : ""} on a Ø${tool.neckDiameter} body (reaches ${(2 * reach).toFixed(2)} mm about the hole axis at its best shift`
+    return { reason: `${what} plus ${(2 * BACK_BORE_CLEARANCE).toFixed(1)} mm clearance) does not pass the Ø${pilotDiameter} pilot hole` }
+  }
+  return { shift: q }
 }
 
 /**

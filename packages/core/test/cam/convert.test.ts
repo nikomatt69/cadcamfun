@@ -102,6 +102,23 @@ describe("conversion between controls", () => {
   })
 })
 
+describe("several work offsets", () => {
+  const fixture = "G21 G90 G54\nT1 M6\nM3 S5000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nX10\nG0 Z5\nG55\nG0 X0 Y0 Z5\nG1 Z-1 F100\nX10\nG0 Z5\nM30"
+  test("the parts of a fixture convert: each is its own toolpath under its register, written again by the target", () => {
+    const read = programOfNc(fixture, { source: "fanuc" })
+    expect(read.errors).toEqual([])
+    expect(read.program!.toolpaths.map((t) => t.workOffset)).toEqual(["G54", "G55"])
+    const r = convertNc(fixture, { source: "fanuc", target: "generic" })
+    expect(r.ok).toBe(true)
+    const lines = r.code.split("\n").map((l) => l.trim())
+    expect(lines.filter((l) => /^G55\b/.test(l))).toHaveLength(1)
+    expect(lines.indexOf("G55")).toBeGreaterThan(lines.findIndex((l) => /^G54\b/.test(l)))
+  })
+  test("a program on one register other than G54 keeps it as the program's register", () => {
+    expect(programOfNc("G21 G90 G56\nG0 X0 Y0 Z5\nG1 Z-1 F100\nM30", { source: "fanuc" }).program!.workOffset).toBe("G56")
+  })
+})
+
 describe("what the conversion refuses instead of changing the cut", () => {
   const refused = (text: string, pattern: RegExp) => {
     const r = convertNc(text, { source: "fanuc", target: "generic" })
@@ -114,10 +131,9 @@ describe("what the conversion refuses instead of changing the cut", () => {
     refused("G90 T1 M6 M3 S500\nG0 X0 Y0 Z5\nG76 X0 Y0 Z-10 R2 Q0.1 F100\nG80\nM30", /boring/)
     refused("G90 G0 X0 Y0 Z5\nG31 Z-10 F100\nM30", /probing/)
   })
-  test("a reversed spindle, feed per revolution, several work offsets", () => {
+  test("a reversed spindle, feed per revolution", () => {
     refused("G90 T1 M6 M4 S500\nG0 X0 Y0 Z5\nG1 Z-1 F100\nM30", /counter-clockwise/)
     refused("G90 T1 M6 M3 S500 G95\nG0 X0 Y0 Z5\nG1 Z-1 F0.1\nM30", /per revolution/)
-    refused("G54 G90 G0 X0 Y0 Z5\nG55 G0 X10\nM30", /several work offsets/)
   })
   test("words the replay does not model fail the conversion, never pass silently", () => {
     refused("G90 G0 X0 Y0 Z5\nG1 Z-1 F100\nG12.5 X3\nM30", /unsupported|G12/)

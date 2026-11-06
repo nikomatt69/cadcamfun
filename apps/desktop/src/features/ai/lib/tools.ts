@@ -9,6 +9,7 @@
  * must name the same capabilities. `cam_verify` is an exposure: the verifier's narrow view of `cam_edit` (generate and
  * verify only), with the same action ids, so it renders as `cam_edit` does.
  */
+import { t } from "../../../i18n/index.ts"
 export const TOOL_IDS = [
   "cad", "cad_edit", "cam", "cam_edit", "library", "parts", "library_edit",
   "memory", "memory_edit", "research", "vcs", "vcs_edit", "agent", "cam_verify", "mods", "mods_edit"
@@ -32,8 +33,9 @@ export interface ToolSummary {
 }
 
 export const TOOL_SUMMARIES: ReadonlyArray<ToolSummary> = [
-  { id: "cad", category: "cad", title: "Read the drawing", description: "Describe what is in the open drawing, check what is illogical in it, search and page through its elements, inspect component relationships, run parametric design rules and capture the viewport." },
-  { id: "cad_edit", category: "cad", title: "Edit the drawing", description: "Add 3D elements and 2D entities, modify, transform, group, import a drawing, create or update a parametric part, control the editor and delete — the destructive actions ask first." },
+  // i18n-ok: the chat reads these two titles from ai.toolTitle.*; the catalogue text below is the wording of the prompts, not shown.
+  { id: "cad", category: "cad", title: "Read the drawing", description: "Describe what is in the open drawing, check what is illogical in it, search and page through its elements, inspect component relationships, run parametric design rules and capture the viewport." }, // i18n-ok
+  { id: "cad_edit", category: "cad", title: "Edit the drawing", description: "Add 3D elements and 2D entities, modify, transform, group, import a drawing, create or update a parametric part, control the editor and delete — the destructive actions ask first." }, // i18n-ok
   { id: "cam", category: "cam", title: "Read the machining", description: "The machine's axes and zeros, the operations, the stock, suggested cutting parameters, static G-code analysis and the CAM viewport." },
   { id: "cam_edit", category: "cam", title: "Machine", description: "Create and update an operation, generate its G-code and verify the program against the stock, the holder, the fixtures and the finished part." },
   { id: "cam_verify", category: "cam", title: "Verify a program", description: "The verifier's view of machining: generate an existing operation's program and verify the stored program, without creating or changing operations or stock." },
@@ -73,6 +75,6 @@ const BY_ID = new Map<string, string>([...TOOL_SUMMARIES, ...EXTRA_TOOL_SUMMARIE
  * one (`cad_edit delete` reads as what happened, where `cad_edit` alone does not).
  */
 export const toolTitle = (id: string, action?: string): string => {
-  const base = BY_ID.get(id) ?? id
+  const base = id === "cad" || id === "cad_edit" ? t(`ai.toolTitle.${id}`) : BY_ID.get(id) ?? id
   return action === undefined || action === "" ? base : `${base}: ${action.replaceAll("_", " ")}`
 }

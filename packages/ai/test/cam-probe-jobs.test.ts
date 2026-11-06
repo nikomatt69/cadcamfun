@@ -76,6 +76,71 @@ describe("cam-probe-simulate", () => {
     expect(out.identity.elements).toMatch(/^[0-9a-f]{64}$/)
   })
 
+  test("partOrigin: a part drawn away from work zero is found where a cycle in work coordinates expects it", () => {
+    // The drawing has the top of the block at z = 50 and its centre at (200, 100); work zero is that point.
+    const block = [{ id: "stock", type: "cube", x: 200, y: 100, z: 40, width: 100, height: 60, depth: 20 }] as unknown as ReadonlyArray<Record<string, unknown>>
+    const input = {
+      settings, elements: block,
+      operations: [{ cycle: { kind: "z-surface", at: { x: 0, y: 0 }, expectedZ: 0 } as cam.probing.ProbeCycle }],
+      misplacement: { z: 0.3 }
+    } satisfies CamProbeSimulateInput
+    const placed = runKernelJobInline("cam-probe-simulate", { ...input, partOrigin: { x: 200, y: 100, z: 50 } })
+    if ("error" in placed) throw new Error(placed.error)
+    expect(placed.report.verdict).not.toBe("missed")
+    expect(placed.report.operations[0]!.contacts.length).toBeGreaterThan(0)
+    expect(placed.report.operations[0]!.results["z"]).toBeCloseTo(0.3, 6)
+    // Without the origin the same cycle stands 150 mm from the block: it must not report a touch.
+    const lost = runKernelJobInline("cam-probe-simulate", input)
+    if ("error" in lost) throw new Error(lost.error)
+    expect(lost.report.verdict).toBe("missed")
+  })
+
+  test("a drawing without a closed solid simulates the stock when it is sent, and says so; a solid wins over it", () => {
+    const stockElement = { id: "stock", type: "cube", x: 0, y: 0, z: -10, width: 100, height: 60, depth: 20 }
+    const operations = [{ cycle: { kind: "z-surface", at: { x: 0, y: 0 }, expectedZ: 0 } as cam.probing.ProbeCycle }]
+    const curve = [{ id: "c", type: "line", x1: 0, y1: 0, x2: 10, y2: 0 }]
+    expect("error" in runKernelJobInline("cam-probe-simulate", { settings, elements: curve, operations })).toBe(true)
+    const out = runKernelJobInline("cam-probe-simulate", { settings, elements: curve, operations, stockElement })
+    if ("error" in out) throw new Error(out.error)
+    expect(out.warnings.join(" ")).toContain("touches the stock block")
+    expect(out.report.operations[0]!.results["z"]).toBeCloseTo(0, 6)
+    const solid = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle: bore }], stockElement })
+    if ("error" in solid) throw new Error(solid.error)
+    expect(solid.warnings.join(" ")).not.toContain("stock block")
+  })
+
+  test("a stylus calibration finds its ring through a work offset that is not zero", () => {
+    const cycle = { kind: "stylus-calibrate", artefact: { kind: "ring", centre: { x: 10, y: 20 }, diameter: 30, depth: 5, top: 0 } } as cam.probing.ProbeCycle
+    const zero = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle }] })
+    const shifted = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle }], workOffsets: { G54: { x: 120, y: -40, z: -200 } } })
+    if ("error" in zero) throw new Error(zero.error)
+    if ("error" in shifted) throw new Error(shifted.error)
+    expect(shifted.report.verdict).not.toBe("missed")
+    expect(shifted.report.operations[0]!.calibration).toEqual(zero.report.operations[0]!.calibration)
+  })
+
+  test("the run as it went stops each touch at its contact, with every macro resolved, and names the lines of the written program", () => {
+    const out = runKernelJobInline("cam-probe-simulate", {
+      settings, elements, dialect: "fanuc", misplacement: { x: 0.4 },
+      operations: [{ cycle: bore, actions: [{ kind: "set-offset", ref: { kind: "g5x", code: "G54" }, axes: { X: "x", Y: "y" }, policy: { mode: "set" } }] }]
+    } satisfies CamProbeSimulateInput)
+    if ("error" in out) throw new Error(out.error)
+    const written = out.program!.nc, played = out.played!
+    expect(written).toMatch(/G91 G31/)
+    expect(played.text).not.toMatch(/\[#|G91 G31/)
+    expect(played.text.split("\n").length).toBeLessThanOrEqual(played.lines.length + 1)
+    const motion = cam.testing.interpretGcode(played.text, { track: true, probeMoves: true })
+    expect(motion.unsupported ?? []).toEqual([])
+    // The first touch ends on the wall of the shifted bore, not at the end of its search.
+    const contact = out.report.operations[0]!.contacts[0]!
+    const lastX = (text: string) => Number(/G31 X(-?[0-9.]+)/.exec(text)?.[1])
+    expect(lastX(played.text)).toBeDefined()
+    expect(played.text).toContain(contact.tip.x.toFixed(3))
+    const line = contact.line!
+    expect(written.split("\n")[line - 1]).toMatch(/G31/)
+    expect(played.lines).toContain(line)
+  })
+
   test("a tilt of the part is refused", () => {
     const out = runKernelJobInline("cam-probe-simulate", { settings, elements, operations: [{ cycle: bore }], misplacement: { a: 0.01 } } satisfies CamProbeSimulateInput)
     expect("error" in out && out.error).toMatch(/not simulated/)

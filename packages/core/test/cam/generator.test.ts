@@ -12,6 +12,7 @@ import {
   adaptFeeds,
   convertLinesToArcs,
   cutLevels,
+  decodeSettings,
   generateToolpath,
   printRequirementOf,
   getCuttingFeedback,
@@ -294,7 +295,7 @@ describe("lathe program", () => {
       grooving: "; Grooving operation", parting: "; Parting operation", knurling: "; Knurling operation"
     }
     for (const [operationType, label] of Object.entries(labels)) {
-      expect(lathe({ operationType: operationType as ToolpathSettings["operationType"] })).toContain(label)
+      expect(lathe({ operationType: operationType as ToolpathSettings["operationType"], stockBore: 20 })).toContain(label)
     }
   })
 
@@ -306,8 +307,48 @@ describe("lathe program", () => {
   })
 
   test("internal turning and threading", () => {
-    expect(lathe({ turningOperation: "internal", depth: 1 })).toContain("G0 X24.000 Z2 ; Position tool")
+    expect(lathe({ turningOperation: "internal", depth: 1, stockBore: 20 })).toContain("G0 X19.000 Z2 ; Position tool")
     expect(lathe({ operationType: "threading", depth: 0.3 }).match(/G32/g)).toHaveLength(3)
+  })
+
+  test("thread pitch and final depth reach G32, and unrepresentable leads are refused", () => {
+    const code = lathe({ operationType: "threading", threadPitch: 2.5, depth: 0.35 })
+    const threadLines = code.split("\n").filter((line) => line.startsWith("G32 "))
+    expect(threadLines).toHaveLength(4)
+    expect(threadLines.every((line) => /\bF2\.5\b/.test(line))).toBe(true)
+    expect(code).toContain("G0 X49.300 ; Rapid to thread diameter")
+    const bad = run(settings({ machineType: "lathe", operationType: "threading", threadPitch: 0.0001 }), geometry())
+    expect(bad.error).toMatch(/pitch.*0\.001 mm/)
+    expect(bad.gcode).not.toContain("G32")
+  })
+
+  test("nose compensation is never silently ignored, including in explicitly saved settings", () => {
+    expect(decodeSettings({}).applyToolCompensation).toBe(false)
+    expect(decodeSettings({ applyToolCompensation: true }).applyToolCompensation).toBe(true)
+    const result = run(settings({ machineType: "lathe", operationType: "turning", applyToolCompensation: true }), geometry())
+    expect(result.error).toMatch(/nose radius compensation is not supported/)
+    expect(result.gcode).not.toMatch(/^G[01]/m)
+  })
+
+  test("internal cuts require and use the pilot bore without rapid plunges into material", () => {
+    for (const operationType of ["turning", "boring"] as const) {
+      const patch = { machineType: "lathe" as const, operationType, turningOperation: "internal" as const, depth: 2, stepdown: 1 }
+      const missing = run(settings(patch), geometry())
+      expect(missing.error).toMatch(/require a declared pilot bore/)
+      expect(missing.gcode).not.toMatch(/^G[01]/m)
+      expect(run(settings({ ...patch, stockBore: 48 }), geometry()).error).toMatch(/must leave material/)
+      const code = run(settings({ ...patch, stockBore: 16 }), geometry()).gcode
+      expect(code).toContain("G0 X15.000 Z2 ; Position tool")
+      expect(code).toContain("G1 X18.000")
+      expect(code).not.toContain("G0 X17.000 ; Rapid to diameter")
+    }
+  })
+
+  test("face mode cuts and retraction clears the stock radially before moving axially", () => {
+    const face = lathe({ turningOperation: "face", stockDiameter: 100 })
+    expect(face).toContain("; Facing operation")
+    expect(face).toContain("G0 X102.000 ; Radial retract\nG0 Z50 ; Retract to safe position")
+    expect(run(settings({ machineType: "lathe", operationType: "turning", stockLength: 22, gripLength: 20 }), geometry()).error).toMatch(/bar must extend/)
   })
 })
 

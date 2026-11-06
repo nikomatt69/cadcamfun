@@ -109,7 +109,7 @@ describe("interpreter: lathe and printer words (spec 31 §4.4)", () => {
 describe("analysis and motion track", () => {
   test("generated lathe and printer programs replay without unsupported words; the track aligns with the program", () => {
     for (const op of ["turning", "facing", "threading", "boring", "grooving", "parting"] as const) {
-      const a = g.analyseGcode(g.generateLatheGCode(lathe({ operationType: op })))
+      const a = g.analyseGcode(g.generateLatheGCode(lathe({ operationType: op, stockBore: 20 })))
       expect(a.warnings.filter((w) => /G18|G32|G96|G97/.test(w))).toEqual([])
       expect(v.trackFits(a.motion, a.program)).toBe(true)
       expect(a.motion.paths[0]!.runs.some((r) => r.plane === 18 && r.spindle === "cw")).toBe(true)
