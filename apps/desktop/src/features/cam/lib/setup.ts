@@ -172,7 +172,7 @@ export const expandedOperations = (setup: Setup): ReadonlyArray<{ readonly id: s
 
 export type PartProbeCycle = cam.program.PartProbeCycle
 export type ProbeCycleKind = PartProbeCycle["kind"]
-export const PROBE_KINDS: ReadonlyArray<ProbeCycleKind> = ["z-surface", "bore", "boss", "edge", "corner"]
+export const PROBE_KINDS: ReadonlyArray<ProbeCycleKind> = ["z-surface", "bore", "boss", "edge", "corner", "web", "pocket", "rectangle", "edge-angle"]
 export const MAX_PROBE_CYCLES = 4
 
 /** The cycle a kind starts from, for the user to adjust: where each part's datum is expected, in the part's own frame. */
@@ -183,11 +183,14 @@ export const defaultProbeCycle = (kind: ProbeCycleKind): PartProbeCycle => {
     case "boss": return { kind, centre: { x: 0, y: 0 }, diameter: 20, depth: 5 }
     case "edge": return { kind, at: { x: 0, y: 0, z: -5 }, normal: { x: 1, y: 0 } }
     case "corner": return { kind, corner: { x: 0, y: 0 }, inside: false, xSense: 1, ySense: 1, depth: 5 }
+    case "web": case "pocket": return { kind, centre: { x: 0, y: 0 }, width: kind === "web" ? 10 : 20, angle: 0, depth: 5 }
+    case "rectangle": return { kind, inside: false, centre: { x: 0, y: 0 }, size: { x: 40, y: 30 }, depth: 5 }
+    case "edge-angle": return { kind, start: { x: 0, y: 0 }, along: { x: 1, y: 0 }, pitch: 20, normal: { x: 0, y: 1 }, depth: 5 }
   }
 }
 
 /** The numeric fields of a cycle, as `[label key, read, write]`: one editor for every kind. */
-export type ProbeFieldKey = "x" | "y" | "z" | "expectedZ" | "diameter" | "depth" | "normalX" | "normalY"
+export type ProbeFieldKey = "x" | "y" | "z" | "expectedZ" | "diameter" | "depth" | "normalX" | "normalY" | "width" | "angle" | "sizeX" | "sizeY" | "pitch"
 export const probeFields = (cycle: PartProbeCycle): ReadonlyArray<{ readonly key: ProbeFieldKey; readonly value: number; readonly set: (value: number) => PartProbeCycle }> => {
   switch (cycle.kind) {
     case "z-surface": return [
@@ -211,6 +214,27 @@ export const probeFields = (cycle: PartProbeCycle): ReadonlyArray<{ readonly key
     case "corner": return [
       { key: "x", value: cycle.corner.x, set: (v) => ({ ...cycle, corner: { ...cycle.corner, x: v } }) },
       { key: "y", value: cycle.corner.y, set: (v) => ({ ...cycle, corner: { ...cycle.corner, y: v } }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+    case "web": case "pocket": return [
+      { key: "x", value: cycle.centre.x, set: (v) => ({ ...cycle, centre: { ...cycle.centre, x: v } }) },
+      { key: "y", value: cycle.centre.y, set: (v) => ({ ...cycle, centre: { ...cycle.centre, y: v } }) },
+      { key: "width", value: cycle.width, set: (v) => ({ ...cycle, width: v > 0 ? v : cycle.width }) },
+      // The core takes radians; the editor shows degrees.
+      { key: "angle", value: Math.round(cycle.angle * 180 / Math.PI * 1e4) / 1e4, set: (v) => ({ ...cycle, angle: v * Math.PI / 180 }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+    case "rectangle": return [
+      { key: "x", value: cycle.centre.x, set: (v) => ({ ...cycle, centre: { ...cycle.centre, x: v } }) },
+      { key: "y", value: cycle.centre.y, set: (v) => ({ ...cycle, centre: { ...cycle.centre, y: v } }) },
+      { key: "sizeX", value: cycle.size.x, set: (v) => ({ ...cycle, size: { ...cycle.size, x: v > 0 ? v : cycle.size.x } }) },
+      { key: "sizeY", value: cycle.size.y, set: (v) => ({ ...cycle, size: { ...cycle.size, y: v > 0 ? v : cycle.size.y } }) },
+      { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
+    ]
+    case "edge-angle": return [
+      { key: "x", value: cycle.start.x, set: (v) => ({ ...cycle, start: { ...cycle.start, x: v } }) },
+      { key: "y", value: cycle.start.y, set: (v) => ({ ...cycle, start: { ...cycle.start, y: v } }) },
+      { key: "pitch", value: cycle.pitch, set: (v) => ({ ...cycle, pitch: v > 0 ? v : cycle.pitch }) },
       { key: "depth", value: cycle.depth, set: (v) => ({ ...cycle, depth: v > 0 ? v : cycle.depth }) }
     ]
   }

@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "बॉस",
   "cam.partProbe.kind.edge": "किनारा",
   "cam.partProbe.kind.corner": "कोना",
+  "cam.partProbe.kind.web": "रिब",
+  "cam.partProbe.kind.pocket": "स्लॉट",
+  "cam.partProbe.kind.rectangle": "आयत",
+  "cam.partProbe.kind.edge-angle": "फलक कोण",
   "cam.partProbe.remove": "चक्र हटाएँ",
   "cam.partProbe.add": "चक्र जोड़ें",
   "cam.partProbe.generate": "कटाई के साथ प्रोब प्रोग्राम बनाएँ",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "गहराई",
   "cam.partProbe.field.normalX": "अभिलंब X",
   "cam.partProbe.field.normalY": "अभिलंब Y",
+  "cam.partProbe.field.width": "चौड़ाई",
+  "cam.partProbe.field.angle": "कोण °",
+  "cam.partProbe.field.sizeX": "आकार X",
+  "cam.partProbe.field.sizeY": "आकार Y",
+  "cam.partProbe.field.pitch": "अंतराल",
   "cam.visualizer.showClamps": "क्लैम्प और मशीन की यात्रा दिखाएँ"
 }

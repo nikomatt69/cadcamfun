@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "Tenon",
   "cam.partProbe.kind.edge": "Arête",
   "cam.partProbe.kind.corner": "Angle",
+  "cam.partProbe.kind.web": "Nervure",
+  "cam.partProbe.kind.pocket": "Rainure",
+  "cam.partProbe.kind.rectangle": "Rectangle",
+  "cam.partProbe.kind.edge-angle": "Angle de face",
   "cam.partProbe.remove": "Retirer le cycle",
   "cam.partProbe.add": "Ajouter un cycle",
   "cam.partProbe.generate": "Générer le programme de palpage avec les coupes",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "Profondeur",
   "cam.partProbe.field.normalX": "Normale X",
   "cam.partProbe.field.normalY": "Normale Y",
+  "cam.partProbe.field.width": "Largeur",
+  "cam.partProbe.field.angle": "Angle °",
+  "cam.partProbe.field.sizeX": "Taille X",
+  "cam.partProbe.field.sizeY": "Taille Y",
+  "cam.partProbe.field.pitch": "Pas",
   "cam.visualizer.showClamps": "Afficher les brides et la course de la machine"
 }

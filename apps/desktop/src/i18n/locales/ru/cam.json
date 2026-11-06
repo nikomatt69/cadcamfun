@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "Бобышка",
   "cam.partProbe.kind.edge": "Кромка",
   "cam.partProbe.kind.corner": "Угол",
+  "cam.partProbe.kind.web": "Ребро",
+  "cam.partProbe.kind.pocket": "Паз",
+  "cam.partProbe.kind.rectangle": "Прямоугольник",
+  "cam.partProbe.kind.edge-angle": "Угол грани",
   "cam.partProbe.remove": "Удалить цикл",
   "cam.partProbe.add": "Добавить цикл",
   "cam.partProbe.generate": "Создать программу щупа вместе с резанием",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "Глубина",
   "cam.partProbe.field.normalX": "Нормаль X",
   "cam.partProbe.field.normalY": "Нормаль Y",
+  "cam.partProbe.field.width": "Ширина",
+  "cam.partProbe.field.angle": "Угол °",
+  "cam.partProbe.field.sizeX": "Размер X",
+  "cam.partProbe.field.sizeY": "Размер Y",
+  "cam.partProbe.field.pitch": "Шаг",
   "cam.visualizer.showClamps": "Показать зажимы и ход станка"
 }

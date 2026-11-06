@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "Boss",
   "cam.partProbe.kind.edge": "Edge",
   "cam.partProbe.kind.corner": "Corner",
+  "cam.partProbe.kind.web": "Web",
+  "cam.partProbe.kind.pocket": "Slot",
+  "cam.partProbe.kind.rectangle": "Rectangle",
+  "cam.partProbe.kind.edge-angle": "Face angle",
   "cam.partProbe.remove": "Remove cycle",
   "cam.partProbe.add": "Add cycle",
   "cam.partProbe.generate": "Generate the probe program with the cuts",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "Depth",
   "cam.partProbe.field.normalX": "Normal X",
   "cam.partProbe.field.normalY": "Normal Y",
+  "cam.partProbe.field.width": "Width",
+  "cam.partProbe.field.angle": "Angle °",
+  "cam.partProbe.field.sizeX": "Size X",
+  "cam.partProbe.field.sizeY": "Size Y",
+  "cam.partProbe.field.pitch": "Pitch",
   "cam.visualizer.showClamps": "Show clamps and machine travel"
 }

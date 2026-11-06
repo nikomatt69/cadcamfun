@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "凸台",
   "cam.partProbe.kind.edge": "边",
   "cam.partProbe.kind.corner": "角",
+  "cam.partProbe.kind.web": "筋",
+  "cam.partProbe.kind.pocket": "槽",
+  "cam.partProbe.kind.rectangle": "矩形",
+  "cam.partProbe.kind.edge-angle": "面角度",
   "cam.partProbe.remove": "移除循环",
   "cam.partProbe.add": "添加循环",
   "cam.partProbe.generate": "随切削一起生成探测程序",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "深度",
   "cam.partProbe.field.normalX": "法向 X",
   "cam.partProbe.field.normalY": "法向 Y",
+  "cam.partProbe.field.width": "宽度",
+  "cam.partProbe.field.angle": "角度 °",
+  "cam.partProbe.field.sizeX": "尺寸 X",
+  "cam.partProbe.field.sizeY": "尺寸 Y",
+  "cam.partProbe.field.pitch": "间距",
   "cam.visualizer.showClamps": "显示夹具和机床行程"
 }

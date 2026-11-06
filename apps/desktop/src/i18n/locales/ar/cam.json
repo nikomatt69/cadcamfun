@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "نتوء",
   "cam.partProbe.kind.edge": "حافة",
   "cam.partProbe.kind.corner": "زاوية",
+  "cam.partProbe.kind.web": "ضلع",
+  "cam.partProbe.kind.pocket": "أخدود",
+  "cam.partProbe.kind.rectangle": "مستطيل",
+  "cam.partProbe.kind.edge-angle": "زاوية الوجه",
   "cam.partProbe.remove": "إزالة الدورة",
   "cam.partProbe.add": "إضافة دورة",
   "cam.partProbe.generate": "توليد برنامج المسّ مع القطع",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "العمق",
   "cam.partProbe.field.normalX": "العمودي X",
   "cam.partProbe.field.normalY": "العمودي Y",
+  "cam.partProbe.field.width": "العرض",
+  "cam.partProbe.field.angle": "الزاوية °",
+  "cam.partProbe.field.sizeX": "الحجم X",
+  "cam.partProbe.field.sizeY": "الحجم Y",
+  "cam.partProbe.field.pitch": "التباعد",
   "cam.visualizer.showClamps": "إظهار المشابك وشوط الماكينة"
 }

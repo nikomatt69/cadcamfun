@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "Saliente",
   "cam.partProbe.kind.edge": "Borde",
   "cam.partProbe.kind.corner": "Esquina",
+  "cam.partProbe.kind.web": "Nervio",
+  "cam.partProbe.kind.pocket": "Ranura",
+  "cam.partProbe.kind.rectangle": "Rectángulo",
+  "cam.partProbe.kind.edge-angle": "Ángulo de cara",
   "cam.partProbe.remove": "Quitar ciclo",
   "cam.partProbe.add": "Añadir ciclo",
   "cam.partProbe.generate": "Generar el programa de palpado con los cortes",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "Profundidad",
   "cam.partProbe.field.normalX": "Normal X",
   "cam.partProbe.field.normalY": "Normal Y",
+  "cam.partProbe.field.width": "Ancho",
+  "cam.partProbe.field.angle": "Ángulo °",
+  "cam.partProbe.field.sizeX": "Tamaño X",
+  "cam.partProbe.field.sizeY": "Tamaño Y",
+  "cam.partProbe.field.pitch": "Paso",
   "cam.visualizer.showClamps": "Mostrar sujeciones y recorrido de la máquina"
 }

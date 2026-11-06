@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "Perno",
   "cam.partProbe.kind.edge": "Spigolo piano",
   "cam.partProbe.kind.corner": "Angolo",
+  "cam.partProbe.kind.web": "Nervatura",
+  "cam.partProbe.kind.pocket": "Cava",
+  "cam.partProbe.kind.rectangle": "Rettangolo",
+  "cam.partProbe.kind.edge-angle": "Angolo faccia",
   "cam.partProbe.remove": "Rimuovi ciclo",
   "cam.partProbe.add": "Aggiungi ciclo",
   "cam.partProbe.generate": "Genera il programma di tastatura con i tagli",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "Profondità",
   "cam.partProbe.field.normalX": "Normale X",
   "cam.partProbe.field.normalY": "Normale Y",
+  "cam.partProbe.field.width": "Larghezza",
+  "cam.partProbe.field.angle": "Angolo °",
+  "cam.partProbe.field.sizeX": "Dim. X",
+  "cam.partProbe.field.sizeY": "Dim. Y",
+  "cam.partProbe.field.pitch": "Passo",
   "cam.visualizer.showClamps": "Mostra morsetti e corse della macchina"
 }

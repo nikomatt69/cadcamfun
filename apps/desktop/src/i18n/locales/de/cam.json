@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "Zapfen",
   "cam.partProbe.kind.edge": "Kante",
   "cam.partProbe.kind.corner": "Ecke",
+  "cam.partProbe.kind.web": "Steg",
+  "cam.partProbe.kind.pocket": "Nut",
+  "cam.partProbe.kind.rectangle": "Rechteck",
+  "cam.partProbe.kind.edge-angle": "Flächenwinkel",
   "cam.partProbe.remove": "Zyklus entfernen",
   "cam.partProbe.add": "Zyklus hinzufügen",
   "cam.partProbe.generate": "Tastprogramm mit den Schnitten erzeugen",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "Tiefe",
   "cam.partProbe.field.normalX": "Normale X",
   "cam.partProbe.field.normalY": "Normale Y",
+  "cam.partProbe.field.width": "Breite",
+  "cam.partProbe.field.angle": "Winkel °",
+  "cam.partProbe.field.sizeX": "Maß X",
+  "cam.partProbe.field.sizeY": "Maß Y",
+  "cam.partProbe.field.pitch": "Abstand",
   "cam.visualizer.showClamps": "Spannmittel und Verfahrweg anzeigen"
 }

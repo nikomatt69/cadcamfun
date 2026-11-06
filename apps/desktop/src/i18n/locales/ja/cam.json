@@ -1794,6 +1794,10 @@
   "cam.partProbe.kind.boss": "ボス",
   "cam.partProbe.kind.edge": "エッジ",
   "cam.partProbe.kind.corner": "コーナー",
+  "cam.partProbe.kind.web": "リブ",
+  "cam.partProbe.kind.pocket": "溝",
+  "cam.partProbe.kind.rectangle": "矩形",
+  "cam.partProbe.kind.edge-angle": "面の角度",
   "cam.partProbe.remove": "サイクルを削除",
   "cam.partProbe.add": "サイクルを追加",
   "cam.partProbe.generate": "切削と一緒に測定プログラムを生成",
@@ -1806,5 +1810,10 @@
   "cam.partProbe.field.depth": "深さ",
   "cam.partProbe.field.normalX": "法線 X",
   "cam.partProbe.field.normalY": "法線 Y",
+  "cam.partProbe.field.width": "幅",
+  "cam.partProbe.field.angle": "角度 °",
+  "cam.partProbe.field.sizeX": "サイズ X",
+  "cam.partProbe.field.sizeY": "サイズ Y",
+  "cam.partProbe.field.pitch": "間隔",
   "cam.visualizer.showClamps": "クランプと機械ストロークを表示"
 }
