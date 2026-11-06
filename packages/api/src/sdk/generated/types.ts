@@ -735,6 +735,7 @@ export type AiSessionControlPayload = {
   readonly requestId?: string | undefined
   readonly answers?: ReadonlyArray<ReadonlyArray<string>> | undefined
   readonly decision?: "once" | "always" | "reject" | undefined
+  readonly message?: string | undefined
   readonly model?:
     | {
         readonly provider?: string | undefined
@@ -944,6 +945,7 @@ export type AiPermissionReplyPayload = {
   readonly projectId?: string | undefined
   readonly requestId: string
   readonly decision: "once" | "always" | "reject"
+  readonly message?: string | undefined
 }
 
 export type AiCompletionPayload = {
@@ -8635,6 +8637,7 @@ export type AiSessionControlInput = {
   readonly requestId?: AiSessionControlPayload["requestId"]
   readonly answers?: AiSessionControlPayload["answers"]
   readonly decision?: AiSessionControlPayload["decision"]
+  readonly message?: AiSessionControlPayload["message"]
   readonly model?: AiSessionControlPayload["model"]
 }
 
@@ -9509,6 +9512,7 @@ export type AiPermissionReplyInput = {
   readonly projectId?: AiPermissionReplyPayload["projectId"]
   readonly requestId: AiPermissionReplyPayload["requestId"]
   readonly decision: AiPermissionReplyPayload["decision"]
+  readonly message?: AiPermissionReplyPayload["message"]
 }
 
 export type AiPermissionReplyOutput = { message: string }

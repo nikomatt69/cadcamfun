@@ -326,30 +326,70 @@ export function AssistantPermissions(): JSX.Element {
     <Show when={ai.permissions().length > 0}>
       <ul class="assistant-permissions" data-testid="ai-permissions">
         <For each={ai.permissions()}>
-          {(request) => (
-            <li class="assistant-permission" data-testid="permission">
-              <div class="assistant-permission-copy">
-                <CircleGauge size={14} class="assistant-coral-icon" aria-hidden="true" />
-                <span>{t("ai.message.permission", { permission: request.permission })}</span>
-                <Show when={request.patterns.length > 0}>
-                  <code class="assistant-permission-patterns" title={request.patterns.join("\n")}>{request.patterns.join(", ")}</code>
-                </Show>
-              </div>
-              <div class="assistant-card-actions mt-0">
-                <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.replyPermission(request.requestId, "reject")}>
-                  {t("ai.message.permission.deny")}
-                </button>
-                <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.replyPermission(request.requestId, "always")}>
-                  {t("ai.message.permission.remember")}
-                </button>
-                <button type="button" class="assistant-btn assistant-btn-primary" onClick={() => void ai.replyPermission(request.requestId, "once")}>
-                  {t("ai.message.permission.grant")}
-                </button>
-              </div>
-            </li>
-          )}
+          {(request) => <PermissionRequest request={request} />}
         </For>
       </ul>
     </Show>
+  )
+}
+
+/** nikcli's `PermissionCorrectedError` limit on our side: the API accepts 2 000 characters. */
+const FEEDBACK_LIMIT = 2_000
+
+/**
+ * One request: allow once, always, deny, or deny and say what to do instead. A denial with feedback does not stop the agent:
+ * it reads the correction as the call's result and carries on with it (Claude Code and opencode do the same).
+ */
+function PermissionRequest(props: { readonly request: ReturnType<ReturnType<typeof useAiStore>["permissions"]>[number] }): JSX.Element {
+  const ai = useAiStore()
+  const [explaining, setExplaining] = createSignal(false)
+  const [feedback, setFeedback] = createSignal("")
+  const sendFeedback = (): void => {
+    const message = feedback().trim()
+    if (message !== "") void ai.replyPermission(props.request.requestId, "reject", message)
+  }
+  return (
+    <li class="assistant-permission" data-testid="permission">
+      <div class="assistant-permission-copy">
+        <CircleGauge size={14} class="assistant-coral-icon" aria-hidden="true" />
+        <span>{t("ai.message.permission", { permission: props.request.permission })}</span>
+        <Show when={props.request.patterns.length > 0}>
+          <code class="assistant-permission-patterns" title={props.request.patterns.join("\n")}>{props.request.patterns.join(", ")}</code>
+        </Show>
+      </div>
+      <Show when={explaining()} fallback={
+        <div class="assistant-card-actions mt-0">
+          <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.replyPermission(props.request.requestId, "reject")}>
+            {t("ai.message.permission.deny")}
+          </button>
+          <button type="button" class="assistant-btn assistant-btn-secondary" data-testid="permission-feedback" onClick={() => setExplaining(true)}>
+            {t("ai.message.permission.feedback")}
+          </button>
+          <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => void ai.replyPermission(props.request.requestId, "always")}>
+            {t("ai.message.permission.remember")}
+          </button>
+          <button type="button" class="assistant-btn assistant-btn-primary" onClick={() => void ai.replyPermission(props.request.requestId, "once")}>
+            {t("ai.message.permission.grant")}
+          </button>
+        </div>
+      }>
+        <form class="assistant-card-actions mt-0" onSubmit={(e) => { e.preventDefault(); sendFeedback() }}>
+          <input
+            class="assistant-field"
+            data-testid="permission-feedback-text"
+            aria-label={t("ai.message.permission.feedbackPlaceholder")}
+            placeholder={t("ai.message.permission.feedbackPlaceholder")}
+            maxLength={FEEDBACK_LIMIT}
+            value={feedback()}
+            ref={(element) => queueMicrotask(() => element.focus())}
+            onInput={(e) => setFeedback(e.currentTarget.value)}
+            onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setExplaining(false) } }}
+          />
+          <button type="submit" class="assistant-btn assistant-btn-primary" disabled={feedback().trim() === ""}>
+            {t("ai.message.permission.feedbackSend")}
+          </button>
+        </form>
+      </Show>
+    </li>
   )
 }

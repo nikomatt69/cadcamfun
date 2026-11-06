@@ -7912,6 +7912,18 @@
                       }
                     ]
                   },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "model": {
                     "anyOf": [
                       {
@@ -14920,6 +14932,18 @@
                       "once",
                       "always",
                       "reject"
+                    ]
+                  },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   }
                 },

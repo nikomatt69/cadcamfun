@@ -9675,6 +9675,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     ],
                     "type": "string",
                   },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "maxLength": 2000,
+                        "minLength": 1,
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "projectId": {
                     "anyOf": [
                       {
@@ -10518,6 +10530,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "anyOf": [
                       {
                         "maxLength": 500,
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "maxLength": 2000,
+                        "minLength": 1,
                         "type": "string",
                       },
                       {

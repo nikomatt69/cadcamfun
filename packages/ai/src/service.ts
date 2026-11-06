@@ -518,11 +518,15 @@ export class AiService extends Context.Service<AiService, {
           yield* Effect.tryPromise({ try: () => replySessionQuestion(projectHost, sessionId, input), catch: (cause) => new AiConfigError({ message: describeControlError(cause) }) })
         } else if (input.action === "reply_permission") {
           if (!input.requestId || !input.decision) return yield* new AiConfigError({ message: "requestId and decision are required." })
+          const feedback = input.message?.trim()
+          if (input.message !== undefined && input.decision !== "reject") return yield* new AiConfigError({ message: "A message goes only with a reject decision." })
+          if (input.message !== undefined && (feedback === undefined || feedback === "")) return yield* new AiConfigError({ message: "The rejection message is empty." })
           yield* Effect.tryPromise({
             try: async () => {
               const pending = await projectHost.client.permission.list()
               if (!pending.some((permission) => permission["id"] === input.requestId && (permission["sessionID"] === sessionId || typeof permission["sessionID"] === "string" && childAgent(sessionId, permission["sessionID"]) !== undefined))) throw new Error("Permission request is not pending in this conversation.")
-              await projectHost.client.permission.reply({ requestID: input.requestId!, reply: input.decision! })
+              // nikcli rejects with `PermissionCorrectedError` when a message comes with the refusal: the model reads it and goes on.
+              await projectHost.client.permission.reply({ requestID: input.requestId!, reply: input.decision!, ...(feedback ? { message: feedback } : {}) })
             }, catch: (cause) => new AiConfigError({ message: describeControlError(cause) })
           })
         }

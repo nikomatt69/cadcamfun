@@ -590,7 +590,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     }))
     .handle("permissionReply", ({ payload }) => Effect.gen(function*() {
       const projectId = yield* controlProject(payload.sessionId, payload.projectId)
-      yield* ai.controlSession({ sessionId: payload.sessionId, projectId, action: "reply_permission", requestId: payload.requestId, decision: payload.decision }).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      yield* ai.controlSession({ sessionId: payload.sessionId, projectId, action: "reply_permission", requestId: payload.requestId, decision: payload.decision, ...(payload.message !== undefined ? { message: payload.message } : {}) }).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
       return { message: "Permission reply sent" }
     }))
     .handle("completion", ({ payload }) => Effect.gen(function*() {
