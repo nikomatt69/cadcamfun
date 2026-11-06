@@ -9,6 +9,7 @@ import { WorkOffsetSchema } from "../ir.ts"
 import { WorkOffsetRefSchema, formatOffsetRef } from "../work-offset.ts"
 import { ToolpathSettingsSchema } from "../generator/schema.ts"
 import { OperationSchema, OperationTemplateSchema, TemplateUseSchema, type Operation, type OperationTemplate, type TemplateUse } from "./op.ts"
+import { boxInPartFrame } from "../indexing.ts"
 import { assignPockets } from "./tooltable.ts"
 
 export const PostConfigSchema = Schema.Struct({
@@ -217,6 +218,8 @@ export const workpieceIssues = (setup: Setup): ReadonlyArray<SetupIssue> => {
     const block = wp.stock ?? setup.stock
     return wp.placement === undefined || block === undefined ? [] : [{
       name: wp.name,
+      datum: wp.placement,
+      index: wp.index,
       min: { x: wp.placement.x + block.origin.x, y: wp.placement.y + block.origin.y, z: wp.placement.z + block.origin.z - block.z },
       max: { x: wp.placement.x + block.origin.x + block.x, y: wp.placement.y + block.origin.y + block.y, z: wp.placement.z + block.origin.z }
     }]
@@ -227,7 +230,8 @@ export const workpieceIssues = (setup: Setup): ReadonlyArray<SetupIssue> => {
     return a.min.x < b.max.x - eps && b.min.x < a.max.x - eps && a.min.y < b.max.y - eps && b.min.y < a.max.y - eps && a.min.z < b.max.z - eps && b.min.z < a.max.z - eps
   }
   for (const box of boxes) {
-    for (const fx of fixtures) if (touches(box, fx)) issues.push({ message: `${box.name}'s blank overlaps ${fx.name}: the part would stand inside the workholding` })
+    // The blank sits in this part's frame. A clamp stored on the first datum is carried by the table turn before the overlap is judged.
+    for (const fx of fixtures) if (touches(box, boxInPartFrame(fx, box.datum, box.index))) issues.push({ message: `${box.name}'s blank overlaps ${fx.name}: the part would stand inside the workholding` })
     const env = setup.envelope
     if (env !== undefined && (box.min.x < env.min.x || box.min.y < env.min.y || box.min.z < env.min.z || box.max.x > env.max.x || box.max.y > env.max.y || box.max.z > env.max.z)) {
       issues.push({ message: `${box.name}'s blank lies outside the machine travel` })

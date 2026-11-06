@@ -119,6 +119,9 @@ export interface SetupReplay {
     readonly register: string; readonly workpieceId: string; readonly name: string; readonly stock: { readonly min: Vec3; readonly max: Vec3 }
     /** Where this part's datum stands in the frame of the first part's datum (its `placement`); absent when the part has none. */
     readonly datum?: Vec3
+    /** The part's rotary index, degrees. A table index leaves the posted moves in the part frame; `plane` means the control's tilted-plane word already turned them. */
+    readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+    readonly indexAs?: "table" | "plane"
   }>
   /** The clamps, jaws and plates of the fixture, in the frame of the first part's datum (the setup's `fixtures`). */
   readonly fixtures?: ReadonlyArray<{ readonly id: string; readonly name: string; readonly min: Vec3; readonly max: Vec3 }>
@@ -157,7 +160,11 @@ export const setupReplay = (setup: Setup, generated: GeneratedProgram, geometryO
     if (!used.has(register)) continue
     const stock = wp.stock !== undefined ? blockBox(wp.stock) : shared
     if (stock === undefined) { notes.push(`${wp.name} has no blank: the setup and the drawing give no stock to replay against`); continue }
-    registers.push({ register, workpieceId: wp.id, name: wp.name, stock, ...(wp.placement !== undefined ? { datum: wp.placement } : {}) })
+    registers.push({
+      register, workpieceId: wp.id, name: wp.name, stock,
+      ...(wp.placement !== undefined ? { datum: wp.placement } : {}),
+      ...(wp.index !== undefined ? { index: wp.index, ...(wp.indexAs !== undefined ? { indexAs: wp.indexAs } : {}) } : {})
+    })
   }
   return { tools, part, registers, ...((setup.fixtures ?? []).length > 0 ? { fixtures: setup.fixtures!.map((f) => ({ id: f.id, name: f.name, min: f.min, max: f.max })) } : {}), notes }
 }
@@ -221,8 +228,11 @@ export interface FixtureSimulation {
   readonly clamps?: ReadonlyArray<{ readonly id: string; readonly name: string; readonly min: Vec3; readonly max: Vec3 }>
   /** `other` is the other part's register, or the clamp's id. */
   readonly crossings: ReadonlyArray<{ readonly register: string; readonly other: string; readonly line: number; readonly message: string }>
-  /** How the contacts were judged: other parts' blanks on the tri-dexel of the whole fixture. */
+  /** How the body's remaining stock was read: one tri-dexel of the whole fixture. */
   readonly method?: "tri-dexel"
+  /** How a move into another part's blank was judged: the box against the swept tool, exact; a penetration of `blankErrorMm` or more is never missed. */
+  readonly blankMethod?: "exact-box"
+  readonly blankErrorMm?: number
   /** How the clamps were judged: the box against the swept tool, exact; a penetration of `clampErrorMm` or more is never missed. */
   readonly clampMethod?: "exact-box"
   readonly clampErrorMm?: number
@@ -288,8 +298,9 @@ const boxMinus = (a: Box, bs: ReadonlyArray<Box>): ReadonlyArray<Box> => {
  * replayed into it in the order the machine runs them, each register carried into the frame by its datum, so the body is what the fixture
  * is after the program: every part's remaining stock from the same solid, and every collision judged on the state the body is in when the
  * move runs. A move of a register is checked against the rest of the body (its own blank is not an obstacle to its own tool, unless
- * another part's blank overlaps it): another part's blank on the lattice (the tool's radius, flutes, shank and holder counted), the
- * clamps exactly, as boxes against the swept tool, so a graze far below the lattice's cell is still a crossing.
+ * another part's blank overlaps it): another part's blank exactly, as a box against the swept tool (the same test as a clamp, so a
+ * graze below the lattice cell is still a crossing), and the clamps exactly the same way, each in the frame of the part that is
+ * cutting (a table index carries the clamp with `boxInPartFrame`; a tilted-plane post has already turned the moves).
  */
 export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: ReadonlyArray<VerifyNcResult>, tools: ReadonlyArray<Tool> = []): FixtureSimulation => {
   const zero = { x: 0, y: 0, z: 0 }
@@ -299,6 +310,12 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
   const shifted = (b: Box, d: Vec3): Box => ({ min: { x: b.min.x + d.x, y: b.min.y + d.y, z: b.min.z + d.z }, max: { x: b.max.x + d.x, y: b.max.y + d.y, z: b.max.z + d.z } })
   const blanks = replay.registers.map((r) => shifted(r.stock, datumOf(r)))
   const clamps = (replay.fixtures ?? []).map((f) => ({ id: f.id, name: f.name, min: f.min, max: f.max }))
+  // A table index leaves the posted moves in the part frame, so the clamp is carried into that frame. A tilted plane is already applied by the interpreter.
+  const clampsByRegister = replay.registers.map((r) => clamps.map((f) => {
+    if (r.index === undefined || r.indexAs === "plane") return f
+    const seen = boxInPartFrame(f, datumOf(r), r.index)
+    return { id: f.id, name: f.name, min: seen.min, max: seen.max }
+  }))
   const run = interpretGcode(gcode, { frame: "machine", workOffsets: table, track: true })
   const cutters = new Map(replay.tools.map((t) => [t.number, { ...t.cutter, ...(tools.find((x) => x.id === t.cutter.id)?.holder !== undefined ? { holder: tools.find((x) => x.id === t.cutter.id)!.holder! } : {}) } as Cutter]))
   const reach = new Map<string, { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }>()
