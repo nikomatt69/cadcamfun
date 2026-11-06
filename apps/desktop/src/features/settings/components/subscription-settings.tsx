@@ -40,7 +40,7 @@ export function SubscriptionSettings(): JSX.Element {
   const app = useApp()
   const subscription = useRead((client) => client.billing.current())
   const info = subscription.data
-  const features = () => planFeatures(info()?.plan ?? t("subscription.free"))
+  const features = () => planFeatures(info()?.plan ?? "FREE")
   const isOnTrial = () => info()?.isOnTrial === true
   const trialDaysLeft = (): number | null => {
     const end = info()?.trialEnd
@@ -49,8 +49,8 @@ export function SubscriptionSettings(): JSX.Element {
   }
   const formattedPeriodEnd = (): string | null => (info()?.periodEnd ? formatDate(info()!.periodEnd!) : null)
   const formattedTrialEnd = (): string | null => (info()?.trialEnd ? formatDate(info()!.trialEnd!) : null)
-  const showManageBilling = () => (info()?.plan ?? t("subscription.free")) !== "FREE" && !isOnTrial()
-  const showUpgradeLink = () => ((info()?.plan ?? t("subscription.free")) === "FREE" && !isOnTrial()) || isOnTrial()
+  const showManageBilling = () => (info()?.plan ?? "FREE") !== "FREE" && !isOnTrial()
+  const showUpgradeLink = () => ((info()?.plan ?? "FREE") === "FREE" && !isOnTrial()) || isOnTrial()
 
   const [billingPending, setBillingPending] = createSignal(false)
   const [billingError, setBillingError] = createSignal<string>()
