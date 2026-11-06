@@ -4518,6 +4518,12 @@ export type CamSetupPlanPayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -4698,6 +4704,7 @@ export type CamSetupPlanPayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -4980,6 +4987,7 @@ export type CamSetupPlanPayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -5030,6 +5038,12 @@ export type CamSetupValidatePayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -5210,6 +5224,7 @@ export type CamSetupValidatePayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -5492,6 +5507,7 @@ export type CamSetupValidatePayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -5542,6 +5558,12 @@ export type CamSetupGeneratePayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -5722,6 +5744,7 @@ export type CamSetupGeneratePayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -6004,6 +6027,7 @@ export type CamSetupGeneratePayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -6365,6 +6389,12 @@ export type CamSetupSavePayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -6545,6 +6575,7 @@ export type CamSetupSavePayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -6827,6 +6858,7 @@ export type CamSetupSavePayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -6878,6 +6910,12 @@ export type CamSetupUpdatePayload = {
       readonly lineNumbers?: { readonly start: number; readonly step: number }
       readonly stamp?: string
       readonly programNumberBase: number
+      readonly swivel?: {
+        readonly dataRecord: string
+        readonly retraction?: 0 | 1 | 2 | 4
+        readonly retractDistance?: number
+        readonly status?: number
+      }
     }
     readonly grouping: "single" | "perTool" | "perOperation"
     readonly retractBeforeToolChange: boolean
@@ -7058,6 +7096,7 @@ export type CamSetupUpdatePayload = {
         | { readonly kind: "preset"; readonly row: number }
       readonly placement?: { readonly x: number; readonly y: number; readonly z: number }
       readonly index?: { readonly a?: number; readonly b?: number; readonly c?: number }
+      readonly indexAs?: "table" | "plane"
       readonly stock?: {
         readonly x: number
         readonly y: number
@@ -7340,6 +7379,7 @@ export type CamSetupUpdatePayload = {
       readonly search?: number
       readonly clearance?: number
       readonly safeZ?: number
+      readonly placement?: "first-program" | "inline"
       readonly limit?: number
       readonly rotation?: "g68" | "offset-r" | "table-c"
       readonly replay?: {
@@ -15181,6 +15221,7 @@ export type CamSetupListOutput = Array<{
       lineNumbers?: { start: number; step: number }
       stamp?: string
       programNumberBase: number
+      swivel?: { dataRecord: string; retraction?: 0 | 1 | 2 | 4; retractDistance?: number; status?: number }
     }
     grouping: "single" | "perTool" | "perOperation"
     retractBeforeToolChange: boolean
@@ -15361,6 +15402,7 @@ export type CamSetupListOutput = Array<{
         | { kind: "preset"; row: number }
       placement?: { x: number; y: number; z: number }
       index?: { a?: number; b?: number; c?: number }
+      indexAs?: "table" | "plane"
       stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
     }>
     magazineSize?: number
@@ -15615,6 +15657,7 @@ export type CamSetupListOutput = Array<{
       search?: number
       clearance?: number
       safeZ?: number
+      placement?: "first-program" | "inline"
       limit?: number
       rotation?: "g68" | "offset-r" | "table-c"
       replay?: {
@@ -15664,6 +15707,7 @@ export type CamSetupSaveOutput = {
       lineNumbers?: { start: number; step: number }
       stamp?: string
       programNumberBase: number
+      swivel?: { dataRecord: string; retraction?: 0 | 1 | 2 | 4; retractDistance?: number; status?: number }
     }
     grouping: "single" | "perTool" | "perOperation"
     retractBeforeToolChange: boolean
@@ -15844,6 +15888,7 @@ export type CamSetupSaveOutput = {
         | { kind: "preset"; row: number }
       placement?: { x: number; y: number; z: number }
       index?: { a?: number; b?: number; c?: number }
+      indexAs?: "table" | "plane"
       stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
     }>
     magazineSize?: number
@@ -16098,6 +16143,7 @@ export type CamSetupSaveOutput = {
       search?: number
       clearance?: number
       safeZ?: number
+      placement?: "first-program" | "inline"
       limit?: number
       rotation?: "g68" | "offset-r" | "table-c"
       replay?: {
@@ -16146,6 +16192,7 @@ export type CamSetupGetOutput = {
       lineNumbers?: { start: number; step: number }
       stamp?: string
       programNumberBase: number
+      swivel?: { dataRecord: string; retraction?: 0 | 1 | 2 | 4; retractDistance?: number; status?: number }
     }
     grouping: "single" | "perTool" | "perOperation"
     retractBeforeToolChange: boolean
@@ -16326,6 +16373,7 @@ export type CamSetupGetOutput = {
         | { kind: "preset"; row: number }
       placement?: { x: number; y: number; z: number }
       index?: { a?: number; b?: number; c?: number }
+      indexAs?: "table" | "plane"
       stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
     }>
     magazineSize?: number
@@ -16580,6 +16628,7 @@ export type CamSetupGetOutput = {
       search?: number
       clearance?: number
       safeZ?: number
+      placement?: "first-program" | "inline"
       limit?: number
       rotation?: "g68" | "offset-r" | "table-c"
       replay?: {
@@ -16631,6 +16680,7 @@ export type CamSetupUpdateOutput = {
       lineNumbers?: { start: number; step: number }
       stamp?: string
       programNumberBase: number
+      swivel?: { dataRecord: string; retraction?: 0 | 1 | 2 | 4; retractDistance?: number; status?: number }
     }
     grouping: "single" | "perTool" | "perOperation"
     retractBeforeToolChange: boolean
@@ -16811,6 +16861,7 @@ export type CamSetupUpdateOutput = {
         | { kind: "preset"; row: number }
       placement?: { x: number; y: number; z: number }
       index?: { a?: number; b?: number; c?: number }
+      indexAs?: "table" | "plane"
       stock?: { x: number; y: number; z: number; origin: { x: number; y: number; z: number }; material: string }
     }>
     magazineSize?: number
@@ -17065,6 +17116,7 @@ export type CamSetupUpdateOutput = {
       search?: number
       clearance?: number
       safeZ?: number
+      placement?: "first-program" | "inline"
       limit?: number
       rotation?: "g68" | "offset-r" | "table-c"
       replay?: {
