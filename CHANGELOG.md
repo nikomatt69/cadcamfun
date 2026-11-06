@@ -3,6 +3,113 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.106 (November 2026)
+
+## Core
+
+- Drive-curve finishing, projection, morph, isoparametric, equidistant, engraving, deburr (spec 69 F3)
+- J3 memory budget on the 10^7-cell fixture (658 MB measured)
+- Parity row for machine-collision pairs is partial with evidence
+- Tool-axis strategies point, line, curve, surface and shortest-holder with tilt limit (spec 69 F4)
+- J3 scale fixtures, parity rows for tip-error, scale, fault injection, tolerance gate
+- Versioned cutting-data library, tool life book, sister tools, magazine plan (spec 69 D4)
+- B5 collision pairs are named, spindle housing is a body of the check
+- Tool data CSV, ISO 13399 XML subset and presetter list (spec 69 D3)
+- Structured triDexel field in StockSummary (B2)
+- Holder library and minimum stick-out search (spec 69 D2)
+- B3 fault injection through runJob (30 overcuts, 30 undercuts, 15 clean jobs)
+- Wire swept profile, mesh contact and shortest chain ordering into the operations (spec 69 D1/F1/F11)
+- Annotations attach to model entities by persistent reference (spec 49, spec 41 N6, P4-2)
+- Sketch fillet, mirror, pattern, offset and project-edges tools (spec 45 K3/K1, P2-10)
+- Machining limits - boundary and avoid regions (spec 69 C7)
+- Operation model - enable/disable, dependencies, copy/mirror/pattern (spec 69 C6)
+- ManufacturingJob.setups[] with a v1 job as one setup (spec 69 C1)
+- Global linking and ordering, 2-opt + or-opt with stay-down (spec 69 F11)
+- Mesh drop-cutter with triangle BVH (spec 69 F1)
+- Swept-profile cutters tapered, lollipop, barrel, lens (spec 69 D1)
+- Global link optimisation, lowest-safe retracts and measured air time (spec 72 P3-4)
+- Global linking and ordering, 2-opt + or-opt with stay-down (spec 69 F11)
+- Closed loft (ring of sections, G1 with smooth)
+- Probing operation planner, model run and Fanuc/LinuxCNC/Siemens emission (spec 72 P4-7)
+- Mesh drop-cutter with triangle BVH (spec 69 F1)
+- Delete-face with heal on the exact model
+- Swept-profile cutters tapered, lollipop, barrel, lens (spec 69 D1)
+- Plunge, high-feed, peel and trochoidal-slot roughing (spec 72 P2-3)
+- Sketch offset, mirror, pattern and corner fillet tools
+- CAM templates, rule application and tool selection (spec 60 P1-P3)
+- Typecheck cloud on its own worker types
+- Typecheck the cloud worker, not identity
+- Typecheck cloud against its own worker types
+- Typecheck cloud on its own worker types and restore code tokens
+- Typecheck cloud against its own worker types and keep code tokens out of t()
+- Typecheck cloud against its own worker types and keep code tokens out of t()
+- Typecheck the worker against its own runtime types
+- Keep the Bun sidecar out of linuxdeploy's ELF pass.
+- Fix the two CI failures in milling replay and chamfer callouts.
+
+## Desktop
+
+- Badge lost persistent references on the parametric timeline
+- Show tool-result evidence and an answer's weakest release in the assistant
+- Save and load multi-operation setups with tool table and conflict UI
+- Keep state values out of the translator
+- Bind phone pairing to the signed-in account in SQLite.
+
+## Desktop (Tauri shell)
+
+- Put the debug-only Manager import where rustfmt expects it.
+- Put the debug Manager import where rustfmt expects it.
+
+## Sidecar
+
+- Typecheck the inline probe assertion
+- Type the inline probe assertion for bun expect
+- Cam setup_plan, setup_list and cam_edit setup_save actions over saved setups (RM-02)
+- Process physics and tolerance gate over HTTP, cancellation proven end to end
+- Kernel reachability gate and routes for sheet, plan, multi-setup job and lathe
+- Design configurations action, mass in results, sketch DOF diagnostics, gripper scenario (agent stopped by rate limit, unverified)
+
+## API
+
+- Regenerate Promise SDK types for cam setups
+- Regenerate Promise SDK types for the Rotation segment
+- Regenerate Promise SDK types for the Rotation segment
+- Revert contract snapshot update (CI is green on the committed snapshot)
+- Regenerate SDK types (main drift)
+- Update contract snapshot for the merged contract (Spline IR move, process, job model)
+- Regenerate clients and reference after merging main
+- Regenerate clients and reference for the operation model fields (enabled, dependsOn, limits)
+- Regenerate clients for cloud enroll and pair
+
+## AI
+
+- Budgets for the saved-setup actions, inventory regenerated
+
+## Build and release
+
+- Drop secret_delete from the pending-caller list
+- Drop secret_delete from the pending-caller list
+- Drop secret_delete from the pending-caller allowlist
+- Drop secret_delete from the pending-caller list
+- Drop secret_delete from the pending-caller allowlist
+- Drop secret_delete from pending callers
+- Keep the desktop release when npm refuses the plugin
+- Restore the Bun sidecar when linuxdeploy's rpath rewrite breaks ldd.
+- Keep the Linux arm64 AppImage sidecar loadable.
+- Fix the aarch64 AppImage bundle aborting inside linuxdeploy.
+- Accept the publish pipeline's release tag on a branch push.
+- Accept the publish pipeline's tag when the runner still reports the main push.
+- Fix the iOS simulator job stopping on the Open-in-app sheet.
+- Fix the iOS simulator job stopping on the Open-in-app sheet.
+- Fix the release tag push after checkout credentials are cleared.
+- Fix the release tag push after checkout credentials are cleared.
+
+## Documentation
+
+- Record lane 3 D1/F1/F11 status in spec 69
+- Record lane 3 D1/F1/F11 status in spec 69
+- Record the release tag push failure in the release spec.
+
 ## v0.1.105 (November 2026)
 
 ## Desktop
