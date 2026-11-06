@@ -238,6 +238,18 @@ describe("a stock sampled from another solid keeps its voids", () => {
     expect(t.errorBound).toBeGreaterThan(original.errorBound)
   })
 
+  test("the volume of a sampled solid is within the declared error times its surface", () => {
+    // A Ø16 x 20 mm cylinder: volume pi r^2 h, surface 2 pi r h + 2 pi r^2.
+    const r = 8, h = 20, exact = Math.PI * r * r * h, surface = 2 * Math.PI * r * h + 2 * Math.PI * r * r
+    for (const cell of [1, 0.5]) {
+      const dexel = TriDexel.fromSolid({ x: -10, y: -10, z: -2 }, { x: 10, y: 10, z: 22 }, cell, (p) => p.x * p.x + p.y * p.y <= r * r && p.z >= 0 && p.z <= h)
+      expect(dexel).toBeDefined()
+      const gap = Math.abs(dexel!.volume() - exact)
+      expect(gap).toBeLessThanOrEqual(dexel!.errorBound * surface)
+      expect(gap / exact).toBeLessThan(0.05)
+    }
+  })
+
   test("a sample that would pass its budget is refused, not guessed", () => {
     expect(TriDexel.fromSolid({ x: 0, y: 0, z: 0 }, { x: 50, y: 50, z: 50 }, 0.5, () => true, 1000)).toBeUndefined()
   })

@@ -244,7 +244,16 @@ export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamR
       ? `Every part of the surface faces the spindle, or stands vertical, in at least one of ${runs.length} setups (${runs.map((r) => `${r.id}: ${pct(coverage.bySetup[r.id]!)}`).join(", ")}); occlusion and undercuts are decided by each setup's own replay, not by this facing test${carryLimits.length > 0 ? `. Carried stock: ${carryLimits.join("; ")}` : heldText}`
       : `${coverage.uncovered.toFixed(1)} mm² (${pct(coverage.uncovered)}) of the part surface faces away from the spindle in every setup (${runs.map((r) => r.orientation).join(", ")}): add a setup that sees it, or a rotary process`
   })
-  const own = runs.reduce<ReleaseLevel>((low, r) => (rank[r.artifact.release] < rank[low] ? r.artifact.release : low), "verified-program")
+  // A setup alone can never certify the faces that look away from its spindle: its own part-coverage says so and holds its release at
+  // preview. In a job that claim is replaced by the coverage of all the setups (above), so a setup counts as released when nothing else
+  // holds it: every other claim passed and the tolerance gate (when enforced) is met.
+  const setupRelease = (a: CamArtifact): ReleaseLevel => {
+    if (a.release !== "preview") return a.release
+    const facing = (c: Claim): boolean => c.id === "part-coverage" && !/required multiaxis contact samples/.test(c.detail)
+    const held = a.claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel") || facing(c))
+    return held && a.claims.some(facing) && !(job.quality?.enforceTolerance === true && a.tolerance?.met === false) ? "verified-program" : "preview"
+  }
+  const own = runs.reduce<ReleaseLevel>((low, r) => { const level = setupRelease(r.artifact); return rank[level] < rank[low] ? level : low }, "verified-program")
   const release: ReleaseLevel = own === "blocked" ? "blocked" : own === "verified-program" && complete && claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"
   return {
     status: "ok",

@@ -171,6 +171,59 @@ describe("a carried stock keeps the void of an undercut (tri-dexel hand-over)", 
     expect(ran.value.release).not.toBe("verified-program")
   })
 
+  const jaws = [
+    { id: "jaw-l", role: "jaw" as const, min: { x: -22, y: -10, z: 6 }, max: { x: -2, y: 62, z: 31 } },
+    { id: "jaw-r", role: "jaw" as const, min: { x: 82, y: -10, z: 6 }, max: { x: 102, y: 62, z: 31 } }
+  ]
+  const held = (): ManufacturingJob => { const j = carriedJob(); return { ...j, setups: [{ id: "top" }, { id: "back", orientation: "-Z", fixtures: jaws }] } }
+  const claimOf = (r: { artifact: { claims: ReadonlyArray<{ id: string; status: string; detail: string }> } }, id: string) => r.artifact.claims.find((c) => c.id === id)!
+
+  test("the setup that bores under the plate has its own claims judged on the tri-dexel, the bar's shifted pass through the pilot included", () => {
+    const ran = runSetups(carriedJob())
+    if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
+    const top = ran.value.setups[0]!
+    for (const id of ["no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed"]) {
+      expect(claimOf(top, id).status, id).toBe("passed")
+      expect(claimOf(top, id).detail, id).toMatch(/tri-dexel/)
+    }
+    // The declared removal (drill cycles) is named, not hidden: the pass is "no cut below the part beyond the error", whatever is declared.
+    expect(claimOf(top, "no-gouge").detail).toMatch(/declares removal the part mesh does not carry/)
+    expect(top.artifact.issues.filter((i) => i.severity === "error")).toEqual([])
+    // Without a fixing for the flipped setup the job is not released: its workholding is still unresolved, and says so.
+    expect(ran.value.release).toBe("preview")
+    expect(ran.value.claims.find((c) => c.id === "setup-workholding")?.status).toBe("unresolved")
+  })
+
+  test("with the flipped setup held by jaws the whole job reaches verified-program", () => {
+    const ran = runSetups(held())
+    if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
+    expect(ran.value.claims.filter((c) => c.status !== "passed" && !(c.status === "unsupported" && c.id === "machine-travel")).map((c) => `${c.id}: ${c.detail}`)).toEqual([])
+    expect(ran.value.release).toBe("verified-program")
+  })
+
+  test("a replay that stopped at its budget leaves the undercut setup's claims unresolved and the job unreleased", () => {
+    const ran = runSetups(held(), { replayWorkLimit: 2e5 })
+    if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
+    const top = ran.value.setups[0]!
+    for (const id of ["no-gouge", "material-removed"]) expect(claimOf(top, id).status, id).toBe("unresolved")
+    expect(ran.value.release).not.toBe("verified-program")
+  })
+
+  test("the volume one setup hands on and the next one starts from differ by less than the declared error times the stock's surface", () => {
+    const ran = runSetups(carriedJob())
+    if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
+    const [top, back] = ran.value.setups
+    const solid = solidOf(top!.artifact)!
+    const gap = Math.abs(back!.artifact.stock.initialVolume - top!.artifact.stock.finalVolume)
+    // The stock box is 84 x 54 x 31 mm; the bore and the pilot add less than 3000 mm² of wall.
+    const surface = 2 * (84 * 54 + 84 * 31 + 54 * 31) + 3000
+    const bound = solid.verdict().errorBound * 2
+    expect(gap).toBeGreaterThan(0)
+    expect(gap).toBeLessThanOrEqual(bound * surface)
+    // And it is a lattice effect, not a lost feature: under 2 % of the stock.
+    expect(gap / top!.artifact.stock.finalVolume).toBeLessThan(0.02)
+  })
+
   test("a carried job without an undercut is not run twice and keeps no tri-dexel", () => {
     const plain: ManufacturingJob = { ...v1, id: "plain", carryStock: true, setups: [{ id: "top" }, { id: "back", orientation: "-Z" }] }
     const ran = runSetups(plain)
