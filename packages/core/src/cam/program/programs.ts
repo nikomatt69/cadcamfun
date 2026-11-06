@@ -375,6 +375,16 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
   const own = replay.registers.map((_, i) => boxMinus(blanks[i]!, blanks.filter((_, j) => j !== i)))
   const PARTS: ReadonlyArray<ReadonlyArray<AssemblyPart>> = [["cutting", "shank"], ["holder"]]
   const said = new Set<string>()
+  // The assembly profile is the same for every move of a tool: build it once per tool and part group.
+  const solidCache = new Map<string, ReturnType<typeof toolSolid>>()
+  const solidOf = (toolNum: number, cutter: Cutter, group: ReadonlyArray<AssemblyPart>): ReturnType<typeof toolSolid> => {
+    const key = `${toolNum}:${group.join("+")}`
+    const cached = solidCache.get(key)
+    if (cached !== undefined) return cached
+    const made = toolSolid(cutter, group)
+    solidCache.set(key, made)
+    return made
+  }
   let clampSamples = 0, clampStopped = false
   let blankSamples = 0, blankStopped = false
   for (const { seg, tool, own: index } of seq) {
@@ -382,9 +392,16 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
     if (cutter === undefined) continue
     const mine = replay.registers[index]!
     const arcR = seg.kind === "arc" ? Math.hypot(seg.from.x - seg.center.x, seg.from.y - seg.center.y) : 0
+    // Plan reach, before a solid exists: a move this far from a target cannot meet it, so the solid is never built.
+    const aside = (target: Box): boolean => {
+      const pad = Math.max(cutter.diameter, cutter.holder?.diameter ?? 0) / 2 + arcR
+      const loX = Math.min(seg.from.x, seg.to.x) - pad, hiX = Math.max(seg.from.x, seg.to.x) + pad
+      const loY = Math.min(seg.from.y, seg.to.y) - pad, hiY = Math.max(seg.from.y, seg.to.y) + pad
+      return hiX < target.min.x || loX > target.max.x || hiY < target.min.y || loY > target.max.y
+    }
     // The tool's reach box over this move, per group of its parts; an arc's box is its chord's box grown by its radius.
     const reachBox = (group: ReadonlyArray<AssemblyPart>): Box | undefined => {
-      const solid = toolSolid(cutter, group)
+      const solid = solidOf(tool, cutter, group)
       if (solid.count === 0) return undefined
       const r = solid.maxRadius + arcR
       return {
@@ -409,11 +426,11 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
         if (j === index) continue
         const otherBlank = blankSeenFrom(index, j)
         const otherReg = replay.registers[j]!
-        if (said.has(`${mine.register}>${otherReg.register}`)) continue
+        if (said.has(`${mine.register}>${otherReg.register}`) || aside(otherBlank)) continue
         for (const group of PARTS) {
           const box = reachBox(group)
           if (box === undefined || !boxesTouch(box, otherBlank)) continue
-          const solid = toolSolid(cutter, group)
+          const solid = solidOf(tool, cutter, group)
           let deepest = 0
           const consider = (tip: Vec3): void => { deepest = Math.max(deepest, boxPenetration(solid, tip, otherBlank)) }
           const grown: Box = { min: { x: otherBlank.min.x - solid.maxRadius, y: otherBlank.min.y - solid.maxRadius, z: otherBlank.min.z - solid.top }, max: { x: otherBlank.max.x + solid.maxRadius, y: otherBlank.max.y + solid.maxRadius, z: otherBlank.max.z - solid.bottom } }
@@ -466,10 +483,11 @@ export const fixtureSimulation = (gcode: string, replay: SetupReplay, results: R
     // The clamps, exactly, in this part's frame: the sampled penetration of the swept tool into the box, to within the sampling step.
     for (const clamp of clampsByRegister[index] ?? []) {
       if (clampStopped) break
+      if (aside(clamp)) continue
       for (const group of PARTS) {
         const box = reachBox(group)
         if (box === undefined || !boxesTouch(box, clamp) || said.has(`${mine.register}>${clamp.id}`)) continue
-        const solid = toolSolid(cutter, group)
+        const solid = solidOf(tool, cutter, group)
         let deepest = 0
         const consider = (tip: Vec3): void => { deepest = Math.max(deepest, boxPenetration(solid, tip, clamp)) }
         // Only where the tool can reach the clamp is the move sampled: the stretch of the line inside the clamp's box grown by the tool's reach.

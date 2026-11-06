@@ -607,9 +607,15 @@ export default function SetupPanel(props: SetupPanelProps = {}): JSX.Element {
                   </span>
                   <Show when={program.hints.length > 0}><span class="block text-gray-500" data-testid="cam-setup-program-hint">{program.hints.join(" ")}</span></Show>
                   <Show when={program.evidence}>{(evidence) => (
+                    <>
                     <span class="block text-gray-500" data-testid="cam-setup-program-evidence" data-release={evidence().release} title={evidence().notes.join(" ")}>
                       {t("cam.setupDoc.evidence", { release: t(RELEASE_LABEL[evidence().release]), registers: evidence().registers.map((r) => `${r.register} ${t(VERDICT_LABEL[r.verdict])}`).join(" · ") })}
                     </span>
+                    {/* What blocks the release, in the row: a register can be clean and the job still blocked by a clamp or by another part's blank. */}
+                    <For each={[...(evidence().fixture?.crossings ?? []).map((c) => c.message), ...evidence().registers.flatMap((r) => r.findings.slice(0, 1).map((f) => `${r.register}: ${f.message}`))].slice(0, 3)}>
+                      {(message) => <span class="block text-red-300" data-testid="cam-setup-program-crossing">{message}</span>}
+                    </For>
+                    </>
                   )}</Show>
                   <Show when={program.generated !== undefined && props.onOpenProgram}>
                     <button type="button" class={BUTTON} data-testid="cam-setup-open-program" onClick={() => props.onOpenProgram?.(program.generated!)} aria-label={t("cam.setupDoc.open")} title={t("cam.setupDoc.open")}><Play size={12} /></button>
