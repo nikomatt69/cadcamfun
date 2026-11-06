@@ -208,3 +208,37 @@ describe("probing the shank and holder against the stock", () => {
     expect(air.overlap).toBe(0)
   })
 })
+
+describe("a stock sampled from another solid keeps its voids", () => {
+  const tslot: Cutter = { id: "ts", name: "T-slot", kind: "tslot", diameter: 12, flutes: 4, material: "carbide", coating: "altin", neckDiameter: 5, headHeight: 4, fluteLength: 12, shankDiameter: 6, stickout: 30 }
+  const neck: Cutter = { id: "n", name: "n", kind: "flat", diameter: 5, flutes: 2, material: "carbide", coating: "none", fluteLength: 30, shankDiameter: 5, stickout: 40 }
+  // A block with a neck hole from the top and a T-slot disc cut at z 6..10: a void under the 10 mm of block above it.
+  const cutBlock = (): TriDexel => {
+    const s = TriDexel.box({ x: -15, y: -15, z: 0 }, { x: 15, y: 15, z: 20 }, 0.25)
+    s.cut(toolSolid(neck), { x: 0, y: 0, z: 6 })
+    s.removePath(toolSolid(tslot), [{ x: 0, y: 0, z: 6 }, { x: 8, y: 0, z: 6 }])
+    return s
+  }
+
+  test("the void under the overhang is a gap in a ray, in the original frame and when the solid is read from the side", () => {
+    const original = cutBlock()
+    // Outside the neck's strip (|x| < 10.5) and inside the disc's (|x| < 14): the disc cut z 6..10 under the 10 mm of block above it.
+    expect(original.solidAt({ x: 12, y: 0, z: 8 })).toBe(false)
+    expect(original.solidAt({ x: 12, y: 0, z: 14 })).toBe(true)
+    expect(original.solidAt({ x: 12, y: 0, z: 3 })).toBe(true)
+    // The same solid seen from the +X side: the setup frame is turned (x' = z, z' = -x), so the Z rays of the new stock run through the void.
+    const turned = TriDexel.fromSolid({ x: 0, y: -15, z: -15 }, { x: 20, y: 15, z: 15 }, 0.25, (p) => original.solidAt({ x: -p.z, y: p.y, z: p.x }))
+    expect(turned).toBeDefined()
+    const t = turned!
+    expect(t.solidAt({ x: 8, y: 0, z: -12 })).toBe(false)
+    expect(t.solidAt({ x: 14, y: 0, z: -12 })).toBe(true)
+    expect(t.solidAt({ x: 3, y: 0, z: -12 })).toBe(true)
+    // The volume agrees with the original within the lattice (the seed doubles the declared error, not the figure).
+    expect(Math.abs(t.volume() - original.volume()) / original.volume()).toBeLessThan(0.02)
+    expect(t.errorBound).toBeGreaterThan(original.errorBound)
+  })
+
+  test("a sample that would pass its budget is refused, not guessed", () => {
+    expect(TriDexel.fromSolid({ x: 0, y: 0, z: 0 }, { x: 50, y: 50, z: 50 }, 0.5, () => true, 1000)).toBeUndefined()
+  })
+})

@@ -8,6 +8,7 @@ import type { Vec2, Vec3 } from "../../cad/vec.ts"
 import type { Coolant, Program, Toolpath, WorkOffset } from "../ir.ts"
 import type { PostId, PostOptions } from "../post/types.ts"
 import type { Cutter } from "./cutters.ts"
+import type { TriDexel } from "./tridexel.ts"
 import type { CutClass, CuttingData, MachineLimits } from "./cutting-data.ts"
 import type { ProcessReport, ProcessRequest } from "./process-report.ts"
 import type { MultiaxisStrategy } from "../operations/multiaxis.ts"
@@ -58,6 +59,25 @@ export interface ResidualStock {
   readonly cellY: number
   readonly floor: number
   readonly top: Float64Array
+  /**
+   * The same stock on a tri-dexel (a carried job that cuts under an overhang): when present the next setup reads the solid from it, not
+   * from the height field, so a void under an overhang is air for that setup too.
+   */
+  readonly solid?: SolidCarry
+}
+
+/**
+ * The stock a setup left, held on a tri-dexel (spec 74): unlike the height field of `ResidualStock` it keeps a void under an overhang
+ * (a T-slot, a dovetail, a lollipop's neck cut, a back-bored pocket) as a gap in its rays, so a setup fixed from another side sees it.
+ * Work coordinates of the setup (`orientation`, shifted by `origin`); `stock.errorBound` is the declared error of what it holds.
+ */
+export interface SolidCarry {
+  readonly orientation: SetupOrientation
+  readonly origin: Vec3
+  readonly stock: TriDexel
+  /** Every move of the setup was replayed on it: what it holds is a verdict, not a sample. */
+  readonly complete: boolean
+  readonly reasons: ReadonlyArray<string>
 }
 
 /**

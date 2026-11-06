@@ -21,7 +21,7 @@ import type { Mesh64 } from "../model/element-mesh.ts"
 import { partMeshes } from "../model/model.ts"
 import type { CadElement } from "../generator/schema.ts"
 import type { CamArtifact, CamIssue, CamResult, Claim, JobSetup, ManufacturingJob, ReleaseLevel, Workplane } from "./contracts.ts"
-import { residualOf, runJob, type RunOptions } from "./execute.ts"
+import { residualOf, runJob, solidOf, type RunOptions } from "./execute.ts"
 
 export type { JobSetup }
 
@@ -141,7 +141,8 @@ const rank: Readonly<Record<ReleaseLevel, number>> = { blocked: 0, preview: 1, "
 const UNDERCUT_KINDS: ReadonlySet<string> = new Set(["tslot", "dovetail", "lollipop", "boringbar"])
 
 /**
- * The limit of a carried stock (spec 69 C4): each setup hands the next one a height field, which holds one solid run per column. A setup
+ * The limit of a carried stock (spec 69 C4): each setup hands the next one a height field, which holds one solid run per column (a job
+ * with such a setup is run again on the tri-dexel, which keeps the void, and the limit is lifted when that replay is complete). A setup
  * whose cutters reach under an overhang (T-slot, dovetail, lollipop, back-boring bar) leaves a void the field cannot hold, so the setups
  * after it start from a stock that is not exact there. One sentence per such setup that is followed by another.
  */
@@ -179,24 +180,45 @@ export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamR
   const issues: CamIssue[] = []
   const { setups: _setups, ...base } = job
   const carried = job.carryStock === true && setups.length > 1
-  for (let k = 0; k < setups.length; k++) {
-    const s = setups[k]!
-    const orientation = s.orientation ?? "+Z"
-    const offset = offsets[k]
-    const one: ManufacturingJob = synthesised ? base : {
-      ...base, id: `${job.id}/${s.id}`, name: s.name ?? `${job.name} - ${s.id}`, setupOrientation: orientation, ...(s.workplane !== undefined ? { workplane: s.workplane } : {}),
-      ...(offset !== undefined ? { workOffset: offset } : {}),
-      ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.stock !== undefined ? { stock: s.stock } : {}), ...(s.stockModel !== undefined ? { stockModel: s.stockModel } : {}),
-      ...(s.fixtures !== undefined ? { fixtures: s.fixtures } : {}), ...(s.operations !== undefined ? { operations: s.operations } : {})
+  // One pass over the setups. With `solid` every setup also keeps the tri-dexel stock it leaves and the next one starts from it: that stock
+  // holds the void of an undercut cutter, which the height field handed on by a plain pass cannot.
+  const pass = (solid: boolean): CamResult<never> | undefined => {
+    runs.length = 0
+    issues.length = 0
+    for (let k = 0; k < setups.length; k++) {
+      const s = setups[k]!
+      const orientation = s.orientation ?? "+Z"
+      const offset = offsets[k]
+      const one: ManufacturingJob = synthesised ? base : {
+        ...base, id: `${job.id}/${s.id}`, name: s.name ?? `${job.name} - ${s.id}`, setupOrientation: orientation, ...(s.workplane !== undefined ? { workplane: s.workplane } : {}),
+        ...(offset !== undefined ? { workOffset: offset } : {}),
+        ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.stock !== undefined ? { stock: s.stock } : {}), ...(s.stockModel !== undefined ? { stockModel: s.stockModel } : {}),
+        ...(s.fixtures !== undefined ? { fixtures: s.fixtures } : {}), ...(s.operations !== undefined ? { operations: s.operations } : {})
+      }
+      // Stock carried between setups (spec 69 C4): this setup starts from what the one before left.
+      const seed = solid && k > 0 ? solidOf(runs[k - 1]!.artifact)?.carry : undefined
+      const before = carried && k > 0 ? residualOf(runs[k - 1]!.artifact) : undefined
+      const left = before !== undefined && seed !== undefined && seed.complete ? { ...before, solid: seed } : before
+      const job1: ManufacturingJob = left === undefined ? one : { ...one, stockModel: { kind: "residual", residual: left } }
+      const r = runJob(job1, solid ? { ...options, solidCarry: { ...(seed !== undefined ? { seed } : {}) } } : options)
+      if (r.status === "failed") return { status: "failed", issues: r.issues.map((i) => ({ ...i, message: `Setup ${s.id}: ${i.message}` })) }
+      runs.push({ id: s.id, orientation, workOffset: offset ?? "G54", artifact: r.value })
+      issues.push(...r.value.issues.map((i) => ({ ...i, message: `Setup ${s.id}: ${i.message}` })))
     }
-    // Stock carried between setups (spec 69 C4): this setup starts from what the one before left.
-    const left = carried && k > 0 ? residualOf(runs[k - 1]!.artifact) : undefined
-    const job1: ManufacturingJob = left === undefined ? one : { ...one, stockModel: { kind: "residual", residual: left } }
-    const r = runJob(job1, options)
-    if (r.status === "failed") return { status: "failed", issues: r.issues.map((i) => ({ ...i, message: `Setup ${s.id}: ${i.message}` })) }
-    runs.push({ id: s.id, orientation, workOffset: offset ?? "G54", artifact: r.value })
-    issues.push(...r.value.issues.map((i) => ({ ...i, message: `Setup ${s.id}: ${i.message}` })))
+    return undefined
   }
+  const stopped = pass(false)
+  if (stopped !== undefined) return stopped
+  // A setup that cuts under an overhang and is followed by another: run again on the tri-dexel so the next setup sees the void.
+  const undercutSetups = carried ? runs.slice(0, -1).filter((r) => r.artifact.tools.some((t) => UNDERCUT_KINDS.has(t.kind))).map((r) => r.id) : []
+  if (undercutSetups.length > 0) {
+    const again = pass(true)
+    if (again !== undefined) return again
+  }
+  const solids = runs.map((r) => solidOf(r.artifact))
+  const held = undercutSetups.length > 0 && solids.every((x) => x !== undefined && x.carry.complete)
+  const chain = held ? solids[solids.length - 1]!.verdict() : undefined
+  const chainGouge = chain !== undefined && chain.closedPart && chain.complete && chain.gouge.depth > 0
 
   const removed = runs.reduce((s, r) => s + (r.artifact.stock.initialVolume - r.artifact.stock.finalVolume), 0)
   // The part in CAD world coordinates, for the coverage.
@@ -213,11 +235,13 @@ export const runSetups = (job: ManufacturingJob, options: RunOptions = {}): CamR
   for (const r of runs) for (const c of r.artifact.claims) if (c.id !== "part-coverage") claims.push({ ...c, setup: r.id })
   // A setup's own part-coverage that reports skipped five-axis samples is a finding about reach, not about the other fixings: keep it.
   for (const r of runs) for (const c of r.artifact.claims) if (c.id === "part-coverage" && /required multiaxis contact samples/.test(c.detail)) claims.push({ ...c, setup: r.id })
-  const carryLimits = carried ? carryLimitsOf(runs.map((r) => ({ id: r.id, kinds: r.artifact.tools.map((t) => t.kind) }))) : []
+  // The height field cannot hold an undercut; where the tri-dexel held it through every setup the limit is lifted, with its own evidence.
+  const carryLimits = carried && !held ? carryLimitsOf(runs.map((r) => ({ id: r.id, kinds: r.artifact.tools.map((t) => t.kind) }))) : []
+  const heldText = chain === undefined ? "" : `. Carried stock: ${undercutSetups.join(", ")} cut${undercutSetups.length === 1 ? "s" : ""} under overhangs and the stock handed on is a tri-dexel that keeps the void (cell ${chain.cell.toFixed(3)} mm, declared error ${chain.errorBound.toFixed(3)} mm); each later setup was replayed on it, and after the last one ${chainGouge ? `the part is cut ${chain.gouge.depth.toFixed(3)} mm too deep (${chain.gouge.volume.toFixed(2)} mm³)` : `nothing is cut below the part beyond that error`}, ${chain.left.depth > 0 || chain.detached > 0 ? `${(chain.left.volume + chain.detached).toFixed(1)} mm³ of stock stays beyond the part` : "no stock stays beyond the part"}`
   claims.push({
-    id: "part-coverage", status: complete && carryLimits.length === 0 ? "passed" : "unresolved",
+    id: "part-coverage", status: chainGouge ? "failed" : complete && carryLimits.length === 0 ? "passed" : "unresolved",
     detail: complete
-      ? `Every part of the surface faces the spindle, or stands vertical, in at least one of ${runs.length} setups (${runs.map((r) => `${r.id}: ${pct(coverage.bySetup[r.id]!)}`).join(", ")}); occlusion and undercuts are decided by each setup's own replay, not by this facing test${carryLimits.length > 0 ? `. Carried stock: ${carryLimits.join("; ")}` : ""}`
+      ? `Every part of the surface faces the spindle, or stands vertical, in at least one of ${runs.length} setups (${runs.map((r) => `${r.id}: ${pct(coverage.bySetup[r.id]!)}`).join(", ")}); occlusion and undercuts are decided by each setup's own replay, not by this facing test${carryLimits.length > 0 ? `. Carried stock: ${carryLimits.join("; ")}` : heldText}`
       : `${coverage.uncovered.toFixed(1)} mm² (${pct(coverage.uncovered)}) of the part surface faces away from the spindle in every setup (${runs.map((r) => r.orientation).join(", ")}): add a setup that sees it, or a rotary process`
   })
   const own = runs.reduce<ReleaseLevel>((low, r) => (rank[r.artifact.release] < rank[low] ? r.artifact.release : low), "verified-program")

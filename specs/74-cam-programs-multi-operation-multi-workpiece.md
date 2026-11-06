@@ -63,10 +63,16 @@ Built on top of §2:
   back, `stale` when the drawing or the text changed. A replay that cannot finish is a preview with the reason, never a pass.
 - **Multi-part removal.** Each register is cut from its own blank in its own frame (`VerifyNcResult.stockVolume/removedVolume`), so the
   figures are per part and not the sum of all parts on one blank.
-- **Carried stock (kernel).** Still a height field per setup. A setup that cuts under an overhang (T-slot, dovetail, lollipop, back-boring
-  bar) hands on a void the field cannot hold: `part-coverage` is now `unresolved` and names the setups (`carryLimitsOf`), so the job is a
-  preview, not a pass. Lateral setups are covered by this only in so far as they use such cutters; a true fix needs a tri-dexel residual
-  between setups (the replay already is one; the hand-over is not).
+- **Carried stock (kernel).** A carried job with a setup that cuts under an overhang (T-slot, dovetail, lollipop, back-boring bar)
+  followed by another setup is run a second time on a tri-dexel (`RunOptions.solidCarry`, `solidOf`): every cutting move is replayed with
+  the cutter's real solid, the stock a setup leaves is handed on as `ResidualStock.solid` and sampled into the next setup's frame
+  (`TriDexel.fromSolid`, one cell of added declared error), so the void under the overhang is a gap in a ray and air for the next
+  setup, whatever its orientation. `carriedColumns` reads the columns from that solid; the stock volume, the leftover figures and the
+  coverage then start from the right material. `part-coverage` states the evidence (cell, declared error, what is left or cut below the
+  part after the last setup) and is `passed` when every setup's replay was complete, `failed` when the chain cuts below the part,
+  `unresolved` with the old `carryLimitsOf` sentence when a replay stopped (budget) or a carried solid was too large to sample. Not
+  done: the claims of the setup that cuts the undercut itself stay with the height field (back-boring moves are blind to it, so its
+  `no-gouge`/`material-removed` stay `unresolved` and the job is a preview); a flat-table job's verdicts are not taken from the tri-dexel.
 
 - **HTTP generate replays on request.** `POST /api/cam/setups/generate` and `POST /api/projects/:id/cam-setups/:setupId/generate` take
   `evidence: true`: every returned program carries `evidence` (the same `SetupEvidence` as the assistant's, built from the same

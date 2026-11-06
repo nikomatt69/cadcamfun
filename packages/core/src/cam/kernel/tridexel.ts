@@ -175,6 +175,61 @@ export class TriDexel {
     return s
   }
 
+  /**
+   * A stock sampled from any solid: `contains` says whether a point (in this stock's frame) is material. Every ray is read at its
+   * cell centres and each transition is bisected, so a void under an overhang stays a gap in the ray (several intervals per ray),
+   * which a height field cannot hold. A feature thinner than one cell can be missed and the transitions are placed to a sixteenth of
+   * a cell, so the declared error is raised by one cell (`sagitta`). Over `maxEvals` membership tests the stock is not built: `undefined`.
+   */
+  static fromSolid(min: Vec3, max: Vec3, cell: number, contains: (p: Vec3) => boolean, maxEvals = 6e7): TriDexel | undefined {
+    if (!(cell > 0)) throw new RangeError("The dexel cell must be positive")
+    const s = TriDexel.box(min, max, cell)
+    let evals = 0
+    for (let a = 0; a < 3; a++) {
+      const g = s.grids[a as 0 | 1 | 2]!
+      const along = a as 0 | 1 | 2, [b, c] = lattice(along)
+      const na = s.n[along]
+      if (evals + g.nb * g.nc * (na + 8) > maxEvals) return undefined
+      const rel: [number, number, number] = [0, 0, 0]
+      const at = (t: number): boolean => { rel[along] = t; return contains({ x: min.x + rel[0], y: min.y + rel[1], z: min.z + rel[2] }) }
+      for (let ic = 0; ic < g.nc; ic++) for (let ib = 0; ib < g.nb; ib++) {
+        rel[b] = s.centre(b, ib); rel[c] = s.centre(c, ic)
+        const lo: number[] = [], hi: number[] = []
+        let prevT = 0, prev = at(0)
+        let start = prev ? 0 : -1
+        evals++
+        const edge = (solidT: number, airT: number): number => {
+          let x = solidT, y = airT
+          for (let k = 0; k < 4; k++) { const m = (x + y) / 2; evals++; if (at(m)) x = m; else y = m }
+          return (x + y) / 2
+        }
+        for (let q = 0; q < na; q++) {
+          const t = Math.min(g.length, s.centre(along, q))
+          const now = at(t); evals++
+          if (now !== prev) {
+            const e = prev ? edge(prevT, t) : edge(t, prevT)
+            if (prev) { lo.push(start); hi.push(e); start = -1 } else start = e
+          }
+          prev = now; prevT = t
+        }
+        if (start >= 0) { lo.push(start); hi.push(g.length) }
+        s.setRay(g, ic * g.nb + ib, lo, hi)
+      }
+    }
+    s.sagitta = Math.max(s.sagitta, cell)
+    return s
+  }
+
+  /** Whether `p` (this stock's frame) is material: the Z ray through it holds `p.z`. Lateral position to the lattice cell. */
+  solidAt(p: Vec3): boolean {
+    const gz = this.grids[2]
+    const i = Math.floor((p.x - this.min.x) / this.cell), j = Math.floor((p.y - this.min.y) / this.cell)
+    if (i < 0 || j < 0 || i >= gz.nb || j >= gz.nc) return false
+    const r = j * gz.nb + i, h = gz.head[r]!, t = p.z - this.min.z
+    for (let k = 0; k < gz.count[r]!; k++) if (t >= gz.pool[h + 2 * k]! && t <= gz.pool[h + 2 * k + 1]!) return true
+    return false
+  }
+
   /** Centre of lattice cell `i` along `axis`, relative to the box minimum (the last cell may be partial). */
   centre(axis: 0 | 1 | 2, i: number): number {
     const w = Math.min(this.cell, this.extent[axis] - i * this.cell)

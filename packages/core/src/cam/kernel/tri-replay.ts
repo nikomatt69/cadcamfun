@@ -51,6 +51,8 @@ export interface TriReplayOptions {
   readonly budget: number
   /** The stock is this closed solid (work frame) instead of the whole box: a bar, a casting, the stock a previous setup left. */
   readonly shape?: ReadonlyArray<Mesh64>
+  /** The stock is this solid (a point of the work frame is material or not), sampled onto the lattice: the stock a previous setup left, undercuts held. */
+  readonly seed?: (p: Vec3) => boolean
 }
 
 export class TriReplay {
@@ -62,7 +64,9 @@ export class TriReplay {
   private readonly reasons: string[] = []
 
   constructor(private readonly options: TriReplayOptions) {
-    this.stock = options.shape === undefined ? TriDexel.box(options.min, options.max, options.cell) : TriDexel.fromPart(PartDexels.fromMeshes(options.shape, options.min, options.max, options.cell))
+    const seeded = options.seed === undefined ? undefined : TriDexel.fromSolid(options.min, options.max, options.cell, options.seed)
+    if (options.seed !== undefined && seeded === undefined) this.reasons.push("the stock carried from the earlier setup was too large to sample onto the tri-dexel within its budget")
+    this.stock = seeded ?? (options.shape === undefined ? TriDexel.box(options.min, options.max, options.cell) : TriDexel.fromPart(PartDexels.fromMeshes(options.shape, options.min, options.max, options.cell)))
   }
 
   /** Mark the replay incomplete: a move it could not place in the part's frame, or a tool it does not know. */
@@ -87,6 +91,9 @@ export class TriReplay {
     }
     this.stock.removePath(solid, tips, axes, step)
   }
+
+  /** Why the replay is not complete, one line each (empty when it is). */
+  get reasonList(): ReadonlyArray<string> { return this.reasons }
 
   /** Whether every move so far was placed and replayed (the part is not looked at here). */
   get replayed(): boolean { return this.reasons.length === 0 }

@@ -10,7 +10,9 @@
  *            carried stock errs by up to that cell laterally (the `stock-replay` term of the new setup states its own cell).
  *
  * A height field holds one solid run per column in its own direction; seen from another direction a column can hold several runs, and
- * all of them are summed. What it cannot hold is an undercut of the old setup (nothing reaches there with a vertical tool).
+ * all of them are summed. What a height field cannot hold is an undercut of the old setup (nothing reaches there with a vertical tool): when
+ * the residual carries the tri-dexel of the setup (`ResidualStock.solid`, a job whose setup cuts under an overhang) the columns are read
+ * from it instead, and the void is air.
  */
 import { applyPoint, type Transform } from "../../cad/brep/math.ts"
 import type { ResidualStock } from "./contracts.ts"
@@ -36,6 +38,8 @@ export const carriedColumns = (residual: ResidualStock, into: Transform): ((x: n
   const solidAt = (x: number, y: number, z: number): boolean => {
     const cad = applyPoint(back, { x, y, z })
     const p = applyPoint(old, cad)
+    // On the tri-dexel the column keeps its voids: several solid runs, not one run from the floor to a top.
+    if (r.solid !== undefined) return r.solid.stock.solidAt({ x: p.x - r.solid.origin.x, y: p.y - r.solid.origin.y, z: p.z - r.solid.origin.z })
     const i = Math.floor((p.x - r.origin.x - r.minX) / r.cellX), j = Math.floor((p.y - r.origin.y - r.minY) / r.cellY)
     if (i < 0 || j < 0 || i >= r.nx || j >= r.ny) return false
     const w = p.z - r.origin.z

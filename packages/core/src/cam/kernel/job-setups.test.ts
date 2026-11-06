@@ -2,7 +2,8 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { Schema } from "effect"
 import type { ManufacturingJob } from "./contracts.ts"
-import { runJob } from "./execute.ts"
+import { runJob, solidOf } from "./execute.ts"
+import type { Feature } from "../../cad/history.ts"
 import { findMachine } from "./machines.ts"
 import { JobSetupSchema } from "./schema.ts"
 import { jobOfSnapshot } from "./snapshot.ts"
@@ -120,5 +121,60 @@ describe("N identical parts as a pattern of one setup", () => {
     expect(limits[0]).toMatch(/setup side cuts under overhangs \(tslot\).*back and the setups after it/)
     // The last setup hands nothing on, so an undercut there is not a carry problem.
     expect(carryLimitsOf([{ id: "top", kinds: ["flat"] }, { id: "last", kinds: ["dovetail"] }])).toEqual([])
+  })
+})
+
+describe("a carried stock keeps the void of an undercut (tri-dexel hand-over)", () => {
+  // A 30 mm plate with a Ø12 pilot and a Ø16 x 12 mm counterbore bored up from the underside by a back-boring bar: under the plate
+  // the counterbore is a void below material, which a height field (one solid run per column) cannot hold.
+  const rect = (id: string, x: number, y: number, width: number, height: number): Feature =>
+    ({ id, type: "sketch", plane: "XY", sketch: { entities: [], constraints: [], shapes: [{ id: `${id}r`, kind: "rectangle", at: [x, y], width, height }] } }) as Feature
+  const under = { id: "under", type: "plane", from: { kind: "points", points: [[0, 0, 0], [1, 0, 0], [0, -1, 0]] } } as Feature
+  const bb = { id: "bb", type: "hole", plane: "under", at: [40, -25], diameter: 12, depth: 30, kind: "counterbore", headDiameter: 16, headDepth: 12 } as Feature
+  const part = { id: "p", type: "parametric", name: "Plate", x: 0, y: 0, z: 0, history: { parameters: {}, features: [rect("base", 0, 0, 80, 50), { id: "plate", type: "extrude", sketch: "base", depth: 30, operation: "new" } as Feature, under, bb] } }
+  const carriedJob = (): ManufacturingJob => ({
+    schemaVersion: 1, id: "undercut", name: "Undercut plate", material: "6061", part: { kind: "elements", elements: [part] },
+    stock: { min: { x: -2, y: -2, z: 0 }, max: { x: 82, y: 52, z: 31 } }, machine: findMachine("vmc-standard")!, quality: { resolution: 0.5 },
+    breadth: { holeCycles: true }, carryStock: true, setups: [{ id: "top" }, { id: "back", orientation: "-Z" }]
+  })
+
+  test("the setup that bores under the plate keeps the counterbore as a void on its tri-dexel, and the flip starts from it", () => {
+    const ran = runSetups(carriedJob())
+    if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
+    const [top, back] = ran.value.setups
+    expect(top!.artifact.tools.some((t) => t.kind === "boringbar")).toBe(true)
+    const held = solidOf(top!.artifact)
+    expect(held?.carry.complete).toBe(true)
+    // In the top setup's frame the stock stands from z 0 to 31 over the stock box; the counterbore (Ø16, 12 mm up from the underside)
+    // is air under solid plate: a ray through it holds two runs (the stock above the ceiling, none below).
+    const at = (x: number, z: number) => held!.carry.stock.solidAt({ x: x - held!.carry.origin.x, y: 25 - held!.carry.origin.y, z: z - held!.carry.origin.z })
+    const probe = (x: number, z: number): boolean => at(x, z)
+    // r = 7 from the bore axis (between the pilot and the counterbore wall): void below the ceiling at z = 12, plate above it.
+    const x = 40 + 7
+    expect(probe(x, 5)).toBe(false)
+    expect(probe(x, 20)).toBe(true)
+    // Far from the bore the plate stands the whole way up.
+    expect(probe(10, 5)).toBe(true)
+    // The next setup's carried stock is read from that solid: its artifact says the stock was carried and the limit is lifted.
+    expect(back!.artifact.stock.initialVolume).toBeLessThan(top!.artifact.stock.initialVolume)
+    const coverage = ran.value.claims.find((c) => c.id === "part-coverage")!
+    expect(coverage.detail).toMatch(/tri-dexel that keeps the void/)
+    expect(coverage.detail).not.toMatch(/height field, which cannot hold that void/)
+  })
+
+  test("when the tri-dexel replay cannot see every move the limit stays, named, and the claim is unresolved", () => {
+    const ran = runSetups(carriedJob(), { replayWorkLimit: 2e5 })
+    if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
+    const coverage = ran.value.claims.find((c) => c.id === "part-coverage")!
+    expect(coverage.status).toBe("unresolved")
+    expect(coverage.detail).toMatch(/height field, which cannot hold that void/)
+    expect(ran.value.release).not.toBe("verified-program")
+  })
+
+  test("a carried job without an undercut is not run twice and keeps no tri-dexel", () => {
+    const plain: ManufacturingJob = { ...v1, id: "plain", carryStock: true, setups: [{ id: "top" }, { id: "back", orientation: "-Z" }] }
+    const ran = runSetups(plain)
+    if (ran.status !== "ok") throw new Error(ran.issues.map((i) => i.message).join("; "))
+    expect(ran.value.setups.every((r) => solidOf(r.artifact) === undefined)).toBe(true)
   })
 })

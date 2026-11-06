@@ -71,6 +71,7 @@ import {
   type CuttingOperationSpec,
   type ReleaseLevel,
   type ResidualStock,
+  type SolidCarry,
   type StockBox,
   type StockSummary
 } from "./contracts.ts"
@@ -538,6 +539,12 @@ export interface RunOptions extends PrepareOptions {
   readonly signal?: { readonly aborted: boolean }
   /** Cell visits the stock replay may spend (default `REPLAY_WORK_LIMIT`); a program past it is replayed up to the budget and the rest reported unchecked. */
   readonly replayWorkLimit?: number
+  /**
+   * Also replay every cutting move on a tri-dexel stock and keep it beside the artifact (`solidOf`): the stock this setup leaves with
+   * the voids of its undercut cutters, for the next setup of a carried job. `seed` is the stock the earlier setup left, read through
+   * this setup's frame. The claims of the setup are not decided by it (only the table-turned moves are).
+   */
+  readonly solidCarry?: { readonly seed?: SolidCarry }
 }
 
 /**
@@ -563,14 +570,14 @@ export const executeJob = (prepared: PreparedJob, options: RunOptions = {}): Cam
     return executeJobWith(prepared, (progress) => {
       if (options.signal?.aborted === true) throw new Cancelled()
       options.onProgress?.(progress)
-    }, options.replayWorkLimit ?? REPLAY_WORK_LIMIT)
+    }, options.replayWorkLimit ?? REPLAY_WORK_LIMIT, options.solidCarry)
   } catch (error) {
     if (error instanceof Cancelled) return { status: "failed", issues: [issue("Cancelled", "prepare", "The job was cancelled before it finished; no artifact was produced")] }
     throw error
   }
 }
 
-const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProgress) => void, replayLimit: number): CamResult<CamArtifact> => {
+const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProgress) => void, replayLimit: number, solid?: { readonly seed?: SolidCarry }): CamResult<CamArtifact> => {
   const { job, material, tools, machine, origin, stock, operations } = prepared
   const issues: CamIssue[] = []
   const o = origin
@@ -1261,8 +1268,19 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
     turnedVoxels = turnedStock
     // Spec 72 step 0.3: when the table turns, the stock is also replayed on the tri-dexel, move by move and in program order, so the
     // gouge and leftover verdicts rest on a stock whose error is declared and not on a bracket of voxels.
-    if (five !== undefined && (interpreted.segments as ReadonlyArray<GSegment>).some((q) => q.kind !== "dwell" && q.kind !== "arc" && q.rotary !== undefined)) {
-      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit, ...(stockShape !== undefined ? { shape: stockShape } : {}) })
+    if (solid !== undefined || (five !== undefined && (interpreted.segments as ReadonlyArray<GSegment>).some((q) => q.kind !== "dwell" && q.kind !== "arc" && q.rotary !== undefined))) {
+      // A carried solid is read through this setup's frame: work point -> oriented -> CAD -> the earlier setup's oriented -> its work frame.
+      const earlier = solid?.seed
+      const seed = earlier === undefined ? undefined : (() => {
+        const back = transposeOf(jobTransform(job)), old = setupTransform(earlier.orientation)
+        return (p: Vec3): boolean => {
+          const cad = applyPoint(back, { x: p.x + o.x, y: p.y + o.y, z: p.z + o.z })
+          const q = applyPoint(old, cad)
+          return earlier.stock.solidAt({ x: q.x - earlier.origin.x, y: q.y - earlier.origin.y, z: q.z - earlier.origin.z })
+        }
+      })()
+      tri = new TriReplay({ min: sMin, max: sMax, cell: triCellFor({ x: width, y: depthY, z: sMax.z - sMin.z }, replayCellSize), budget: replayLimit, ...(stockShape !== undefined ? { shape: stockShape } : {}), ...(seed !== undefined ? { seed } : {}) })
+      if (earlier !== undefined && !earlier.complete) tri.unchecked(`the stock carried from the earlier setup was not replayed completely: ${earlier.reasons.join("; ") || "unknown reason"}`)
     }
     let angles: RotaryAngles = { a: 0, b: 0, c: 0 }
     let replayWork = 0
@@ -1406,7 +1424,8 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   // the job declares them the tri-dexel does not decide that verdict and the claim stays unresolved.
   const declaredRemoval = (prepared.plan?.allowances ?? []).length > 0 || operations.some((op) => (op.strategy === "drill" && op.cycle !== undefined) || op.strategy === "chamfer" || op.strategy === "thread" || (op.strategy === "drill" && (op.cut === "tap" || toolOf(op.tool).kind === "tap")))
   const triAllowance = Math.max(0.05, prepared.scallop * 1.5)
-  const triVerdict: TriVerdict | undefined = tri?.verdict(workMeshes, prepared.tolerance, triAllowance)
+  // With the table flat the height field decides; the tri-dexel is then only the carried solid (read by `solidOf`).
+  const triVerdict: TriVerdict | undefined = turnedMoves > 0 ? tri?.verdict(workMeshes, prepared.tolerance, triAllowance) : undefined
   const triGougeFound = triVerdict !== undefined && !declaredRemoval && triVerdict.closedPart && triVerdict.gouge.depth > 0
   const triGougeDecided = triVerdict !== undefined && triVerdict.complete && !declaredRemoval
   const triLeftDecided = triVerdict !== undefined && triVerdict.complete && declaredLeft.length === 0
@@ -1648,8 +1667,11 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
 
   const toolChanges = usedTools.length
   const cycleTimeSeconds = Math.round(finalOutcomes.reduce((s, x) => s + x.timeSeconds, 0) + toolChanges * (machine.toolChangeSeconds ?? 8))
+  // The tri-dexel of a carried stock is derived from what the earlier setup's program did, which the digest of that program's NC already names.
+  const stockModelOfDigest = job.stockModel?.kind === "residual" ? { stockModel: { kind: "residual" as const, residual: (({ solid: _solid, ...rest }) => rest)(job.stockModel.residual) } } : {}
   const jobDigest = digestOf("cam-kernel/job@1", {
     ...job,
+    ...stockModelOfDigest,
     part: job.part.kind === "meshes" ? { kind: "meshes", meshes: job.part.meshes.map((m) => ({ positions: Array.from(m.positions), indices: Array.from(m.indices) })) } : job.part,
     resolved: { material: material.id, machine: machine.id, tools: tools.map((t) => t.id) }
   })
@@ -1702,11 +1724,25 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
       ...(tipErr !== undefined ? { tipError: tipErr } : {})
   }
   // The stock this program leaves, for the next setup (spec 69 C4); kept beside the artifact so the artifact stays small plain data.
+  if (tri !== undefined && solid !== undefined) {
+    const t = tri
+    SOLIDS.set(artifact, {
+      carry: { orientation: job.setupOrientation ?? "+Z", origin, stock: t.stock, complete: t.replayed && replayStoppedAt === undefined, reasons: replayStoppedAt === undefined ? [...t.reasonList] : [...t.reasonList, `the replay stopped at NC line ${replayStoppedAt}`] },
+      verdict: () => t.verdict(workMeshes, prepared.tolerance, triAllowance)
+    })
+  }
   RESIDUALS.set(artifact, { orientation: job.setupOrientation ?? "+Z", origin, nx: hf.nx, ny: hf.ny, minX: hf.minX, minY: hf.minY, cellX: hf.cellX, cellY: hf.cellY, floor: hf.floor, top: Float64Array.from(hf.top) })
   return { status: "ok", value: artifact }
 }
 
 const RESIDUALS = new WeakMap<CamArtifact, ResidualStock>()
+const SOLIDS = new WeakMap<CamArtifact, { readonly carry: SolidCarry; readonly verdict: () => TriVerdict }>()
+
+/**
+ * The tri-dexel stock a run left (only when it ran with `solidCarry`): the carry to hand to the next setup, and the comparison of that
+ * stock with the part in this setup's frame (what is left, what was cut below the part), within the declared error of the stock.
+ */
+export const solidOf = (artifact: CamArtifact): { readonly carry: SolidCarry; readonly verdict: () => TriVerdict } | undefined => SOLIDS.get(artifact)
 
 /**
  * The stock a run left, as a height field in the setup's work frame (spec 69 C4), or `undefined` for an artifact that did not come from
