@@ -343,7 +343,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `precision-and-tolerances` | cam | 2609 | cam_edit, parts |
 | `industrial-standards` | cad | 5993 | cad, library, parts |
 | `machines-and-axes` | cam | 9381 | cam, cam_edit, parts |
-| `probing-and-inspection` | cam | 7119 | cad, cam, cam_edit, library_edit |
+| `probing-and-inspection` | cam | 8181 | cad, cam, cam_edit, library_edit |
 | `drawings-and-images` | cad | 2420 | cad, cad_edit, parts |
 | `plugin-authoring` | dev | 1659 | — |
 | `cad-naming` | cad | 2763 | cad, cad_edit, parts |
