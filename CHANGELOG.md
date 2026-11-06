@@ -3,6 +3,16 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.105 (November 2026)
+
+## Desktop
+
+- Reject a permission with feedback, nikcli style
+
+## Documentation
+
+- Record the reminders and /goal audit against nikcli
+
 ## v0.1.104 (November 2026)
 
 ## Sidecar
