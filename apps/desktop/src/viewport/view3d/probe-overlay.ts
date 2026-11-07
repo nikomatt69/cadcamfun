@@ -80,6 +80,11 @@ export const OVERLAY_LAYERS: ReadonlyArray<OverlayLayer> = ["contacts", "deviati
 
 export interface ProbeOverlay {
   readonly root: THREE.Group
+  /**
+   * What is on the part (contacts, deviations, work coordinate triads, tilted frames): the viewport turns it with the rotary
+   * table in the machine frame, as it turns the path. The calibration spheres stay in the root: they are machine positions.
+   */
+  readonly part: THREE.Group
   /** Reveal what playback reached by `seconds`; `Infinity` shows the whole run. True when something on screen changed. */
   update(seconds: number): boolean
   /** The last contact playback has reached by `seconds` (undefined before the first, or when the run has no timeline). */
@@ -99,11 +104,21 @@ export interface ProbeOverlayOptions {
   readonly triadLength?: number
   readonly contactRadius?: number
   readonly layers?: Partial<Record<OverlayLayer, boolean>>
+  /**
+   * Program point -> part frame at a playback time (a rotary program in machine coordinates: turned back by the angles in force
+   * at that time). Absent: points are drawn as they are.
+   */
+  readonly toPart?: (p: Vec3, time: number | undefined) => Vec3
 }
 
 export const createProbeOverlay = (model: ProbeOverlayModel, options: ProbeOverlayOptions = {}): ProbeOverlay => {
   const root = new THREE.Group()
   root.name = "probe-overlay"
+  const part = new THREE.Group()
+  part.name = "probe:on-part"
+  root.add(part)
+  const toPart = options.toPart ?? ((p: Vec3) => p)
+  const timeOf = new Map(model.contacts.map((c) => [c.index, c.time]))
   const length = options.triadLength ?? 30
   const radius = options.contactRadius ?? 0.6
   const layers: Record<OverlayLayer, boolean> = { contacts: true, deviations: true, wcs: true, frames: true, calibration: true, ...options.layers }
@@ -116,17 +131,19 @@ export const createProbeOverlay = (model: ProbeOverlayModel, options: ProbeOverl
   const contacts = model.contacts.map((c) => {
     const mesh = new THREE.Mesh(contactGeometry, mat(new THREE.MeshBasicMaterial({ color: PROBE_COLORS.contact })))
     mesh.name = `probe:contact:${c.index}`
-    mesh.position.set(c.tip.x, c.tip.y, c.tip.z)
+    const tip = toPart(c.tip, c.time)
+    mesh.position.set(tip.x, tip.y, tip.z)
     mesh.userData = { time: c.time, name: c.name }
-    root.add(mesh)
+    part.add(mesh)
     return mesh
   })
   const deviations = model.deviations.map((d) => {
-    const line = new THREE.Line(own(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(d.from.x, d.from.y, d.from.z), new THREE.Vector3(d.to.x, d.to.y, d.to.z)])),
+    const from = toPart(d.from, timeOf.get(d.index)), to = toPart(d.to, timeOf.get(d.index))
+    const line = new THREE.Line(own(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(from.x, from.y, from.z), new THREE.Vector3(to.x, to.y, to.z)])),
       mat(new THREE.LineBasicMaterial({ color: PROBE_COLORS.deviation })))
     line.name = `probe:deviation:${d.index}`
     line.userData = { magnitude: d.magnitude, contact: d.index }
-    root.add(line)
+    part.add(line)
     return line
   })
   const before = triad(frameAxes(), length, "probe:wcs:before", { opacity: 0.35 })
@@ -137,11 +154,11 @@ export const createProbeOverlay = (model: ProbeOverlayModel, options: ProbeOverl
   const wcs = new THREE.Group()
   wcs.name = "probe:wcs"
   wcs.add(before, after)
-  root.add(wcs)
+  part.add(wcs)
   const frames = model.frames.map((f, i) => {
     const frame = triad(frameAxes(f.x, f.y), length * 0.6, `probe:frame:${i}`)
     frame.position.set(f.origin.x, f.origin.y, f.origin.z)
-    root.add(frame)
+    part.add(frame)
     return frame
   })
   const spheres = model.spheres.map((sphere, i) => {
@@ -190,6 +207,7 @@ export const createProbeOverlay = (model: ProbeOverlayModel, options: ProbeOverl
   update(Infinity)
   return {
     root,
+    part,
     update,
     reached: (seconds) => {
       let best: number | undefined

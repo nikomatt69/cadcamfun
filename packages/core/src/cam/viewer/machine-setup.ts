@@ -5,7 +5,8 @@
  *            nothing; the table is under it. The stock box is in program (work) coordinates.
  *   lathe    the stock bar turns with the chuck about the spindle axis (machine Z); the tool travels in X (diameter or
  *            radius) and Z on a rear or front turret. No Y.
- *   printer  nothing turns; the nozzle deposits on a bed of the given size and origin.
+ *   printer  nothing turns; the nozzle deposits on a bed of the given size and origin. A 4/5-axis printer (A/B/C words) tilts
+ *            its bed or its head like a mill's rotary table (`rotary.ts`).
  *
  * Every builder fills what the settings do not say with defaults and records it in `assumed`: the preview draws assumed parts
  * translucent and the checks never report them as verified (principle 4 of the spec).
@@ -86,6 +87,8 @@ export interface PrinterSetup {
   readonly extrusionWidth: number
   /** The hot end as the preview draws it (`tool-model.ts`). */
   readonly tool: NozzleModel
+  /** A 4/5-axis (rotary) print: the tilting bed or head and the frame of its coordinates (`rotary.ts`). */
+  readonly rotary?: RotarySetup
   readonly assumed: ReadonlyArray<AssumedPart>
 }
 
@@ -179,13 +182,64 @@ export const withTurnMill = (setup: MachineSetup, program: Program): MachineSetu
   return used.b || used.y || used.cPositioned ? { ...base, turnMill: { b: [-120, 120] as const } } : base
 }
 
-/** A mill set-up with the rotary table its program uses (none for a 3-axis program). */
+/** The rotary table or head of a mill or printer set-up (a lathe's mill-turn axes are `LatheSetup.turnMill`). */
+export const setupRotary = (setup: MachineSetup | undefined): RotarySetup | undefined =>
+  setup?.kind === "mill" || setup?.kind === "3dprinter" ? setup.rotary : undefined
+
+/** A mill or printer set-up with the rotary table its program uses (none for a 3-axis program); a lathe gets its mill-turn axes. */
 export const withRotary = (setup: MachineSetup, program: Program, gcode = "", pivot?: Vec3): MachineSetup => {
   if (setup.kind === "lathe") return withTurnMill(setup, program)
-  if (setup.kind !== "mill") return setup
+  if (setup.kind === "3dprinter") {
+    // The bed's centre is the assumed pivot of a tilting bed; printer firmware has no TCP, so its coordinates are the machine's.
+    const centre = setup.bed.origin === "center" ? { x: 0, y: 0, z: 0 } : { x: setup.bed.width / 2, y: setup.bed.depth / 2, z: 0 }
+    const rotary = rotaryOfProgram(program, gcode, pivot ?? centre, undefined, "machine")
+    const { rotary: _drop, ...rest } = setup
+    void _drop
+    return rotary === undefined ? rest : { ...rest, rotary }
+  }
   const rotary = rotaryOfProgram(program, gcode, pivot)
   if (rotary === undefined) { const { rotary: _drop, ...rest } = setup; void _drop; return { ...rest, axes: 3 } }
   return { ...setup, rotary, axes: 5 }
+}
+
+/**
+ * The rotary table a library machine describes (`cam.kernel.MachineRotary`, structurally): its layout, pivot (the measured one
+ * after a calibration), whether the control applies TCP and its ranges. It replaces what the program's words let the preview
+ * assume, on a mill and on a printer; a 3-axis program stays 3-axis.
+ */
+export interface ProfileRotary {
+  readonly layout?: "table-AC" | "table-BC"
+  readonly tilt?: { readonly min: number; readonly max: number }
+  readonly rotation?: { readonly min: number; readonly max: number }
+  readonly pivot?: Vec3
+  readonly tcp?: "control" | "program"
+  readonly calibration?: { readonly pivotMeasured?: Vec3 }
+}
+
+export const withProfileRotary = (setup: MachineSetup, profile: ProfileRotary | undefined): MachineSetup => {
+  const rotary = setupRotary(setup)
+  if (profile === undefined || rotary === undefined || setup.kind === "lathe") return setup
+  const reasons = [...rotary.reasons]
+  const pivot = profile.calibration?.pivotMeasured ?? profile.pivot
+  if (profile.layout !== undefined) reasons.push(`the machine profile is a ${profile.layout}`)
+  if (pivot !== undefined) reasons.push(profile.calibration?.pivotMeasured !== undefined ? "pivot measured by the last rotary calibration" : "pivot from the machine profile")
+  if (profile.tcp !== undefined) reasons.push(profile.tcp === "control" ? "the machine's control applies TCP: part coordinates" : "the machine runs without TCP: machine coordinates")
+  const limits = {
+    ...(profile.tilt !== undefined ? { tilt: [profile.tilt.min, profile.tilt.max] as const } : {}),
+    ...(profile.rotation !== undefined ? { rotation: [profile.rotation.min, profile.rotation.max] as const } : {})
+  }
+  // An indexed (Orient) program is in machine coordinates whatever the control can do.
+  const indexed = rotary.reasons.some((r) => r.startsWith("indexed"))
+  const next: RotarySetup = {
+    ...rotary,
+    ...(profile.layout !== undefined ? { layout: profile.layout } : {}),
+    ...(pivot !== undefined ? { pivot } : {}),
+    ...(profile.tcp !== undefined && !indexed ? { coordinates: profile.tcp === "control" ? "part" as const : "machine" as const } : {}),
+    ...(limits.tilt !== undefined || limits.rotation !== undefined ? { limits } : {}),
+    assumed: rotary.assumed && (profile.layout === undefined || pivot === undefined || (profile.tcp === undefined && !indexed)),
+    reasons
+  }
+  return { ...setup, rotary: next }
 }
 
 export interface SetupProblem {

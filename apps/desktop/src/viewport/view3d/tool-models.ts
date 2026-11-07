@@ -23,6 +23,8 @@ export const previewToolFor = (id: string, sources: ToolSources): cam.ToolModel 
 
 /** Tip to spindle nose of a tool as drawn: through its holder (the assumed one when it names none). */
 export const gaugeOfTool = (model: cam.ToolModel | undefined, withHolder = true): number => {
+  // A printer's machine model measures its carriage from the nozzle tip.
+  if (model?.family === "nozzle") return 0
   if (model === undefined || (model.family !== "mill" && model.family !== "probe")) return 60
   return cam.toolProfile(model.family === "mill" && withHolder ? { ...model, holder: model.holder ?? cam.assumedHolderOf(model) } : model).length
 }

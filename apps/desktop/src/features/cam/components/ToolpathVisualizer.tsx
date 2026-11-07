@@ -200,10 +200,14 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     const layout = cam.viewer.MACHINE_PRESETS.find((p) => p.id === machinePreset())?.layout
     return setup?.kind === "mill" && setup.rotary !== undefined && layout !== undefined ? { ...setup, rotary: { ...setup.rotary, layout } } : setup
   })
+  const rotary = (): cam.viewer.RotarySetup | undefined => cam.viewer.setupRotary(effectiveMachine())
   /** The machine's own axis values at the playhead (the machine DRO): the tool tip in machine coordinates and A B C. */
   const joints = createMemo(() => {
     const model = machineInfo()?.model, r = readout()
     if (props.machine?.kind === "lathe" && props.machine.turnMill !== undefined && r !== undefined) return { ...r.program, b: r.angles.b ?? 0, c: r.angles.c ?? 0 }
+    // A rotary printer has no machine model: its axes are the program's (firmware without TCP) with the angles in force.
+    const printer = props.machine?.kind === "3dprinter" ? props.machine.rotary : undefined
+    if (printer !== undefined && r !== undefined) return { ...cam.viewer.machinePointOf(r.program, r.angles, printer), ...r.angles }
     return model !== undefined && r !== undefined ? cam.viewer.machinePose(model, r.program, r.angles, rotary(), 0, "machine").joints : undefined
   })
   const [stopAtCollision, setStopAtCollision] = createSignal(true)
@@ -228,6 +232,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
    */
   const collisions = createMemo((): ReadonlyArray<cam.viewer.CollisionEvent> => {
     const setup = effectiveMachine()
+    // A rotary printer: its nozzle and carriage against the tilted bed.
+    if (setup?.kind === "3dprinter") return cam.viewer.checkCollisions({ setup, timeline: timeline(), reachOf: () => undefined })
     if (setup === undefined || setup.kind !== "mill") return []
     const toolOf = (path: number) => previewToolFor(props.program.toolpaths[path]?.toolId ?? "", props)
     const model = showMachine() ? cam.viewer.machineModelOf(setup, machineOptions()) : undefined
@@ -265,18 +271,18 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const limits = createMemo((): ReadonlyArray<cam.viewer.LimitFinding> => {
     const setup = effectiveMachine()
     if (setup?.kind === "lathe") return cam.viewer.turnMillLimitFindings(setup, timeline())
-    if (setup === undefined || setup.kind !== "mill" || (!showMachine() && setup.rotary === undefined)) return []
-    const model = cam.viewer.machineModelOf(setup, machineOptions())
+    const printer = setup?.kind === "3dprinter"
+    if (setup === undefined || (setup.kind !== "mill" && !printer) || (!showMachine() && rotary() === undefined)) return []
+    const model = cam.viewer.machineModelOf(setup, printer ? {} : machineOptions())
     if (model === undefined) return []
-    const found = cam.viewer.checkLimits(model, timeline(), setup.rotary, (path) => gaugeOfTool(previewToolFor(props.program.toolpaths[path]?.toolId ?? "", props), showHolder()))
+    const found = cam.viewer.checkLimits(model, timeline(), rotary(), (path) => printer ? 0 : gaugeOfTool(previewToolFor(props.program.toolpaths[path]?.toolId ?? "", props), showHolder()))
     return showMachine() ? found : found.filter((f) => f.code === "SINGULARITY" || f.code === "C_UNWIND")
   })
   const limitMarkers = createMemo(() => findingTimes(timeline(), limits().map((f) => ({ ...(f.line !== undefined ? { line: f.line } : {}), severity: f.severity, message: f.message }))))
-  const rotary = (): cam.viewer.RotarySetup | undefined => { const setup = effectiveMachine(); return setup?.kind === "mill" ? setup.rotary : undefined }
   // Each machine opens on the view its operator reads: a lathe from the front (the XZ plane flat, the chuck on the left).
-  const multiAxis = (): boolean => props.machine?.kind === "mill" ? props.machine.rotary !== undefined : props.machine?.kind === "lathe" && props.machine.turnMill !== undefined
+  const multiAxis = (): boolean => props.machine?.kind === "lathe" ? props.machine.turnMill !== undefined : cam.viewer.setupRotary(props.machine) !== undefined
   const presetFor = (kind: cam.MachineKind | undefined): ViewPreset => kind === "lathe" && !multiAxis() ? "front" : "perspective"
-  createEffect(on(() => `${props.machine?.kind}:${props.machine?.kind === "mill" ? props.machine.rotary?.layout ?? "plain" : multiAxis()}`, () => {
+  createEffect(on(() => `${props.machine?.kind}:${props.machine?.kind === "lathe" ? multiAxis() : cam.viewer.setupRotary(props.machine)?.layout ?? "plain"}`, () => {
     setPreset(props.machine?.kind === "lathe" && !multiAxis() ? "front" : "perspective")
     setLayer(undefined); setFrame(multiAxis() ? "machine" : "part"); setShowMachine(multiAxis()); setMachinePreset("auto")
   }))
@@ -528,7 +534,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                   </div>
                 )}</Show>
                 <Show when={machine().assumed.includes("workholding")}><div class="text-amber-300">{t("cam.visualizer.assumedWorkholding")}</div></Show>
-                <For each={(machineInfo()?.findings ?? []).slice(0, 3)}>{(f) => (
+                <For each={(machineInfo()?.findings ?? []).filter((f) => !cam.viewer.PRINTER_COLLISION_CODES.has(f.code)).slice(0, 3)}>{(f) => (
                   <div data-testid="visualizer-finding" class={f.severity === "error" ? "text-red-400" : "text-amber-300"}>{t("cam.visualizer.setupFindings")}: {f.message}{f.count > 1 ? ` (×${f.count})` : ""}</div>
                 )}</For>
               </div>
@@ -554,7 +560,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
               colors={bandColors()}
               names={names()}
               toolChanges={toolChangeTimes(props.program, spans())}
-              markers={[...findingTimes(timeline(), machineInfo()?.findings ?? []), ...limitMarkers(), ...collisions().map((e) => ({ seconds: e.seconds, severity: e.severity, message: e.message }))]}
+              markers={[...findingTimes(timeline(), (machineInfo()?.findings ?? []).filter((f) => !cam.viewer.PRINTER_COLLISION_CODES.has(f.code))), ...limitMarkers(), ...collisions().map((e) => ({ seconds: e.seconds, severity: e.severity, message: e.message }))]}
               rate={rate()}
               onRate={setRate}
               autoResume={runThrough()}
@@ -702,6 +708,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                       </select>
                     </label>
                   )}</Show>
+                  <Show when={machine().kind === "3dprinter" && rotary() !== undefined}>{toggle(t("cam.visualizer.showMachine"), showMachine, setShowMachine)}</Show>
                   <Show when={machine().kind === "3dprinter"}>
                     <label class="block text-xs text-slate-200">{t("cam.visualizer.deposit")}
                       <select class="mt-1 w-full rounded border border-slate-600 bg-slate-800 p-1.5" value={depositMode()} onChange={(event) => setDepositMode(event.currentTarget.value as "progressive" | "all")}>

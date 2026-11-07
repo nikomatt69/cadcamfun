@@ -30,7 +30,9 @@ test("objects are named, contacts appear as playback reaches them, the triad mov
     frames: [{ origin: { x: 0, y: 0, z: 10 }, x: { x: 1, y: 0, z: 0 }, y: { x: 0, y: Math.SQRT1_2, z: Math.SQRT1_2 } }], spheres: [{ centre: { x: 0, y: 0, z: 50 }, diameter: 25 }] })
   const overlay = createProbeOverlay(model)
   const names = (o: THREE.Object3D) => o.children.map((c) => c.name)
-  expect(names(overlay.root)).toEqual(["probe:contact:0", "probe:contact:1", "probe:deviation:0", "probe:deviation:1", "probe:wcs", "probe:frame:0", "probe:calibration:0"])
+  // What is on the part turns with the rotary table; the calibration spheres are machine positions.
+  expect(names(overlay.root)).toEqual(["probe:on-part", "probe:calibration:0"])
+  expect(names(overlay.part)).toEqual(["probe:contact:0", "probe:contact:1", "probe:deviation:0", "probe:deviation:1", "probe:wcs", "probe:frame:0"])
   overlay.update(1.2)
   expect(overlay.root.getObjectByName("probe:contact:0")!.visible).toBe(true)
   expect(overlay.root.getObjectByName("probe:contact:1")!.visible).toBe(false)

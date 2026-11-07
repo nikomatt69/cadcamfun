@@ -17,7 +17,7 @@ import type { MachineSetup } from "./machine-setup.ts"
 import { headRotationOf, machinePointOf, rotationOf, type Angles, type MachineRotaryLayout, type RotarySetup } from "./rotary.ts"
 import { poseAt, type Timeline } from "./timeline.ts"
 
-export type MachinePresetId = "vmc-3" | "vmc-4a" | "trunnion-ac" | "trunnion-bc" | "head-table-bc" | "head-head-ac" | "router-gantry"
+export type MachinePresetId = "vmc-3" | "vmc-4a" | "trunnion-ac" | "trunnion-bc" | "head-table-bc" | "head-head-ac" | "router-gantry" | "printer-5axis"
 
 export const MACHINE_PRESETS: ReadonlyArray<{ readonly id: MachinePresetId; readonly name: string; readonly layout?: MachineRotaryLayout }> = [
   { id: "vmc-3", name: "Vertical machining centre (table X/Y, head Z)" },
@@ -70,8 +70,15 @@ const v = (x: number, y: number, z: number): Vec3 => ({ x, y, z })
 const box = (id: string, link: LinkRole, min: Vec3, max: Vec3): ModelBody => ({ id, link, shape: { type: "box", min, max } })
 const cyl = (id: string, link: LinkRole, axis: Axis3, center: Vec3, radius: number, length: number): ModelBody => ({ id, link, shape: { type: "cylinder", axis, center, radius, length } })
 
+/** A 4/5-axis printer: its gantry, the trunnion and cradle of a tilting bed or the fork of a tilting head. Not offered as a mill class. */
+export const PRINTER_PRESET = { id: "printer-5axis" as const, name: "5-axis printer (gantry, tilting bed or head)" }
+
+/** Tilt range assumed for a printer's bed or head when its profile does not say, degrees. */
+export const PRINTER_TILT_ASSUMED: readonly [number, number] = [-90, 90]
+
 /** The preset a set-up calls for: its rotary layout, else a VMC. */
 export const presetFor = (setup: MachineSetup): MachinePresetId => {
+  if (setup.kind === "3dprinter") return "printer-5axis"
   if (setup.kind !== "mill" || setup.rotary === undefined) return "vmc-3"
   switch (setup.rotary.layout) {
     case "table-BC": return "trunnion-bc"
@@ -86,6 +93,7 @@ export const presetFor = (setup: MachineSetup): MachinePresetId => {
  * workholding; travels and rotary limits come from `options` or are typical of the class (and listed as assumed).
  */
 export const machineModelOf = (setup: MachineSetup, options: MachineModelOptions = {}): MachineModel | undefined => {
+  if (setup.kind === "3dprinter") return printerModelOf(setup, options)
   if (setup.kind !== "mill") return undefined
   const preset = options.preset ?? presetFor(setup)
   const info = MACHINE_PRESETS.find((p) => p.id === preset)!
@@ -97,8 +105,12 @@ export const machineModelOf = (setup: MachineSetup, options: MachineModelOptions
   const tableTop = s.min.z - hold
   const L = setup.table.length, W = setup.table.width
   const travel = options.travel ?? (assumed.push("travel"), { x: Math.max(L * 0.8, 300), y: Math.max(W, 250), z: Math.max(400, (s.max.z - tableTop) + 300) })
-  const tilt = options.tilt ?? (info.layout !== undefined ? (assumed.push("rotary limits"), [-120, 120] as const) : undefined)
-  const rotaryLimits: MachineModel["rotaryLimits"] = info.layout === "table-AC" || info.layout === "head-head-AC" ? (tilt ? { a: tilt } : {}) : info.layout !== undefined && tilt ? { b: tilt } : {}
+  const tilt = options.tilt ?? setup.rotary?.limits?.tilt ?? (info.layout !== undefined ? (assumed.push("rotary limits"), [-120, 120] as const) : undefined)
+  const rotation = setup.rotary?.limits?.rotation
+  const rotaryLimits: MachineModel["rotaryLimits"] = {
+    ...(info.layout === "table-AC" || info.layout === "head-head-AC" ? (tilt ? { a: tilt } : {}) : info.layout !== undefined && tilt ? { b: tilt } : {}),
+    ...(info.layout !== undefined && rotation !== undefined ? { c: rotation } : {})
+  }
   const tableCarries: ReadonlyArray<Axis3> = preset === "vmc-3" || preset === "vmc-4a" ? ["x", "y"] : preset === "trunnion-ac" || preset === "trunnion-bc" ? ["y"] : []
   const columnCarries: ReadonlyArray<Axis3> = preset === "router-gantry" ? ["y"] : preset === "vmc-3" || preset === "vmc-4a" ? [] : ["x"]
   const pivot = setup.rotary?.pivot ?? v(cx, cy, tableTop)
@@ -163,6 +175,64 @@ export const machineModelOf = (setup: MachineSetup, options: MachineModelOptions
     preset, name: info.name, ...(info.layout !== undefined ? { layout: info.layout } : {}), tableCarries, columnCarries,
     travel: { x: [cx - travel.x / 2, cx + travel.x / 2], y: [cy - travel.y / 2, cy + travel.y / 2], z: [tableTop, tableTop + travel.z] },
     rotaryLimits, pivot, bodies, assumed
+  }
+}
+
+/**
+ * The machine model of a rotary printer: a frame under the bed, two uprights and a beam that follows Y, the carriage with the
+ * hot end; a tilting bed sits on a cradle between trunnion supports (on the tilt axis through the pivot), a tilting head hangs
+ * in a fork. The travels are the bed and the build height (assumed: a printer does not state its travel apart from its bed).
+ * A 3-axis printer has no model: nothing turns.
+ */
+const printerModelOf = (setup: MachineSetup & { readonly kind: "3dprinter" }, options: MachineModelOptions): MachineModel | undefined => {
+  const rotary = setup.rotary
+  if (rotary === undefined) return undefined
+  const assumed: string[] = ["travel"]
+  const { width: w, depth: d, origin } = setup.bed
+  const x0 = origin === "corner" ? 0 : -w / 2, y0 = origin === "corner" ? 0 : -d / 2
+  const x1 = x0 + w, y1 = y0 + d, H = setup.buildHeight
+  const p = rotary.pivot
+  const layout = rotary.layout
+  const tiltAxis: "a" | "b" = layout === "table-BC" || layout === "head-table-BC" ? "b" : "a"
+  const tilt = options.tilt ?? rotary.limits?.tilt ?? (assumed.push("rotary limits"), PRINTER_TILT_ASSUMED)
+  const rotation = rotary.limits?.rotation
+  const table = layout === "table-AC" || layout === "table-BC"
+  const bodies: ModelBody[] = []
+  const floor = Math.min(0, p.z) - 140
+  bodies.push(box("frame", "base", v(x0 - 80, y0 - 80, floor - 30), v(x1 + 80, y1 + 80, floor)))
+  bodies.push(box("upright-left", "base", v(x0 - 80, -20 + (y0 + y1) / 2, floor), v(x0 - 50, 20 + (y0 + y1) / 2, H + 120)))
+  bodies.push(box("upright-right", "base", v(x1 + 50, -20 + (y0 + y1) / 2, floor), v(x1 + 80, 20 + (y0 + y1) / 2, H + 120)))
+  // The beam rides on the uprights along Y with the carriage; the carriage hangs from it over the nozzle.
+  bodies.push(box("beam", "column", v(x0 - 80, -18, H + 80), v(x1 + 80, 18, H + 120)))
+  bodies.push(box("carriage", "head", v(-28, -28, 30), v(28, 28, 90)))
+  if (layout === "head-head-AC") {
+    bodies.push(cyl("fork", "fork", "z", v(0, 0, 70), 30, 30))
+    bodies.push(box("fork-arm-left", "fork", v(-34, -10, 10), v(-26, 10, 60)))
+    bodies.push(box("fork-arm-right", "fork", v(26, -10, 10), v(34, 10, 60)))
+  } else if (layout === "head-table-BC") {
+    bodies.push(cyl("b-axis", "fork", "y", v(0, 0, 45), 18, 60))
+  }
+  bodies.push(cyl("hot-end", "spindle", "z", v(0, 0, 18), 9, 24))
+  if (table) {
+    // The cradle carries the bed (the bed itself is the set-up's, drawn with the deposits); the supports stand on the tilt axis.
+    bodies.push(box("cradle", "cradle", v(x0 - 10, y0 - 10, -26), v(x1 + 10, y1 + 10, -8)))
+    if (tiltAxis === "b") {
+      bodies.push(box("trunnion-front", "base", v(p.x - 30, y0 - 60, floor), v(p.x + 30, y0 - 25, p.z + 25)))
+      bodies.push(box("trunnion-back", "base", v(p.x - 30, y1 + 25, floor), v(p.x + 30, y1 + 60, p.z + 25)))
+      bodies.push(cyl("tilt-shaft", "cradle", "y", v(p.x, (y0 + y1) / 2, p.z), 10, d + 50))
+    } else {
+      bodies.push(box("trunnion-left", "base", v(x0 - 60, p.y - 30, floor), v(x0 - 25, p.y + 30, p.z + 25)))
+      bodies.push(box("trunnion-right", "base", v(x1 + 25, p.y - 30, floor), v(x1 + 60, p.y + 30, p.z + 25)))
+      bodies.push(cyl("tilt-shaft", "cradle", "x", v((x0 + x1) / 2, p.y, p.z), 10, w + 50))
+    }
+  } else {
+    bodies.push(box("bed-frame", "table", v(x0 - 10, y0 - 10, -26), v(x1 + 10, y1 + 10, -8)))
+  }
+  return {
+    preset: PRINTER_PRESET.id, name: PRINTER_PRESET.name, layout, tableCarries: [], columnCarries: ["y"],
+    travel: { x: [x0, x1], y: [y0, y1], z: [0, H] },
+    rotaryLimits: { [tiltAxis]: tilt, ...(rotation !== undefined ? { c: rotation } : {}) },
+    pivot: p, bodies, assumed
   }
 }
 

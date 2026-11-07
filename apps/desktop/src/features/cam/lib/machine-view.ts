@@ -44,7 +44,11 @@ export const previewSetup = (
   kind: cam.MachineKind,
   settings: cam.generator.ToolpathSettings,
   stock: cam.generator.Stock,
-  options: { readonly artifact?: cam.kernel.CamArtifact | undefined; readonly machineId?: string | undefined; readonly program?: cam.Program; readonly gcode?: string; readonly tool?: cam.ToolModel } = {}
+  options: {
+    readonly artifact?: cam.kernel.CamArtifact | undefined; readonly machineId?: string | undefined; readonly program?: cam.Program; readonly gcode?: string; readonly tool?: cam.ToolModel
+    /** The rotary table of the library machine picked in the workspace: its layout, pivot (calibrated), TCP and ranges. */
+    readonly rotaryProfile?: cam.viewer.ProfileRotary | undefined
+  } = {}
 ): cam.viewer.MachineSetup => {
   const table = options.machineId !== undefined ? cam.kernel.findMachine(options.machineId)?.table : undefined
   const tableSize = table !== undefined ? { length: table.length, width: table.width } : undefined
@@ -53,7 +57,8 @@ export const previewSetup = (
     : kind === "3dprinter" ? { ...cam.viewer.printerSetupOf(settings), ...(options.tool?.family === "nozzle" ? { tool: options.tool, nozzle: options.tool.diameter } : {}) }
     : cam.viewer.setupOf(kind, settings, stock, tableSize)
   // A rotary program (A/B/C words, indexed Orient moves) gets its trunnion table; a lathe program that mills gets its B head and C spindle.
-  const setup = options.program !== undefined ? cam.viewer.withRotary(base, options.program, options.gcode ?? "") : base
+  const turned = options.program !== undefined ? cam.viewer.withRotary(base, options.program, options.gcode ?? "") : base
+  const setup = cam.viewer.withProfileRotary(turned, options.rotaryProfile)
   const fiveAxis = options.machineId !== undefined ? cam.kernel.findMachine(options.machineId)?.fiveAxis : undefined
   return setup.kind === "mill" && setup.rotary !== undefined && fiveAxis !== undefined
     ? { ...setup, rotary: { ...setup.rotary, layout: fiveAxis.layout, pivot: fiveAxis.pivot, reasons: [...setup.rotary.reasons, "layout and pivot from the selected machine"] } }
@@ -113,6 +118,8 @@ export const previewSummary = (input: {
   readonly settings: cam.generator.ToolpathSettings
   readonly override?: cam.MachineKind | undefined
   readonly motion?: cam.viewer.MotionTrack | undefined
+  /** The parsed program: its rotary words say whether the preview plays it on 4/5 axes. */
+  readonly program?: cam.Program | undefined
 }): Record<string, unknown> | undefined => {
   if (input.gcode.trim() === "") return undefined
   const produced = input.kernelNc !== undefined && input.kernelNc === input.gcode ? { kind: "mill" as const, source: "kernel" as const }
@@ -128,7 +135,20 @@ export const previewSummary = (input: {
     machine: choice.kind, source: choice.source,
     ...(choice.mismatch !== undefined ? { mismatch: choice.mismatch.inferred } : {}),
     turns: choice.kind === "mill" ? "the tool turns, the part is clamped" : choice.kind === "lathe" ? "the part turns in the chuck, the tool travels in X (diameter) and Z" : "nothing turns, the nozzle deposits",
+    ...(input.program !== undefined ? { multiAxis: multiAxisSummary(choice.kind, s, input.program, input.gcode) } : {}),
     workholding, assumed: choice.kind !== "3dprinter" && !s.workholdingConfigured,
     unsupportedLines: input.motion?.unsupported.length ?? 0
+  }
+}
+
+/** How the preview plays a program's rotary axes, for the assistant: the table or head, its frame and what was assumed. */
+const multiAxisSummary = (kind: cam.MachineKind, settings: cam.generator.ToolpathSettings, program: cam.Program, gcode: string): Record<string, unknown> | null => {
+  const setup = cam.viewer.withRotary(kind === "lathe" ? cam.viewer.latheSetupOf(settings) : kind === "3dprinter" ? cam.viewer.printerSetupOf(settings) : cam.viewer.millSetupOf(settings, { width: 100, height: 100, depth: 20, radius: 0, x: 0, y: 0, topZ: 0, allowance: 0 }), program, gcode)
+  if (setup.kind === "lathe") return setup.turnMill !== undefined ? { kinematics: "mill-turn XYZBC", b: setup.turnMill.b } : null
+  const rotary = cam.viewer.setupRotary(setup)
+  if (rotary === undefined) return null
+  return {
+    kinematics: kind === "3dprinter" ? `5-axis printer, ${rotary.layout.startsWith("table") ? "tilting bed" : "tilting head"}` : rotary.layout,
+    layout: rotary.layout, coordinates: rotary.coordinates, pivot: rotary.pivot, assumed: rotary.assumed, reasons: rotary.reasons
   }
 }
