@@ -75,11 +75,14 @@ Built on top of §2:
   `unresolved` with the old `carryLimitsOf` sentence when a replay stopped (budget) or a carried solid was too large to sample. The setup that cuts the
   undercut itself is judged on its own tri-dexel (the replay exists whenever the program has a back-boring operation, carried or not): its
   `no-rapid-in-stock`, `holder-clearance`, `no-gouge` and `material-removed` are decided there, with the error declared. While the bar passes the
-  pilot it is oriented and shifted by -Q (`backBoreShift`), and that pass is judged as the envelope the planner's own pilot rule assumes (`backBoreReach`: the
-  farthest corner of any insert about the hole axis, or the body at Q + body radius; the bar has `flutes` inserts evenly spaced, the first towards +X, each
-  `Cutter.insertWidth` wide, a point when absent, so a wider insert reaches farther with its corners and the shift is searched; two opposite inserts
-  cannot pass a pilot narrower than the bar), not as an insert all round. The replay finds the hole's moves by position to 2 microns, since the NC
-  carries three decimals (a non-round shift used to fall out of the envelope); the shifts between the bar on the
+  pilot it stands still, oriented and shifted by -Q against its first insert (`backBoreShift`), and what reaches the pilot wall is the oriented solid
+  (`orientedBar`, `TriReplay.contactBar`): the body (the neck, a circle at the bar's real axis position) and the inserts, `flutes` teeth evenly spaced, the first
+  towards the spindle angle (+X at angle 0), each a strip `toothWidth` wide (`Cutter.insertWidth`, never less than 1 mm: a thinner tooth sunk into a wall would
+  overlap it by less than any tolerance in the direction across it, a collision no check would see) from the axis to the head radius, judged against the stock as
+  it stands by the same exact probe as the shank, not as an insert all round. The planner's pilot rule (`backBoreReach`, the farthest corner of any insert
+  about the hole axis; two opposite inserts cannot pass a pilot narrower than the bar) stays the analytic reach for a round pilot, which the tooth
+  never exceeds. The replay finds the hole's moves by position to 2 microns, since the NC carries three decimals (a non-round shift used to fall out of the
+  envelope); the shifts between the bar on the
   axis and the bar shifted judge the body only (the insert moves away from the wall it cut). Declared removal the mesh does not carry (drill
   points, chamfers, threads) is named in the claim: a replay that found no cut below the part beyond its error passes whatever is declared, one
   that found a cut cannot be told from the declared removal and stays `unresolved`. With the tri-dexel incomplete (budget) the claims stay
@@ -187,10 +190,16 @@ Still not done:
 1. Templates in the desktop panel, copy / mirror of a template over a symmetric fixture, templates from the tool library.
 2. The viewer does not draw the combined fixture view's clamps (the data is in the evidence); the desktop does not send `fixtures` / `envelope` to the sidecar.
 3. The probe replay of a table-C write, of a rotation under a tilted plane (the writer refuses it), of two outlines on top of each other, and of features that overlap.
-4. The pass of a back-boring bar through the pilot is judged on the cylinder of its farthest insert corner about the hole axis (`backBoreReach`, exact for the
-   oriented insert's corners): against a round pilot that is the contact the oriented insert makes, and it is conservative only against material that is not round about the
-   hole (the real insert occupies a sector, the envelope a full circle). A sector-shaped insert in the tri-dexel needs a non-axisymmetric tool solid, which the contact
-   test does not have. The one tri-dexel of the fixture carves every register, turned and tilted ones included.
+4. The back-boring insert is oriented. `Cutter` teeth are strips from the axis to the head radius (a real insert has a rake, a nose radius and a chip
+   pocket the strip does not), a point insert is stood at 1 mm wide, and the tooth is only modelled where the bar stands still: the cut itself is the head
+   spinning, a full disc on the axis (a stopped-spindle cut would remove a strip, and no cycle here cuts that way). A pilot that is not round
+   (`pilotOutline`, a polygon from the hole axis: slot, hexagon, keyway) is passed by turning the spindle to the angle and shifting by the Q that
+   leave the body and the teeth the most room (`backBoreShift`, searched by 5 degrees and 0.05 mm, then 0.5 degrees and 0.01 mm; refused with the room it had when
+   under 0.2 mm). A control that orients only to its own mark (plain `M19`: Fanuc, Mitsubishi, Mazak, Brother, Okuma, generic) leaves the angle 0 and the
+   search is the shift alone, so a slot across the mark is refused; Haas, Siemens, LinuxCNC and Heidenhain write the angle (`HoleCycleInput.orient`).
+   The pilot the replay judges against is the stock the pilot drill really left, so an outline that claims a slot the drill did not cut is caught by the
+   contact. The planner still plans round pilots only (it does not make a `pilotOutline`). The one tri-dexel of the fixture carves every register,
+   turned and tilted ones included.
 5. Tool life by the Taylor model and chip-load limits for legacy tools; clamps as true solids in the carving (they are exact boxes in the contact
    test, but the body's remaining stock does not subtract what a clamp occupies of the blank); holder collision against the machine; no controller
    qualification (a pass is the reference interpreter's, not a machine's).

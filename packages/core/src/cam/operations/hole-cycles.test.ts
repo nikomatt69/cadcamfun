@@ -3,8 +3,8 @@ import type { Vec3 } from "../../cad/vec.ts"
 import { expandCycle, moveTarget, type Move } from "../ir.ts"
 import { anglesFor, partToMachine, tableRotation, type RotaryAngles, type RotaryLayout } from "../indexing.ts"
 import { DEFAULT_CUTTERS, countersinkDepth, findCutter, pointLength, type Cutter } from "../kernel/cutters.ts"
-import { TriDexel, toolSolid } from "../kernel/tridexel.ts"
-import { BACK_BORE_CLEARANCE, backBoreReach, backBoreShift, generateBackBore, generateCountersink, generateDeepHole, generateHoleCycle, generateTiltedDrill, peckSchedule, type HoleCycleInput, type HoleIndexing } from "./hole-cycles.ts"
+import { TriDexel, orientedBar, toolSolid } from "../kernel/tridexel.ts"
+import { BACK_BORE_CLEARANCE, backBoreReach, backBoreShift, barMargin, generateBackBore, outlineMargin, generateCountersink, generateDeepHole, generateHoleCycle, generateTiltedDrill, peckSchedule, type HoleCycleInput, type HoleIndexing } from "./hole-cycles.ts"
 import type { HoleCycle } from "../kernel/contracts.ts"
 
 const lib = (id: string): Cutter => findCutter(DEFAULT_CUTTERS, id)!
@@ -396,3 +396,83 @@ describe("the plain drill cycle cannot express these policies", () => {
   })
 })
 
+
+// ---------------------------------------------------------------- a pilot that is not round
+
+describe("back boring through a pilot that is not round", () => {
+  const bar = lib("boringbar-b16")
+  const rect = (w: number, h: number): Array<{ x: number; y: number }> => [{ x: -w / 2, y: -h / 2 }, { x: w / 2, y: -h / 2 }, { x: w / 2, y: h / 2 }, { x: -w / 2, y: h / 2 }]
+  const circle = (r: number, n = 96): Array<{ x: number; y: number }> => Array.from({ length: n }, (_, k) => ({ x: r * Math.cos((2 * Math.PI * k) / n), y: r * Math.sin((2 * Math.PI * k) / n) }))
+  // A slot 15 long and 9 wide: the head (radius 8) does not fit along it, so the bar must be moved back; across it, nothing fits.
+  const slot = rect(15, 9)
+  const shifted = (r: ReturnType<typeof backBoreShift>): { shift: number; angle: number } => {
+    if ("reason" in r) throw new Error(r.reason)
+    return { shift: r.shift, angle: r.angle ?? 0 }
+  }
+
+  test("the distance to an outline is positive inside, negative outside, and the same from the wall either side", () => {
+    const sq = rect(10, 10)
+    expect(outlineMargin(sq, 0, 0)).toBeCloseTo(5, 9)
+    expect(outlineMargin(sq, 4, 0)).toBeCloseTo(1, 9)
+    expect(outlineMargin(sq, 6, 0)).toBeCloseTo(-1, 9)
+    expect(outlineMargin(sq, 6, 6)).toBeCloseTo(-Math.SQRT2, 9)
+  })
+
+  test("a round outline of the pilot's size passes with the clearance, and without an outline nothing changes (no angle)", () => {
+    const r = shifted(backBoreShift(bar, 12, circle(6), "any"))
+    expect(barMargin(bar, circle(6), r.angle, r.shift)).toBeGreaterThanOrEqual(BACK_BORE_CLEARANCE - 1e-6)
+    expect(backBoreShift(bar, 12)).toEqual({ shift: 2.5 })
+  })
+
+  test("in a slot the bar is turned along it and moved back, the head standing at the slot's end with room to spare", () => {
+    const r = shifted(backBoreShift(bar, 9, slot, "any"))
+    expect(Math.min(r.angle % 180, 180 - (r.angle % 180))).toBeLessThan(1)
+    // The head's radius 8 is more than the slot's half-length 7.5: the bar has to be moved back by at least 0.5 + the clearance.
+    expect(r.shift).toBeGreaterThan(0.5 + BACK_BORE_CLEARANCE - 1e-6)
+    expect(barMargin(bar, slot, r.angle, r.shift)).toBeGreaterThanOrEqual(BACK_BORE_CLEARANCE - 1e-6)
+    // Not moved back at all it would stand 0.5 mm in the wall; turned across the slot the tooth reaches 8 - q off the axis against 4.5 mm of half-width.
+    expect(barMargin(bar, slot, r.angle, 0)).toBeLessThan(0)
+    expect(barMargin(bar, slot, 90, r.shift)).toBeLessThan(0)
+  })
+
+  test("a pilot too small for the body and the tooth together is refused with the room it had", () => {
+    const r = backBoreShift(bar, 8, rect(7, 7), "any")
+    expect(r).toEqual({ reason: expect.stringMatching(/does not pass the pilot outline.*clearance needed/) })
+  })
+
+  test("a control that orients only to its mark leaves the angle 0, so a slot across the mark is refused and the cycle never writes an angle", () => {
+    const across = rect(9, 15)
+    const mark = backBoreShift(bar, 9, across)
+    expect(mark).toEqual({ reason: expect.stringMatching(/to the control's mark only \(angle 0\)/) })
+    expect(shifted(backBoreShift(bar, 9, across, "any")).angle).toBeGreaterThan(80)
+    const along = shifted(backBoreShift(bar, 9, slot))
+    expect(along.angle).toBe(0)
+    expect(along.shift).toBeGreaterThan(0.5 + BACK_BORE_CLEARANCE - 1e-6)
+    const tp = generateBackBore(base({ cycle: { kind: "back-bore", diameter: 16, pilotDiameter: 9, face: 0, pilotOutline: slot }, tool: bar, top: 12, bottom: -3.5, clearanceZ: 40, retractZ: 32, feed: 120, rpm: 2000 }))
+    expect(tp.moves.filter((m) => m._tag === "SpindleOrient")).toEqual([{ _tag: "SpindleOrient", angle: 0 }, { _tag: "SpindleOrient", angle: 0 }])
+  })
+
+  test("the cycle turns the spindle to the angle and moves the bar against the tooth, and the stopped bar clears a slot cut in a plate", () => {
+    const cycle: HoleCycle = { kind: "back-bore", diameter: 16, pilotDiameter: 9, face: 0, pilotOutline: slot }
+    const tp = generateBackBore(base({ cycle, tool: bar, top: 12, bottom: -3.5, clearanceZ: 40, retractZ: 32, feed: 120, rpm: 2000, orient: "any" }))
+    const { shift, angle } = shifted(backBoreShift(bar, 9, slot, "any"))
+    expect(tp.moves.filter((m) => m._tag === "SpindleOrient")).toEqual([{ _tag: "SpindleOrient", angle }, { _tag: "SpindleOrient", angle }])
+    const sx = -shift * Math.cos((angle * Math.PI) / 180), sy = -shift * Math.sin((angle * Math.PI) / 180)
+    const motion = tp.moves.filter((m) => m._tag === "Rapid" || m._tag === "Linear")
+    const through = motion.filter((m) => (m._tag === "Rapid" || m._tag === "Linear") && m.to.z < 40 && m.to.z !== 9 && (m.to.x !== 0 || m.to.y !== 0))
+    expect(through.length).toBeGreaterThan(0)
+    for (const m of through) if (m._tag === "Rapid" || m._tag === "Linear") { expect(m.to.x).toBeCloseTo(sx, 9); expect(m.to.y).toBeCloseTo(sy, 9) }
+    // A plate with the slot cut through it: the stopped bar, as its body and its tooth at the angle the cycle uses, overlaps no material
+    // on the way down and out; turned across the slot it would.
+    const s = plate(0.1, 30)
+    s.removePath(toolSolid(flat(9)), [{ x: -3, y: 0, z: -1 }, { x: 3, y: 0, z: -1 }])
+    const overlapAt = (a: number): number => {
+      // Down the pilot and out again the bar stands at the shifted position: probe it every half millimetre of the way.
+      let worst = 0
+      for (let z = -3.5; z <= 30; z += 0.5) for (const solid of orientedBar(bar, ["cutting", "shank"], a)) worst = Math.max(worst, s.probe(solid, { x: sx, y: sy, z }).overlap)
+      return worst
+    }
+    expect(overlapAt(angle)).toBeLessThan(0.05)
+    expect(overlapAt(angle + 90)).toBeGreaterThan(0.5)
+  })
+})

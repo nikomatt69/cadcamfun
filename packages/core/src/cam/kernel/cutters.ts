@@ -184,6 +184,14 @@ export const verifyTool = (c: Cutter): VerifyTool => ({
 })
 
 /**
+ * The width of one insert tooth of a boring bar as the replay models it, mm: its `insertWidth`, never less than 1 mm. A tooth that stands still
+ * in the pilot is a thin strip, and a strip a tenth of a millimetre wide that sank into a wall would overlap it by a tenth of a millimetre in the
+ * direction across it (the penetration is the least of the three directions): below any tolerance, a collision no check would see. A real insert
+ * is a millimetre or more across, so that is the least the contact and the pilot-outline checks stand it at.
+ */
+export const toothWidth = (c: Cutter): number => Math.max(c.insertWidth ?? 0, 1)
+
+/**
  * Depth from the surface at which a countersink cone reaches the finished diameter `diameter`, mm: the cone runs from its flat tip
  * (`tipDiameter`, 0 = a point) at the tip to its full diameter at `pointLength`, so the tip goes down by the cone height between the
  * tip and the finished diameter. Throws when the tool cannot make that diameter.

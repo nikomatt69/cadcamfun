@@ -1830,6 +1830,7 @@ export type ToolpathGeneratorManufacturePayload = {
               readonly diameter: number
               readonly pilotDiameter: number
               readonly face: number
+              readonly pilotOutline?: ReadonlyArray<{ readonly x: number; readonly y: number }>
             }
           | {
               readonly kind: "tilted"
@@ -2512,6 +2513,7 @@ export type ToolpathGeneratorManufacturePayload = {
                 readonly diameter: number
                 readonly pilotDiameter: number
                 readonly face: number
+                readonly pilotOutline?: ReadonlyArray<{ readonly x: number; readonly y: number }>
               }
             | {
                 readonly kind: "tilted"
@@ -3127,6 +3129,7 @@ export type ToolpathGeneratorPlanPayload = {
               readonly diameter: number
               readonly pilotDiameter: number
               readonly face: number
+              readonly pilotOutline?: ReadonlyArray<{ readonly x: number; readonly y: number }>
             }
           | {
               readonly kind: "tilted"
@@ -3809,6 +3812,7 @@ export type ToolpathGeneratorPlanPayload = {
                 readonly diameter: number
                 readonly pilotDiameter: number
                 readonly face: number
+                readonly pilotOutline?: ReadonlyArray<{ readonly x: number; readonly y: number }>
               }
             | {
                 readonly kind: "tilted"

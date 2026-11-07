@@ -315,3 +315,71 @@ describe("a stock sampled from another solid keeps its voids", () => {
     expect(TriDexel.fromSolid({ x: 0, y: 0, z: 0 }, { x: 50, y: 50, z: 50 }, 0.5, () => true, 1000)).toBeUndefined()
   })
 })
+
+describe("a boring bar standing still is its body and its teeth, not the disc it sweeps spinning", () => {
+  const bar: Cutter = { ...findCutter(DEFAULT_CUTTERS, "boringbar-b16")!, insertWidth: 4 }
+  const slab = (): TriDexel => TriDexel.box({ x: -20, y: -20, z: 0 }, { x: 20, y: 20, z: 10 }, 0.1)
+  const cutWith = (s: TriDexel, solids: ReturnType<typeof orientedBar>, tip: { x: number; y: number; z: number }): void => { for (const solid of solids) s.cut(solid, tip) }
+
+  test("the teeth remove a strip as wide as the insert from the axis to the head radius, the body the neck, and nothing else", () => {
+    const s = slab()
+    const before = s.volume()
+    cutWith(s, orientedBar(bar, ["cutting"], 0), { x: 0, y: 0, z: 3 })
+    // One tooth toward +X: the strip |y| <= 2, 0 <= x <= sqrt(64 - y^2), 3 mm high, and the neck (a Ø6 cylinder) above it up to the flute length.
+    let strip = 0
+    for (let k = 0; k < 4000; k++) { const y = -2 + (4 * (k + 0.5)) / 4000; strip += Math.sqrt(64 - y * y) * (4 / 4000) }
+    const removed = before - s.volume()
+    // The head stands at z 3..6 (the strip), the neck above it fills the slab to z 10 (4 mm of a Ø6 cylinder).
+    const expected = strip * 3 + Math.PI * 9 * 4
+    expect(Math.abs(removed - expected) / expected).toBeLessThan(0.1)
+    // Toward +X the tooth cut as far as the head radius, toward -X and +Y only the neck stands.
+    expect(s.has({ x: 6, y: 0, z: 4 })).toBe(false)
+    expect(s.has({ x: -6, y: 0, z: 4 })).toBe(true)
+    expect(s.has({ x: 0, y: 6, z: 4 })).toBe(true)
+    expect(s.has({ x: 6, y: 3, z: 4 })).toBe(true)
+    // The whole disc the spinning head sweeps removes far more.
+    const spin = slab()
+    spin.cut(toolSolid(bar), { x: 0, y: 0, z: 3 })
+    expect(before - spin.volume()).toBeGreaterThan(removed * 3)
+  })
+
+  test("turned to 90 degrees the same tooth stands toward +Y, and two teeth stand opposite each other", () => {
+    const s = slab()
+    cutWith(s, orientedBar(bar, ["cutting"], 90), { x: 0, y: 0, z: 3 })
+    expect(s.has({ x: 0, y: 6, z: 4 })).toBe(false)
+    expect(s.has({ x: 6, y: 0, z: 4 })).toBe(true)
+    expect(s.has({ x: 0, y: -6, z: 4 })).toBe(true)
+    const two = slab()
+    cutWith(two, orientedBar({ ...bar, flutes: 2 }, ["cutting"], 0), { x: 0, y: 0, z: 3 })
+    expect(two.has({ x: 6, y: 0, z: 4 })).toBe(false)
+    expect(two.has({ x: -6, y: 0, z: 4 })).toBe(false)
+    expect(two.has({ x: 0, y: 6, z: 4 })).toBe(true)
+  })
+
+  test("in a Ø12 pilot the bar shifted against its tooth passes, the same shift turned the other way touches the wall", () => {
+    const s = slab()
+    s.cut(toolSolid({ ...bar, kind: "flat", diameter: 12, neckDiameter: undefined, headHeight: undefined, fluteLength: 30, shankDiameter: 12, stickout: 40 } as Cutter), { x: 0, y: 0, z: -1 })
+    const probe = (angle: number): number => Math.max(0, ...orientedBar(bar, ["cutting", "shank"], angle).map((solid) => s.probe(solid, { x: -2.5, y: 0, z: 1 }).overlap))
+    // Tooth toward +X from an axis at x = -2.5 reaches x = 5.5 (inside the 6 mm radius); toward -X it reaches -10.5, through the wall.
+    expect(probe(0)).toBeLessThan(0.05)
+    expect(probe(180)).toBeGreaterThan(0.5)
+    // The body alone is the same either way; it is the tooth that makes the difference.
+    expect(Math.max(0, ...orientedBar(bar, ["cutting", "shank"], 0).slice(0, 1).map((solid) => s.probe(solid, { x: -2.5, y: 0, z: 1 }).overlap))).toBeLessThan(0.05)
+  })
+
+  test("a point insert is stood at 1 mm wide: a tooth thinner than the tolerance sunk into a wall would be a collision nobody sees", () => {
+    const point = findCutter(DEFAULT_CUTTERS, "boringbar-b16")!
+    const [, tooth] = orientedBar(point, ["cutting"], 0)
+    const s = slab()
+    const before = s.volume()
+    s.cut(tooth!, { x: 0, y: 0, z: 3 })
+    // 1 mm wide, 3 mm high, about 8 mm long.
+    expect(before - s.volume()).toBeGreaterThan(18)
+    expect(before - s.volume()).toBeLessThan(30)
+  })
+
+  test("a bar with no neck or no head height is the plain solid", () => {
+    expect(orientedBar({ ...bar, neckDiameter: undefined }, ["cutting"], 0)).toHaveLength(1)
+    expect(orientedBar(findCutter(DEFAULT_CUTTERS, "drill-4")!, ["cutting"], 0)[0]!.wedges).toBeUndefined()
+  })
+})

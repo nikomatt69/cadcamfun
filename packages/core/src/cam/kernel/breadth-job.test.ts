@@ -86,6 +86,51 @@ describe("hole breadth in a planned job", () => {
     for (const id of ["no-rapid-in-stock", "holder-clearance"]) expect(a.claims.find((c) => c.id === id)?.status, id).toBe("passed")
   })
 
+  // The planned back-bore with the outline of its pilot declared: a round one of the pilot's size, or a slot the real pilot is not.
+  const withOutline = (outline: ReadonlyArray<{ x: number; y: number }>, post?: string): CamArtifact => {
+    const under: Feature = { id: "under", type: "plane", from: { kind: "points", points: [[0, 0, 0], [1, 0, 0], [0, -1, 0]] } } as Feature
+    const bb = { id: "bb", type: "hole", plane: "under", at: [40, -25], diameter: 12, depth: 30, kind: "counterbore", headDiameter: 16, headDepth: 12 } as Feature
+    const machine = findMachine("vmc-standard")!
+    const base = job([under, bb], { breadth: { holeCycles: true }, ...(post !== undefined ? { machine: { ...machine, post } } : {}) }, 30)
+    const planned = planOnly(base)
+    if (planned.status !== "ok") throw new Error("plan")
+    const operations = planned.value.operations.map((o) => (o.strategy === "drill" && o.cycle?.kind === "back-bore" ? { ...o, cycle: { ...o.cycle, pilotOutline: outline } } : o))
+    return ok(runJob({ ...base, operations }))
+  }
+  const ring = (r: number, n = 96): Array<{ x: number; y: number }> => Array.from({ length: n }, (_, k) => ({ x: r * Math.cos((2 * Math.PI * k) / n), y: r * Math.sin((2 * Math.PI * k) / n) }))
+
+  test("a back-bore with the outline of its round pilot is turned and shifted by the search, and the stopped tooth passes the real pilot", () => {
+    const a = withOutline(ring(6))
+    expect(a.operations.find((o) => o.strategy === "drill" && o.toolId.startsWith("boringbar"))?.status).toBe("ok")
+    expect(a.issues.filter((i) => i.severity === "error")).toEqual([])
+    for (const id of ["no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed"]) expect(a.claims.find((c) => c.id === id)?.status, id).toBe("passed")
+    // A control with a fixed mark leaves the angle 0 (plain M19), and the undercut is still the whole disc the spinning head sweeps.
+    expect(a.nc).toMatch(/M19\b(?! [PR])/)
+  })
+
+  // A hexagon turned 15 degrees, inscribed in the round Ø12 pilot: smaller than the hole, and too small for the bar with its clearance.
+  const hexagon = Array.from({ length: 6 }, (_, k) => ({ x: 6 * Math.cos(((15 + 60 * k) * Math.PI) / 180), y: 6 * Math.sin(((15 + 60 * k) * Math.PI) / 180) }))
+
+  test("a post that writes an angle writes the orientation the search found; an outline the bar cannot pass is refused on either post, naming what the control allows", () => {
+    const haas = withOutline(ring(6), "haas")
+    expect(haas.operations.find((o) => o.strategy === "drill" && o.toolId.startsWith("boringbar"))?.status).toBe("ok")
+    expect(haas.nc).toMatch(/M19 [PR]\d/)
+    for (const id of ["no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed"]) expect(haas.claims.find((c) => c.id === id)?.status, id).toBe("passed")
+    const refusedOnHaas = withOutline(hexagon, "haas")
+    expect(refusedOnHaas.operations.find((o) => o.strategy === "drill" && o.toolId.startsWith("boringbar"))?.status).toBe("failed")
+    expect(refusedOnHaas.issues.map((i) => i.message).join(" ")).toMatch(/does not pass the pilot outline: at its best angle/)
+    const refusedOnFanuc = withOutline(hexagon)
+    expect(refusedOnFanuc.operations.find((o) => o.strategy === "drill" && o.toolId.startsWith("boringbar"))?.status).toBe("failed")
+    expect(refusedOnFanuc.issues.map((i) => i.message).join(" ")).toMatch(/control's mark only/)
+  })
+
+  test("an outline that says the pilot is a long slot, when the drilled pilot is round, is caught: the tooth the search stands outside the round wall", () => {
+    const slot = [{ x: -8.5, y: -4.5 }, { x: 8.5, y: -4.5 }, { x: 8.5, y: 4.5 }, { x: -8.5, y: 4.5 }]
+    const a = withOutline(slot)
+    expect(a.claims.find((c) => c.id === "no-rapid-in-stock")?.status).not.toBe("passed")
+    expect(a.release).not.toBe("verified-program")
+  })
+
   test("a back-bore replay that stopped at its budget is not read as passed", () => {
     const under: Feature = { id: "under", type: "plane", from: { kind: "points", points: [[0, 0, 0], [1, 0, 0], [0, -1, 0]] } } as Feature
     const bb = { id: "bb", type: "hole", plane: "under", at: [40, -25], diameter: 12, depth: 30, kind: "counterbore", headDiameter: 16, headDepth: 12 } as Feature

@@ -18,7 +18,7 @@ import { optimizedOrder } from "../geometry.ts"
 import { CHIP_BREAK_RETRACT, PECK_CLEARANCE, moveTarget, type Coolant, type Move, type Toolpath } from "../ir.ts"
 import { anglesFor, frameFromNormal, indexToolpath, type RotaryLayout, type RotaryLimits } from "../indexing.ts"
 import { worldToWork } from "../setup.ts"
-import { countersinkDepth, pointLength, type Cutter } from "../kernel/cutters.ts"
+import { countersinkDepth, pointLength, toothWidth, type Cutter } from "../kernel/cutters.ts"
 import type { HoleCycle } from "../kernel/contracts.ts"
 import { MoveBuilder } from "./common.ts"
 
@@ -51,6 +51,12 @@ export interface HoleCycleInput {
   /** Work zero in CAD world (tilted sites are shifted by it). */
   readonly origin?: Vec3
   readonly indexing?: HoleIndexing
+  /**
+   * Back-boring through a pilot whose `pilotOutline` is not round: which angles the spindle may be oriented to. `"mark"` (the default): only the
+   * control's own mark, angle 0 (plain `M19` takes no angle); `"any"`: the post writes an angle (Haas, Siemens, LinuxCNC, Heidenhain), so the bar
+   * is turned to whichever angle leaves it the most room.
+   */
+  readonly orient?: "mark" | "any"
 }
 
 const MAX_PECKS = 100_000
@@ -177,16 +183,90 @@ export const backBoreReach = (tool: Cutter, q: number): number => {
   return reach
 }
 
+/** A point of a pilot outline, mm, from the hole axis. */
+export interface PilotPoint { readonly x: number; readonly y: number }
+
+/** Signed distance from (x, y) to the closed outline: positive inside, negative outside, mm. */
+export const outlineMargin = (outline: ReadonlyArray<PilotPoint>, x: number, y: number): number => {
+  let inside = false, best = Infinity
+  for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+    const a = outline[j]!, b = outline[i]!
+    if ((b.y > y) !== (a.y > y) && x < ((a.x - b.x) * (y - b.y)) / (a.y - b.y) + b.x) inside = !inside
+    const dx = b.x - a.x, dy = b.y - a.y
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy || 1)))
+    best = Math.min(best, Math.hypot(x - (a.x + t * dx), y - (a.y + t * dy)))
+  }
+  return inside ? best : -best
+}
+
+/**
+ * Points along the plan boundary of a bar standing still, oriented `angle` degrees from +X with its axis at (ax, ay): the neck (a circle)
+ * and each insert (a strip `toothWidth` wide, at least 1 mm, from the axis to the head radius), sampled every 0.2 mm or so.
+ */
+const barBoundary = (tool: Cutter, angle: number, ax: number, ay: number): ReadonlyArray<PilotPoint> => {
+  const R = tool.diameter / 2, neck = (tool.neckDiameter ?? 0) / 2
+  const out: PilotPoint[] = []
+  const n = Math.max(24, Math.ceil((2 * Math.PI * neck) / 0.2))
+  for (let k = 0; k < n; k++) out.push({ x: ax + neck * Math.cos((2 * Math.PI * k) / n), y: ay + neck * Math.sin((2 * Math.PI * k) / n) })
+  const teeth = Math.max(1, Math.round(tool.flutes)), hw = toothWidth(tool) / 2
+  const xe = Math.sqrt(Math.max(R * R - hw * hw, 0)), edge = Math.max(2, Math.ceil(xe / 0.2)), arc = Math.max(2, Math.ceil((2 * hw) / 0.2))
+  for (let t = 0; t < teeth; t++) {
+    const a = (angle * Math.PI) / 180 + (2 * Math.PI * t) / teeth
+    const c = Math.cos(a), s = Math.sin(a)
+    const put = (u: number, v: number): void => { out.push({ x: ax + u * c - v * s, y: ay + u * s + v * c }) }
+    for (let k = 0; k <= edge; k++) { const u = (xe * k) / edge; put(u, -hw); put(u, hw) }
+    // The rim of the head between the two corners is an arc of radius R about the axis.
+    const half = Math.asin(Math.min(1, hw / R))
+    for (let k = 0; k <= arc; k++) { const phi = -half + (2 * half * k) / arc; put(R * Math.cos(phi), R * Math.sin(phi)) }
+  }
+  return out
+}
+
+/** How far the oriented bar, its axis moved `q` mm against the direction of its first insert, stands inside the outline everywhere, mm (negative: it touches). */
+export const barMargin = (tool: Cutter, outline: ReadonlyArray<PilotPoint>, angle: number, q: number): number => {
+  const a = (angle * Math.PI) / 180
+  let margin = Infinity
+  for (const p of barBoundary(tool, angle, -q * Math.cos(a), -q * Math.sin(a))) margin = Math.min(margin, outlineMargin(outline, p.x, p.y))
+  return margin
+}
+
+/**
+ * The pilot is not round (a slot, a hexagon, a keyway): the bar is turned to the angle and moved back by the shift that leave its teeth and body
+ * the most room inside the outline, found by a search over the angle (5 degrees, then half a degree) and the shift (0.05 mm, then 0.01 mm).
+ * Refused with the room it did have when that is under `BACK_BORE_CLEARANCE`.
+ */
+const backBoreThroughOutline = (tool: Cutter, outline: ReadonlyArray<PilotPoint>, orient: "mark" | "any"): { readonly shift: number; readonly angle: number } | { readonly reason: string } => {
+  const R = tool.diameter / 2
+  let best = { margin: -Infinity, angle: 0, q: 0 }
+  const scan = (angles: ReadonlyArray<number>, qs: ReadonlyArray<number>): void => {
+    for (const angle of angles) for (const q of qs) {
+      const margin = barMargin(tool, outline, angle, q)
+      if (margin > best.margin + 1e-12) best = { margin, angle, q }
+    }
+  }
+  const steps = (from: number, to: number, step: number): number[] => { const out: number[] = []; for (let v = from; v <= to + 1e-9; v += step) out.push(v); return out }
+  // A control that orients the spindle only to its own mark leaves the angle 0: the shift alone is searched.
+  scan(orient === "any" ? steps(0, 355, 5) : [0], steps(0, R, 0.05))
+  const a0 = best.angle, q0 = best.q
+  scan(orient === "any" ? steps(a0 - 5, a0 + 5, 0.5).map((a) => ((a % 360) + 360) % 360) : [0], steps(Math.max(0, q0 - 0.1), q0 + 0.1, 0.01))
+  if (best.margin < BACK_BORE_CLEARANCE - 1e-9) {
+    const teeth = Math.round(tool.flutes)
+    return { reason: `the Ø${tool.diameter} bar with ${teeth} insert${teeth > 1 ? "s" : ""}${tool.insertWidth !== undefined ? ` ${tool.insertWidth} mm wide` : ""} on a Ø${tool.neckDiameter} body does not pass the pilot outline${orient === "mark" ? " with the spindle oriented to the control's mark only (angle 0)" : ""}: at its best angle (${best.angle.toFixed(1)}°) and shift (${best.q.toFixed(2)} mm) it keeps ${best.margin.toFixed(2)} mm from the wall, ${BACK_BORE_CLEARANCE} mm clearance needed` }
+  }
+  return { shift: best.q, angle: Math.round(best.angle * 1e4) / 1e4 }
+}
+
 /**
  * The oriented shift of a back-boring bar, mm: with insert 0 pointing to +X the bar is moved by -Q so that its reach about the hole axis
  * (`backBoreReach`) is as small as it can be, then it clears the pilot wall by `BACK_BORE_CLEARANCE`. For one point insert that is
  * Q = (R - body radius) / 2 (the insert side R - Q and the body side Q + body radius get the same room); more inserts or a wider insert
  * reach farther and the shift is searched (the reach is convex in Q). Undefined, with the reason, when the bar cannot pass the pilot at all.
  */
-export const backBoreShift = (tool: Cutter, pilotDiameter: number): { readonly shift: number } | { readonly reason: string } => {
+export const backBoreShift = (tool: Cutter, pilotDiameter: number, outline?: ReadonlyArray<PilotPoint>, orient: "mark" | "any" = "mark"): { readonly shift: number; readonly angle?: number } | { readonly reason: string } => {
   const R = tool.diameter / 2
   const body = (tool.neckDiameter ?? 0) / 2
   if (!(body > 0)) return { reason: `${tool.id} has no body diameter (neckDiameter)` }
+  if (outline !== undefined && outline.length >= 3) return backBoreThroughOutline(tool, outline, orient)
   const room = pilotDiameter / 2 - BACK_BORE_CLEARANCE
   const simple = Math.round(tool.flutes) <= 1 && tool.insertWidth === undefined
   let q = (R - body) / 2
@@ -207,7 +287,8 @@ export const backBoreShift = (tool: Cutter, pilotDiameter: number): { readonly s
 }
 
 /**
- * Back-boring (G87-style, as explicit moves): over the pilot hole the bar is oriented (insert towards +X) and shifted by `-Q`, goes
+ * Back-boring (G87-style, as explicit moves): over the pilot hole the bar is oriented (insert towards +X, or towards the angle that fits a
+ * non-round `pilotOutline`) and shifted by `-Q` against the insert, goes
  * down through the pilot to `bottom` below the far face, is shifted back onto the axis, started (the post restarts the stopped spindle
  * before the first feed move), and fed upwards until the top of the insert is at `top` (the ceiling of the new bore), dwells, is
  * stopped and oriented again (`SpindleOrient`), shifted again, and withdrawn through the pilot.
@@ -226,23 +307,25 @@ export const generateBackBore = (i: HoleCycleInput): Toolpath => {
   need(i.top > c.face + 1e-9, `${i.id}: the bore ceiling ${i.top} is not above the face ${c.face}`)
   need(i.bottom + h <= c.face - 0.1 + 1e-9, `${i.id}: the lowest tip ${i.bottom} leaves the insert (${h} mm) inside the face at ${c.face}`)
   need(bar.fluteLength >= i.retractZ - i.bottom - 1e-9, `${i.id}: the reach of ${bar.id} (${bar.fluteLength} mm) does not span the ${(i.retractZ - i.bottom).toFixed(1)} mm from the lowest tip to the R plane`)
-  const shifted = backBoreShift(bar, c.pilotDiameter)
+  const shifted = backBoreShift(bar, c.pilotDiameter, c.pilotOutline, i.orient)
   if ("reason" in shifted) throw new RangeError(`${i.id}: ${shifted.reason}`)
-  const q = shifted.shift
+  // The bar is moved back against its first insert: with the spindle oriented to `angle` the shift is -Q along that direction.
+  const angle = shifted.angle ?? 0
+  const sx = -shifted.shift * Math.cos((angle * Math.PI) / 180), sy = -shifted.shift * Math.sin((angle * Math.PI) / 180)
   const tipEnd = i.top - h
   const b = new MoveBuilder()
   b.comment(`Back bore Ø${c.diameter} from the face at Z${c.face} up to Z${i.top}: ${i.name}`)
   optimizedOrder(i.points).forEach((p) => {
     b.rapid({ x: p.x, y: p.y, z: i.clearanceZ })
-    b.push({ _tag: "SpindleOrient", angle: 0 })
-    b.rapid({ x: p.x - q, y: p.y, z: i.clearanceZ })
-    b.rapid({ x: p.x - q, y: p.y, z: i.bottom })
+    b.push({ _tag: "SpindleOrient", angle })
+    b.rapid({ x: p.x + sx, y: p.y + sy, z: i.clearanceZ })
+    b.rapid({ x: p.x + sx, y: p.y + sy, z: i.bottom })
     b.rapid({ x: p.x, y: p.y, z: i.bottom })
     b.linear({ x: p.x, y: p.y, z: tipEnd }, i.feed)
     b.dwell(Math.max(0.2, Math.round((2 * 60 / i.rpm) * 1000) / 1000))
-    b.push({ _tag: "SpindleOrient", angle: 0 })
-    b.rapid({ x: p.x - q, y: p.y, z: tipEnd })
-    b.rapid({ x: p.x - q, y: p.y, z: i.clearanceZ })
+    b.push({ _tag: "SpindleOrient", angle })
+    b.rapid({ x: p.x + sx, y: p.y + sy, z: tipEnd })
+    b.rapid({ x: p.x + sx, y: p.y + sy, z: i.clearanceZ })
     b.rapid({ x: p.x, y: p.y, z: i.clearanceZ })
   })
   if (i.points.length === 0) b.comment("nothing to bore: no hole positions")

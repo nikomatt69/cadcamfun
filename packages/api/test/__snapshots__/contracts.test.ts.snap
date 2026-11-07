@@ -23614,6 +23614,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                             "exclusiveMinimum": 0,
                                             "type": "number",
                                           },
+                                          "pilotOutline": {
+                                            "items": {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "x": {
+                                                  "type": "number",
+                                                },
+                                                "y": {
+                                                  "type": "number",
+                                                },
+                                              },
+                                              "required": [
+                                                "x",
+                                                "y",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            "maxItems": 64,
+                                            "minItems": 3,
+                                            "type": "array",
+                                          },
                                         },
                                         "required": [
                                           "kind",
@@ -102681,6 +102702,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "exclusiveMinimum": 0,
                                       "type": "number",
                                     },
+                                    "pilotOutline": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "maxItems": 64,
+                                      "minItems": 3,
+                                      "type": "array",
+                                    },
                                   },
                                   "required": [
                                     "kind",
@@ -107100,6 +107142,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           "pilotDiameter": {
                                             "exclusiveMinimum": 0,
                                             "type": "number",
+                                          },
+                                          "pilotOutline": {
+                                            "items": {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "x": {
+                                                  "type": "number",
+                                                },
+                                                "y": {
+                                                  "type": "number",
+                                                },
+                                              },
+                                              "required": [
+                                                "x",
+                                                "y",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            "maxItems": 64,
+                                            "minItems": 3,
+                                            "type": "array",
                                           },
                                         },
                                         "required": [
@@ -117904,6 +117967,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "exclusiveMinimum": 0,
                                       "type": "number",
                                     },
+                                    "pilotOutline": {
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "x": {
+                                            "type": "number",
+                                          },
+                                          "y": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y",
+                                        ],
+                                        "type": "object",
+                                      },
+                                      "maxItems": 64,
+                                      "minItems": 3,
+                                      "type": "array",
+                                    },
                                   },
                                   "required": [
                                     "kind",
@@ -122323,6 +122407,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           "pilotDiameter": {
                                             "exclusiveMinimum": 0,
                                             "type": "number",
+                                          },
+                                          "pilotOutline": {
+                                            "items": {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "x": {
+                                                  "type": "number",
+                                                },
+                                                "y": {
+                                                  "type": "number",
+                                                },
+                                              },
+                                              "required": [
+                                                "x",
+                                                "y",
+                                              ],
+                                              "type": "object",
+                                            },
+                                            "maxItems": 64,
+                                            "minItems": 3,
+                                            "type": "array",
                                           },
                                         },
                                         "required": [

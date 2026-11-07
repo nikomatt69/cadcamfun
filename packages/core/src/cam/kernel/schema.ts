@@ -52,7 +52,10 @@ export const HoleCycleSchema = Schema.Union([
     kind: Schema.Literal("deep"), peck: positive, retract: Schema.Literals(["full", "chip-break"]), peckReduction: Schema.optionalKey(nonNegative), minPeck: Schema.optionalKey(positive),
     chipBreakRetract: Schema.optionalKey(positive), fullRetractEvery: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))), dwell: Schema.optionalKey(nonNegative)
   }),
-  Schema.Struct({ kind: Schema.Literal("back-bore"), diameter: positive, pilotDiameter: positive, face: Schema.Finite }),
+  Schema.Struct({
+    kind: Schema.Literal("back-bore"), diameter: positive, pilotDiameter: positive, face: Schema.Finite,
+    pilotOutline: Schema.optionalKey(Schema.Array(Schema.Struct({ x: Schema.Finite, y: Schema.Finite })).check(Schema.isMinLength(3), Schema.isMaxLength(64)))
+  }),
   Schema.Struct({
     kind: Schema.Literal("tilted"), peck: Schema.optionalKey(nonNegative), chipBreak: Schema.optionalKey(Schema.Boolean),
     sites: Schema.Array(Schema.Struct({ entry: vec3, direction: vec3, depth: positive })).check(Schema.isMinLength(1), Schema.isMaxLength(5000))

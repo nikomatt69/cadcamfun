@@ -24,7 +24,7 @@ import { buildPartModelFromMeshes, partMeshes, type PartModel } from "../model/m
 import { meshBounds, type Mesh64 } from "../model/element-mesh.ts"
 import { AdaptiveParams, generateAdaptive } from "../operations/adaptive.ts"
 import { DrillParams, generateDrill } from "../operations/drill.ts"
-import { backBoreReach, backBoreShift, generateHoleCycle, type HoleIndexing } from "../operations/hole-cycles.ts"
+import { backBoreShift, generateHoleCycle, type HoleIndexing } from "../operations/hole-cycles.ts"
 import { recognizeNamedFeatures, type NamedFeature } from "../model/features.ts"
 import { elementBrep } from "../../cad/scene-step.ts"
 import { EngraveParams, generateEngrave } from "../operations/engrave.ts"
@@ -649,6 +649,9 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   const probePlans: Array<{ readonly op: ProbeOperationSpec; readonly moves: ReadonlyArray<Move>; readonly routine: ProbeRoutine; readonly toolpath: Toolpath }> = []
   const opOfToolpath: number[] = []
   const toolOf = (id: string): Cutter => tools.find((t) => t.id === id)!
+  // A back-bore through a pilot that is not round turns the spindle to any angle only where the post writes one; plain M19 takes the control's mark.
+  const orientDefinition = job.post?.definition === undefined ? undefined : compileDefinition(job.post.definition)
+  const orientOf: "mark" | "any" = (orientDefinition?.ok === true ? orientDefinition.dialect : dialectOf(machine.post))?.spindleOrient?.angled === true ? "any" : "mark"
 
   const runOperation = (op: OperationSpec, opIndex: number): void => {
     checkpoint({ stage: "operations", operation: { id: op.id, index: opIndex, count: operations.length } })
@@ -820,7 +823,7 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
             if (op.cycle.kind === "tilted" && (job.setupOrientation ?? "+Z") !== "+Z") { fail("UnsupportedCapability", `${op.id}: tilted drilling is run for the upright setup only`, data); return }
             const cycle = generateHoleCycle({
               id: op.id, name, cycle: op.cycle.kind === "back-bore" ? { ...op.cycle, face: op.cycle.face - o.z } : op.cycle, tool, points: op.points.map((p) => shift2(p, o)), top: op.top - o.z, bottom: op.bottom - o.z,
-              clearanceZ: CLEARANCE, retractZ: RETRACT, feed, rpm, coolant, origin: o, ...(indexing !== undefined ? { indexing } : {})
+              clearanceZ: CLEARANCE, retractZ: RETRACT, feed, rpm, coolant, origin: o, ...(indexing !== undefined ? { indexing } : {}), orient: orientOf
             })
             // The cycle turns the table before its first hole: the tool leaves the previous operation by rising to the safe height, so the
             // table does not swing through it. The cycle itself only rises between orientations.
@@ -1222,16 +1225,20 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0
   let undercutMoves = 0
   const undercutIds = new Set(operations.filter((x) => x.strategy === "drill" && x.cycle?.kind === "back-bore").map((x) => x.id))
-  // While a back-boring bar passes the pilot it is oriented and shifted by -Q (hole-cycles `backBoreShift`): its inserts (`flutes` of them, each `insertWidth` wide,
-  // the first towards +X) reach as far as their corners go about the hole axis, and its body reaches Q + body radius. The contact test of those moves uses that envelope (the
-  // planner's own pilot rule), centred on the hole axis; the axisymmetric Ø of the head would stand for an insert all round and refuse every pass.
-  const backBores = new Map<string, { readonly q: number; readonly envelope: Cutter; readonly body: Cutter; readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }> }>()
+  // While a back-boring bar passes the pilot it stands still, oriented to `angle` and shifted by -Q against its first insert (hole-cycles `backBoreShift`): what
+  // reaches the pilot wall is its body (the neck, a circle) and its inserts (`flutes` teeth, each a strip `insertWidth` wide from the axis to the head radius), not
+  // the disc the head sweeps spinning. The contact test of those moves uses that solid (`TriReplay.contactBar`) at the bar's real axis position, against the stock
+  // as it stands, so a round pilot, a slot or a hexagon is judged by the same oriented tooth. The cut itself (the head spinning, on the axis) is the whole disc.
+  const backBores = new Map<string, { readonly sx: number; readonly sy: number; readonly angle: number; readonly bar: Cutter; readonly body: Cutter; readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }> }>()
   for (const x of operations) {
     if (x.strategy !== "drill" || x.cycle?.kind !== "back-bore") continue
-    const bar = toolOf(x.tool), shifted = backBoreShift(bar, x.cycle.pilotDiameter)
+    const bar = toolOf(x.tool), shifted = backBoreShift(bar, x.cycle.pilotDiameter, x.cycle.pilotOutline, orientOf)
     if ("reason" in shifted) continue
-    const body = (bar.neckDiameter ?? 0) / 2, reach = backBoreReach(bar, shifted.shift)
-    backBores.set(x.id, { q: shifted.shift, body: { ...bar, diameter: bar.neckDiameter ?? 0 }, envelope: { ...bar, diameter: 2 * reach, neckDiameter: 2 * (body + shifted.shift), shankDiameter: Math.max(bar.shankDiameter ?? 0, 2 * (body + shifted.shift)) }, points: x.points.map((p) => shift2(p, o)) })
+    const angle = shifted.angle ?? 0
+    backBores.set(x.id, {
+      sx: -shifted.shift * Math.cos((angle * Math.PI) / 180), sy: -shifted.shift * Math.sin((angle * Math.PI) / 180), angle, bar,
+      body: { ...bar, diameter: bar.neckDiameter ?? 0 }, points: x.points.map((p) => shift2(p, o))
+    })
   }
   // Moves with A/B/C words: their XYZ is in the machine frame, not the work frame the height field is in, so they are not carved or checked here.
   let turnedMoves = 0
@@ -1373,17 +1380,19 @@ const executeJobWith = (prepared: PreparedJob, checkpoint: (progress: KernelProg
           const tips: Vec3[] = [s.from]
           forEachSample(seg, tri.stock.cell, (x, y, z) => { tips.push({ x, y, z }) })
           if (seg.rapid) tips.push(s.to)
-          // Oriented and shifted over the pilot: judged as the envelope about the hole axis, the holder on the tool axis as it is.
+          // Oriented and shifted over the pilot: the stopped bar is judged as its body and its teeth at its real axis position, the holder on the tool axis as it is.
           const info = backBores.get(outcomes[opOfToolpath[op]!]?.id ?? "")
           // The NC carries three decimals: a shift such as 2.5617 comes back as 2.562, so positions match to a few microns, not to the float.
           const near = (a: number, b: number): boolean => Math.abs(a - b) < 2e-3
-          const hole = info?.points.find((pt) => near(s.from.y, pt.y) && near(s.to.y, pt.y) && near(s.from.x, pt.x - info.q) && near(s.to.x, pt.x - info.q))
+          const atShift = (pt: { readonly x: number; readonly y: number }, v: Vec3): boolean => info !== undefined && near(v.x, pt.x + info.sx) && near(v.y, pt.y + info.sy)
+          const onAxis = (pt: { readonly x: number; readonly y: number }, v: Vec3): boolean => near(v.x, pt.x) && near(v.y, pt.y)
+          const hole = info?.points.find((pt) => atShift(pt, s.from) && atShift(pt, s.to))
           // Between the bar on the axis and the bar shifted the insert moves away from the wall it cut (or through air above and below the part):
           // there the body is judged and the insert is the declared tooth.
-          const lateral = hole === undefined ? info?.points.find((pt) => near(s.from.y, pt.y) && near(s.to.y, pt.y) && near(s.from.z, s.to.z) && ((near(s.from.x, pt.x) && near(s.to.x, pt.x - info.q)) || (near(s.from.x, pt.x - info.q) && near(s.to.x, pt.x)))) : undefined
+          const lateral = hole === undefined ? info?.points.find((pt) => near(s.from.z, s.to.z) && ((onAxis(pt, s.from) && atShift(pt, s.to)) || (atShift(pt, s.from) && onAxis(pt, s.to)))) : undefined
           const threshold = prepared.tolerance + tri.stock.errorBound
           const hit = hole !== undefined && info !== undefined
-            ? tri.contact(info.envelope, seg.rapid ? ["cutting", "shank"] : ["shank"], tips.map((t) => ({ x: t.x + info.q, y: t.y, z: t.z })), undefined, threshold) ?? tri.contact(cutter, ["holder"], tips, undefined, threshold)
+            ? tri.contactBar(info.bar, seg.rapid ? ["cutting", "shank"] : ["shank"], info.angle, tips, threshold) ?? tri.contact(cutter, ["holder"], tips, undefined, threshold)
             : lateral !== undefined && info !== undefined
               ? tri.contact(info.body, ["cutting", "shank"], tips, undefined, threshold) ?? tri.contact(cutter, ["holder"], tips, undefined, threshold)
               : tri.contact(cutter, seg.rapid ? ["cutting", "shank", "holder"] : ["shank", "holder"], tips, undefined, threshold)

@@ -294,7 +294,11 @@ export type HoleCycle =
    * Back-boring from the far side: the bar goes through the Ø`pilotDiameter` hole, the cutter is brought to the bore axis below
    * the face at Z `face` (the setup's coordinates, like `top` and `bottom`) and bores up `top - face` mm to Ø`diameter`; `bottom` is the lowest the tool tip goes.
    */
-  | { readonly kind: "back-bore"; readonly diameter: number; readonly pilotDiameter: number; readonly face: number }
+  | {
+    readonly kind: "back-bore"; readonly diameter: number; readonly pilotDiameter: number; readonly face: number
+    /** The pilot is not round (a slot, a hexagon, a keyway): its outline from the hole axis, mm. The bar is oriented and shifted to pass it; `pilotDiameter` stays its nominal size. */
+    readonly pilotOutline?: ReadonlyArray<{ readonly x: number; readonly y: number }>
+  }
   /**
    * Drilling along other axes than Z on an indexed (3+2) machine: each site is entered at `entry` (CAD world mm) and goes
    * `depth` mm along the unit `direction` into the material. `peck` as the plain cycle.

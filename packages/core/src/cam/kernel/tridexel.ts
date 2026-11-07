@@ -18,7 +18,7 @@
  */
 import type { Vec3 } from "../../cad/vec.ts"
 import { assemblyProfile, type AssemblyPart } from "./assembly.ts"
-import type { Cutter } from "./cutters.ts"
+import { toothWidth, type Cutter } from "./cutters.ts"
 import type { Mesh64 } from "../model/element-mesh.ts"
 
 /** Facets per quarter turn of a rounded cutter edge in the tool solid; the facet sagitta is R (1 - cos(pi / 4 / this)). */
@@ -38,7 +38,17 @@ export interface ToolSolid {
   readonly maxRadius: number
   /** The least radius of the profile that matters for the sampling sagitta (the tip radius of a rounded tool, else the radius). */
   readonly sagRadius: number
+  /**
+   * A solid that is not a body of revolution (an insert of a boring bar that is stopped and oriented): the cones only occupy the plan
+   * region of these wedges, taken about the tool axis in the work frame, a union of convex regions. Each wedge is the points with
+   * `nx x + ny y <= c` for every one of its half-planes. Only a tool standing on +Z carries it: with the axis tilted the cones are taken
+   * whole (the larger solid, the conservative one).
+   */
+  readonly wedges?: ReadonlyArray<ReadonlyArray<Halfplane>>
 }
+
+/** `nx x + ny y <= c` in the plan frame of the tool axis (x, y measured from the tip). */
+export interface Halfplane { readonly nx: number; readonly ny: number; readonly c: number }
 
 /** The solid of the parts of the assembly in `parts` (default the flutes), as the union of the cones between profile points. */
 export const toolSolid = (cutter: Cutter, parts: ReadonlyArray<AssemblyPart> = ["cutting"]): ToolSolid => {
@@ -58,6 +68,41 @@ export const toolSolid = (cutter: Cutter, parts: ReadonlyArray<AssemblyPart> = [
     count: z0.length, z0: Float64Array.from(z0), z1: Float64Array.from(z1), r0: Float64Array.from(r0), r1: Float64Array.from(r1),
     top: z1.length === 0 ? 0 : Math.max(...z1), bottom: z0.length === 0 ? 0 : Math.min(...z0), maxRadius, sagRadius
   }
+}
+
+/**
+ * A back-boring bar standing still, oriented with its first insert towards `angle` degrees from +X (the spindle orientation of the cycle):
+ * the body (the neck and shank, a body of revolution) and the insert teeth, each a strip `toothWidth` wide (its `insertWidth`, at least 1 mm) from the axis out
+ * to the head radius, `flutes` of them evenly round the axis. The head of the bar spinning is the whole disc (`toolSolid`); stopped, only
+ * these teeth stand in the pilot. Anything that is not a bar with a neck and a head gives the plain solid.
+ */
+export const orientedBar = (cutter: Cutter, parts: ReadonlyArray<AssemblyPart>, angle: number): ReadonlyArray<ToolSolid> => {
+  const whole = toolSolid(cutter, parts)
+  const neck = (cutter.neckDiameter ?? 0) / 2
+  if (cutter.kind !== "boringbar" || !(neck > 0) || !(cutter.headHeight !== undefined && cutter.headHeight > 0) || whole.count === 0) return [whole]
+  const body = { z0: [] as number[], z1: [] as number[], r0: [] as number[], r1: [] as number[] }
+  const head = { z0: [] as number[], z1: [] as number[], r0: [] as number[], r1: [] as number[] }
+  for (let q = 0; q < whole.count; q++) {
+    const to = Math.max(whole.r0[q]!, whole.r1[q]!) > neck + 1e-9 ? head : body
+    to.z0.push(whole.z0[q]!); to.z1.push(whole.z1[q]!); to.r0.push(whole.r0[q]!); to.r1.push(whole.r1[q]!)
+  }
+  const solidOf = (c: typeof body, wedges?: ReadonlyArray<ReadonlyArray<Halfplane>>): ToolSolid => ({
+    count: c.z0.length, z0: Float64Array.from(c.z0), z1: Float64Array.from(c.z1), r0: Float64Array.from(c.r0), r1: Float64Array.from(c.r1),
+    top: c.z1.length === 0 ? 0 : Math.max(...c.z1), bottom: c.z0.length === 0 ? 0 : Math.min(...c.z0),
+    maxRadius: c.r0.length === 0 ? 0 : Math.max(...c.r0, ...c.r1), sagRadius: whole.sagRadius, ...(wedges !== undefined ? { wedges } : {})
+  })
+  const teeth = Math.max(1, Math.round(cutter.flutes))
+  const half = toothWidth(cutter) / 2
+  const wedges: Array<ReadonlyArray<Halfplane>> = []
+  for (let k = 0; k < teeth; k++) {
+    const a = (angle * Math.PI) / 180 + (2 * Math.PI * k) / teeth
+    const ux = Math.cos(a), uy = Math.sin(a)
+    wedges.push([{ nx: -ux, ny: -uy, c: 0 }, { nx: -uy, ny: ux, c: half }, { nx: uy, ny: -ux, c: half }])
+  }
+  const out: ToolSolid[] = []
+  if (body.z0.length > 0) out.push(solidOf(body))
+  if (head.z0.length > 0) out.push(solidOf(head, wedges))
+  return out
 }
 
 /**
@@ -595,6 +640,8 @@ const sweepPose = (s: TriDexel, tool: ToolSolid, px: number, py: number, pz: num
           if (m >= SCRATCH - 2) break
         }
         if (m === 0) continue
+        if (tool.wedges !== undefined && D[2] > 0.999999) m = clipToWedges(tool.wedges, m, axis, P, vb, vc)
+        if (m === 0) continue
         // Merge the intervals (insertion sort by start: m is small).
         for (let a = 1; a < m; a++) {
           const lo = loBuf[a]!, hi = hiBuf[a]!
@@ -657,6 +704,42 @@ const sweepPose = (s: TriDexel, tool: ToolSolid, px: number, py: number, pz: num
     }
   }
   return removed
+}
+
+const WEDGE_SCRATCH = 512
+const wedgeLo = new Float64Array(WEDGE_SCRATCH)
+const wedgeHi = new Float64Array(WEDGE_SCRATCH)
+
+/**
+ * The `m` intervals in `loBuf`/`hiBuf` of a tool on a ray, cut down to where the ray's points stand inside one of the wedges (plan
+ * regions about the tool axis, tool standing on +Z). A ray along the axis stands at one fixed plan position; along X or Y the plan position
+ * moves with the parameter, so each half-plane is a linear condition on it and a wedge makes one interval. Returns the new count.
+ */
+const clipToWedges = (wedges: ReadonlyArray<ReadonlyArray<Halfplane>>, m: number, axis: 0 | 1 | 2, P: readonly [number, number, number], vb: number, vc: number): number => {
+  // Plan position of the ray point at parameter t: (ox + kx t, oy + ky t) measured from the tip.
+  let ox: number, oy: number, kx: number, ky: number
+  if (axis === 2) { ox = vb - P[0]; oy = vc - P[1]; kx = 0; ky = 0 }
+  else if (axis === 0) { ox = -P[0]; oy = vb - P[1]; kx = 1; ky = 0 }
+  else { ox = vb - P[0]; oy = -P[1]; kx = 0; ky = 1 }
+  let out = 0
+  for (const wedge of wedges) {
+    let tLo = -Infinity, tHi = Infinity, empty = false
+    for (const h of wedge) {
+      // nx (ox + kx t) + ny (oy + ky t) <= c  <=>  alpha t <= beta
+      const alpha = h.nx * kx + h.ny * ky, beta = h.c - h.nx * ox - h.ny * oy
+      if (Math.abs(alpha) < 1e-12) { if (beta < 0) { empty = true; break } continue }
+      const t = beta / alpha
+      if (alpha > 0) tHi = Math.min(tHi, t); else tLo = Math.max(tLo, t)
+    }
+    if (empty || !(tLo < tHi)) continue
+    for (let a = 0; a < m && out < WEDGE_SCRATCH; a++) {
+      const lo = Math.max(loBuf[a]!, tLo), hi = Math.min(hiBuf[a]!, tHi)
+      if (lo < hi) { wedgeLo[out] = lo; wedgeHi[out] = hi; out++ }
+    }
+  }
+  const n = Math.min(out, SCRATCH)
+  for (let a = 0; a < n; a++) { loBuf[a] = wedgeLo[a]!; hiBuf[a] = wedgeHi[a]! }
+  return n
 }
 
 /** Subtract the merged intervals in `loBuf`/`hiBuf` from ray `r`; returns the length removed. */
