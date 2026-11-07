@@ -80,8 +80,9 @@ export const displayAxes = (setup: MachineSetup): { readonly axes: ReadonlyArray
 /** Positive rotary senses in the machine display frame, alongside the existing spindle indicator. */
 export const displayRotaryAxes = (setup: MachineSetup): ReadonlyArray<{ readonly name: "A" | "B" | "C"; readonly axis: Vec3 }> => {
   if (setup.kind === "lathe") return setup.turnMill === undefined ? [] : [{ name: "B", axis: { x: 0, y: setup.turret === "rear" ? -1 : 1, z: 0 } }, { name: "C", axis: { x: -1, y: 0, z: 0 } }]
-  if (setup.kind !== "mill" || setup.rotary === undefined) return []
-  const b = setup.rotary.layout === "table-BC" || setup.rotary.layout === "head-table-BC"
+  const rotary = setup.kind === "mill" || setup.kind === "3dprinter" ? setup.rotary : undefined
+  if (rotary === undefined) return []
+  const b = rotary.layout === "table-BC" || rotary.layout === "head-table-BC"
   return [{ name: b ? "B" : "A", axis: { x: b ? 0 : 1, y: b ? 1 : 0, z: 0 } }, { name: "C", axis: { x: 0, y: 0, z: 1 } }]
 }
 

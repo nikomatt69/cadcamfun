@@ -21,7 +21,7 @@ const mountVisualizer = async (kind: cam.MachineKind, initialCode: string) => {
     const analysis = createMemo(() => cam.generator.analyseGcode(code()))
     const machine = createMemo(() => previewSetup(kind, settings, stock, { program: analysis().program, gcode: code() }))
     const tools = createMemo(() => kind === "lathe" ? cam.viewer.turnMillToolModels(analysis().program, analysis().motion, code()) : cam.headerToolModels(code(), "mill"))
-    const fallback = kind === "lathe" ? cam.viewer.latheSetupOf(settings).tool : cam.toolModelOf({ type: "endmill", diameter: 8 }, "mill")
+    const fallback = kind === "lathe" ? cam.viewer.latheSetupOf(settings).tool : kind === "3dprinter" ? cam.viewer.printerSetupOf(settings).tool : cam.toolModelOf({ type: "endmill", diameter: 8 }, "mill")
     const duration = createMemo(() => cam.viewer.buildTimeline(analysis().program, analysis().motion, cam.viewer.DEFAULT_RAPID_RATE, cam.viewer.programStart(kind, analysis().program)).duration)
     return ToolpathVisualizer({
       get program() { return analysis().program },
@@ -86,5 +86,36 @@ test("a mill follows B/C inference and resets a manual machine class for the nex
     expect(view.select("Rotary view").parentElement?.textContent).toContain("head-table-BC")
     expect(view.select("Rotary view").value).toBe("machine")
     expect(view.root.querySelector('[data-testid="visualizer-dro"]')?.textContent).toContain("B30° C60°")
+  } finally { view.dispose() }
+})
+
+test("a 3D printer with B/C words opens the five-axis controls: tilting bed, machine axes and rotary frame", async () => {
+  const view = await mountVisualizer("3dprinter", "G28\nG1 X110 Y110 Z10 F3000\nG1 X120 Y110 Z10 E1 F1200\nG1 B30 C45 F1200\nG1 X120 Y110 Z30 E2 F1200")
+  try {
+    expect(view.select("View preset").value).toBe("perspective")
+    expect(view.root.querySelector('[data-testid="visualizer-multiaxis"]')?.textContent).toContain("table-BC")
+    expect(view.root.querySelector('[data-testid="visualizer-dro"]')?.textContent).toContain("B30° C45°")
+    expect(view.root.querySelector('[data-testid="visualizer-joints"]')?.textContent).toContain("X120 Y110 Z30 B30 C45")
+    view.openSettings()
+    expect(view.select("Rotary view").value).toBe("machine")
+    expect(view.select("Rotary view").parentElement?.textContent).toContain("table-BC")
+    // The machine model and its class are a mill's.
+    expect(view.root.querySelector('select[aria-label="Machine class"]')).toBeNull()
+
+    view.replaceCode("G28\nG1 X10 Y10 Z0.2 F3000\nG1 X20 Y10 Z0.2 E1 F1200")
+    expect(view.root.querySelector('[data-testid="visualizer-multiaxis"]')).toBeNull()
+    expect(view.root.querySelector('[data-testid="visualizer-joints"]')).toBeNull()
+    expect(view.root.querySelector('select[aria-label="Rotary view"]')).toBeNull()
+  } finally { view.dispose() }
+})
+
+test("a probe cycle that tilts the table (A/C words) gets its rotary set-up and five-axis readout", async () => {
+  const probe = "G90 G54\nT99 M6\nG0 X0 Y0 Z50 A0 C0\nG31 Z-5 F150\nG0 Z50\nG0 A90 C0\nG31 X-20 F150\nG0 Z50"
+  const view = await mountVisualizer("mill", probe)
+  try {
+    expect(view.root.querySelector('[data-testid="visualizer-multiaxis"]')?.textContent).toContain("table-AC")
+    expect(view.root.querySelector('[data-testid="visualizer-dro"]')?.textContent).toContain("A90° C0°")
+    view.openSettings()
+    expect(view.select("Rotary view").value).toBe("machine")
   } finally { view.dispose() }
 })

@@ -216,6 +216,15 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     root.add(lines)
   }
 
+  // A 4/5-axis printer: its program points in the bed's frame, and where the nozzle is and how it leans for the angles.
+  const printerRotary = setup.kind === "3dprinter" ? setup.rotary : undefined
+  const onBed = (p: Vec3, angles: cam.viewer.Angles): Vec3 => printerRotary !== undefined ? v.partPointOf(p, angles, printerRotary) : p
+  const nozzlePose = (p: Vec3, angles: cam.viewer.Angles): { readonly at: Vec3; readonly axis: Vec3 } | undefined => {
+    if (printerRotary === undefined) return undefined
+    return (display.frame ?? "part") === "machine"
+      ? { at: v.machinePointOf(p, angles, printerRotary), axis: v.toolAxisInMachine(angles, printerRotary) }
+      : { at: v.partPointOf(p, angles, printerRotary), axis: v.toolAxisInPart(angles, printerRotary) }
+  }
   let tool: THREE.Group | undefined
   let turned: THREE.Mesh | undefined
   let beads: THREE.LineSegments | undefined
@@ -281,10 +290,15 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     tool = toolObjectOf(modelOfPath(timeline.moves[0]?.path)!)
     tool.visible = true
     deposits = v.printerDeposits(timeline, setup.layerHeight)
+    // A rotary print's beads are drawn in the part (bed) frame, with the bed's bodies: View3D turns that group by the bed's
+    // rotation in the machine frame, so the part stays on the bed as it tilts.
+    const printed = printerRotary !== undefined ? statics : root
     const positions = new Float32Array(deposits.beads.length * 6)
     const colors = new Float32Array(deposits.beads.length * 6)
     deposits.beads.forEach((b, i) => {
-      positions.set([b.from.x, b.from.y, b.from.z, b.to.x, b.to.y, b.to.z], i * 6)
+      const m = timeline.moves[b.move]!
+      const from = onBed(b.from, m.anglesFrom), to = onBed(b.to, m.angles)
+      positions.set([from.x, from.y, from.z, to.x, to.y, to.z], i * 6)
       const c = layerColor(b.layer, deposits!.layers.length)
       colors.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6)
     })
@@ -293,18 +307,18 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
     beads = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ vertexColors: true }))
     beads.name = "deposits"
-    root.add(beads)
+    printed.add(beads)
     partial = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xfacc15 }))
     partial.name = "deposit-current"
     partial.visible = false
-    root.add(partial)
+    printed.add(partial)
     // Travel without filament: thin grey.
     const travel: number[] = []
-    for (const i of deposits.travels) { const m = timeline.moves[i]!; travel.push(m.from.x, m.from.y, m.from.z, m.to.x, m.to.y, m.to.z) }
+    for (const i of deposits.travels) { const m = timeline.moves[i]!; const a = onBed(m.from, m.anglesFrom), b = onBed(m.to, m.angles); travel.push(a.x, a.y, a.z, b.x, b.y, b.z) }
     const tg = new THREE.BufferGeometry(); tg.setAttribute("position", new THREE.Float32BufferAttribute(travel, 3))
     const travels = new THREE.LineSegments(tg, new THREE.LineDashedMaterial({ color: 0x6b7280, dashSize: 1.5, gapSize: 1.5, transparent: true, opacity: 0.6 }))
     travels.computeLineDistances(); travels.name = "travel"; travels.visible = display.showPathLines !== false
-    root.add(travels)
+    printed.add(travels)
   }
 
   const updateTurned = (seconds: number): boolean => {
@@ -342,9 +356,14 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     }
     if (tool) {
       const headPose = millTurn && setup.kind === "lathe" ? v.turnMillDisplayPose(setup, pose.point, pose.angles, display.frame ?? "machine", pose.state?.xMode) : undefined
-      const d = headPose?.tip ?? v.displayPoint(setup, pose.point, pose.state?.xMode)
+      const nozzle = nozzlePose(pose.point, pose.angles)
+      const d = headPose?.tip ?? nozzle?.at ?? v.displayPoint(setup, pose.point, pose.state?.xMode)
       if (tool.position.x !== d.x || tool.position.y !== d.y || tool.position.z !== d.z) { tool.position.set(d.x, d.y, d.z); changed = true }
       tool.visible = timeline.moves.length > 0 && display.showTool !== false
+      if (nozzle !== undefined) {
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(nozzle.axis.x, nozzle.axis.y, nozzle.axis.z).normalize())
+        if (!tool.quaternion.equals(q)) { tool.quaternion.copy(q); changed = true }
+      }
       if (headPose !== undefined) {
         const axis = new THREE.Vector3(headPose.axis.x, headPose.axis.y, headPose.axis.z)
         const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis)
@@ -384,9 +403,11 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
       if (beads.geometry.drawRange.count !== complete * 2) { beads.geometry.setDrawRange(0, complete * 2); changed = true }
       const current = display.depositMode === "progressive" && complete < limit ? all[complete] : undefined
       if (current !== undefined && current.start < seconds) {
-        const to = v.pointOn(timeline.moves[current.move]!, (seconds - current.start) / Math.max(1e-12, current.end - current.start))
+        const move = timeline.moves[current.move]!
+        const f = (seconds - current.start) / Math.max(1e-12, current.end - current.start)
+        const from = onBed(current.from, move.anglesFrom), to = onBed(v.pointOn(move, f), v.lerpAngles(move.anglesFrom, move.angles, Math.max(0, Math.min(1, f))))
         const attr = partial.geometry.getAttribute("position") as THREE.BufferAttribute
-        attr.setXYZ(0, current.from.x, current.from.y, current.from.z); attr.setXYZ(1, to.x, to.y, to.z); attr.needsUpdate = true
+        attr.setXYZ(0, from.x, from.y, from.z); attr.setXYZ(1, to.x, to.y, to.z); attr.needsUpdate = true
         partial.visible = true; changed = true
       } else if (partial.visible) { partial.visible = false; changed = true }
     }
@@ -406,7 +427,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
     }
     root.add(group)
   }
-  const rotary = setup.kind === "mill" ? setup.rotary : undefined
+  const rotary = v.setupRotary(setup)
   const limits = model !== undefined ? cam.viewer.checkLimits(model, timeline, rotary, input.gaugeOf ?? (() => 0)) : setup.kind === "lathe" ? v.turnMillLimitFindings(setup, timeline) : []
   const placeMachine = (pose: cam.viewer.MachinePose): boolean => {
     let changed = false

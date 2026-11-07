@@ -652,7 +652,7 @@ export function View3D(props: View3DProps) {
       const track = machineScene?.timeline.track
       // Program -> display: the identity, except on a lathe (spindle axis horizontal, X as a radius).
       // Rotary mills: every point in the part frame (a machine-coordinate program is turned back by its move's angles).
-      rotary = machine?.kind === "mill" ? machine.rotary : undefined
+      rotary = cam.viewer.setupRotary(machine)
       anglesOf.clear()
       const timed = new Map<string, cam.viewer.TimedMove>()
       if (machineScene && (rotary || machine?.kind === "lathe" && machine.turnMill !== undefined)) for (const m of machineScene.timeline.moves) { anglesOf.set(`${m.path}:${m.index}`, m.angles); timed.set(`${m.path}:${m.index}`, m) }

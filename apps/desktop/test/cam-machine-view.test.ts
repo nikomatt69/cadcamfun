@@ -336,3 +336,45 @@ describe("collisions with the preview's tools (spec 32 P7)", () => {
     expect(gaugeOfTool(short, false)).toBeCloseTo(15, 9)
   })
 })
+
+describe("a 4/5-axis printer: its tilting bed in the preview", () => {
+  // Printer firmware has no TCP: X Y Z are the machine's; B tilts the bed about Y through its centre (corner origin, 220 x 220).
+  const gcode = "G28\nG1 X110 Y110 Z10 F3000\nG1 X120 Y110 Z10 E1 F1200\nG1 B90 F1200\nG1 X120 Y110 Z30 E2 F1200"
+  const a = parsed(gcode)
+  const base = v.printerSetupOf(settings({ machineType: "3dprinter", bedWidth: 220, bedDepth: 220, bedOrigin: "corner" }))
+  const setup = v.withRotary(base, a.program, gcode)
+
+  test("B/C words give the printer a rotary set-up in machine coordinates, pivoting on the bed centre", () => {
+    expect(setup.kind).toBe("3dprinter")
+    const rotary = v.setupRotary(setup)
+    expect(rotary).toMatchObject({ layout: "table-BC", coordinates: "machine", pivot: { x: 110, y: 110, z: 0 }, assumed: true })
+    expect(v.displayRotaryAxes(setup).map((r) => r.name)).toEqual(["B", "C"])
+    // A planar print keeps the plain printer.
+    const plain = parsed("G1 X10 Y10 Z0.2 E1 F1200")
+    expect(v.setupRotary(v.withRotary(base, plain.program, "G1 X10 Y10 Z0.2 E1 F1200"))).toBeUndefined()
+  })
+
+  test("the deposits sit on the bed (part frame) and the nozzle leans in the part frame, stays vertical in the machine frame", () => {
+    const part = createMachineScene({ setup, program: a.program, motion: a.motion, display: { ...DEFAULT_MACHINE_DISPLAY, depositMode: "all", frame: "part" }, scale: 100 })
+    const beads = part.root.getObjectByName("deposits") as THREE.LineSegments
+    // The beads are on the bed's group, which View3D turns with the bed in the machine frame.
+    expect(beads.parent?.name).toBe("machine-bodies")
+    const at = (i: number) => { const p = beads.geometry.getAttribute("position") as THREE.BufferAttribute; return { x: p.getX(i), y: p.getY(i), z: p.getZ(i) } }
+    // The first bead is printed flat; the second after B90: machine (120, 110, 30) is (80, 110, 10) on the bed.
+    expect(at(1)).toMatchObject({ x: 120, y: 110, z: 10 })
+    expect(at(3).x).toBeCloseTo(80, 6); expect(at(3).y).toBeCloseTo(110, 6); expect(at(3).z).toBeCloseTo(10, 6)
+    part.update(part.timeline.duration)
+    const nozzle = part.root.children.find((c) => c.userData.tool !== undefined && c.visible)!
+    const axis = new THREE.Vector3(0, 0, 1).applyQuaternion(nozzle.quaternion)
+    expect(Math.abs(axis.x)).toBeCloseTo(1, 6)
+    expect(nozzle.position.x).toBeCloseTo(80, 6); expect(nozzle.position.z).toBeCloseTo(10, 6)
+    part.dispose()
+
+    const machine = createMachineScene({ setup, program: a.program, motion: a.motion, display: { ...DEFAULT_MACHINE_DISPLAY, frame: "machine" }, scale: 100 })
+    machine.update(machine.timeline.duration)
+    const head = machine.root.children.find((c) => c.userData.tool !== undefined && c.visible)!
+    expect(new THREE.Vector3(0, 0, 1).applyQuaternion(head.quaternion).z).toBeCloseTo(1, 6)
+    expect(head.position).toMatchObject({ x: 120, y: 110, z: 30 })
+    machine.dispose()
+  })
+})

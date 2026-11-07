@@ -124,10 +124,6 @@ export default function CamPage(): JSX.Element {
   // The clamps and the machine travel the setup panel describes are outlined in the view as they are edited, before anything is generated.
   const clampsOfSetup = createMemo(() => clampBoxes(setupStore.choices.fixtures))
   const travelOfSetup = createMemo(() => travelBox(setupStore.choices.envelope))
-  const previewMachine = createMemo(() => previewSetup(machineChoice().kind, previewSettings(), previewStock(), {
-    ...(kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}),
-    program: camStore.program, gcode: camStore.gcode, tool: toolModel()
-  }))
   const previewDefaultTool = createMemo(() => machineChoice().kind === "mill" ? cam.kernel.settingsCutter(previewSettings()) : undefined)
   /** What the program sheet says about the program: the machine, its toolpaths and their moves. */
   const sheetSummary = createMemo(() => {
@@ -158,6 +154,11 @@ export default function CamPage(): JSX.Element {
   const shownProgram = () => probePreview()?.program ?? camStore.program
   const shownMotion = () => (probePreview() !== undefined ? probePreview()!.motion : camStore.motion)
   const shownGcode = () => probePreview()?.nc ?? camStore.gcode
+  const previewMachine = createMemo(() => previewSetup(machineChoice().kind, previewSettings(), previewStock(), {
+    ...(kernelShown() ? { artifact: camStore.kernelArtifact, machineId: gen.kernelSettings.machine } : {}),
+    // The program the 3D view plays (a probe cycle's, when one is previewed): its A/B/C words and indexed moves set the rotary axes.
+    program: shownProgram(), gcode: shownGcode(), tool: toolModel()
+  }))
   const [search, setSearch] = useSearchParams()
   const navigate = useNavigate()
 

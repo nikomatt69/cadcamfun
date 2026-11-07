@@ -204,6 +204,9 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const joints = createMemo(() => {
     const model = machineInfo()?.model, r = readout()
     if (props.machine?.kind === "lathe" && props.machine.turnMill !== undefined && r !== undefined) return { ...r.program, b: r.angles.b ?? 0, c: r.angles.c ?? 0 }
+    // A rotary printer has no machine model: its axes are the program's (firmware without TCP) with the angles in force.
+    const printer = props.machine?.kind === "3dprinter" ? props.machine.rotary : undefined
+    if (printer !== undefined && r !== undefined) return { ...cam.viewer.machinePointOf(r.program, r.angles, printer), ...r.angles }
     return model !== undefined && r !== undefined ? cam.viewer.machinePose(model, r.program, r.angles, rotary(), 0, "machine").joints : undefined
   })
   const [stopAtCollision, setStopAtCollision] = createSignal(true)
@@ -272,13 +275,13 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     return showMachine() ? found : found.filter((f) => f.code === "SINGULARITY" || f.code === "C_UNWIND")
   })
   const limitMarkers = createMemo(() => findingTimes(timeline(), limits().map((f) => ({ ...(f.line !== undefined ? { line: f.line } : {}), severity: f.severity, message: f.message }))))
-  const rotary = (): cam.viewer.RotarySetup | undefined => { const setup = effectiveMachine(); return setup?.kind === "mill" ? setup.rotary : undefined }
+  const rotary = (): cam.viewer.RotarySetup | undefined => cam.viewer.setupRotary(effectiveMachine())
   // Each machine opens on the view its operator reads: a lathe from the front (the XZ plane flat, the chuck on the left).
-  const multiAxis = (): boolean => props.machine?.kind === "mill" ? props.machine.rotary !== undefined : props.machine?.kind === "lathe" && props.machine.turnMill !== undefined
+  const multiAxis = (): boolean => props.machine?.kind === "lathe" ? props.machine.turnMill !== undefined : cam.viewer.setupRotary(props.machine) !== undefined
   const presetFor = (kind: cam.MachineKind | undefined): ViewPreset => kind === "lathe" && !multiAxis() ? "front" : "perspective"
-  createEffect(on(() => `${props.machine?.kind}:${props.machine?.kind === "mill" ? props.machine.rotary?.layout ?? "plain" : multiAxis()}`, () => {
+  createEffect(on(() => `${props.machine?.kind}:${props.machine?.kind === "lathe" ? multiAxis() : cam.viewer.setupRotary(props.machine)?.layout ?? "plain"}`, () => {
     setPreset(props.machine?.kind === "lathe" && !multiAxis() ? "front" : "perspective")
-    setLayer(undefined); setFrame(multiAxis() ? "machine" : "part"); setShowMachine(multiAxis()); setMachinePreset("auto")
+    setLayer(undefined); setFrame(multiAxis() ? "machine" : "part"); setShowMachine(multiAxis() && props.machine?.kind !== "3dprinter"); setMachinePreset("auto")
   }))
   /** Where the tool is now and what the machine is doing (from the timeline the 3D view plays). */
   const pose = createMemo(() => {

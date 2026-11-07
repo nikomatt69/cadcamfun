@@ -38,8 +38,11 @@ export interface RotarySetup {
   readonly reasons: ReadonlyArray<string>
 }
 
-/** The rotary angles the program uses, or `undefined` for a 3-axis program. */
-export const rotaryOfProgram = (program: Program, gcode = "", pivot: Vec3 = { x: 0, y: 0, z: 0 }, machineLayout?: MachineRotaryLayout): RotarySetup | undefined => {
+/**
+ * The rotary angles the program uses, or `undefined` for a 3-axis program. `noTcpFrame` is the frame assumed when nothing in the
+ * program says: part coordinates on a mill control, machine coordinates on printer firmware (which has no tool centre point).
+ */
+export const rotaryOfProgram = (program: Program, gcode = "", pivot: Vec3 = { x: 0, y: 0, z: 0 }, machineLayout?: MachineRotaryLayout, noTcpFrame: "part" | "machine" = "part"): RotarySetup | undefined => {
   const used = { a: false, b: false, c: false }
   let orient = false
   for (const path of program.toolpaths) for (const m of path.moves) {
@@ -65,6 +68,7 @@ export const rotaryOfProgram = (program: Program, gcode = "", pivot: Vec3 = { x:
   if (orient) { coordinates = "machine"; reasons.push("indexed (Orient) moves are in machine coordinates") }
   else if (/MACHINE COORDINATES/.test(header)) { coordinates = "machine"; reasons.push("the header says machine coordinates") }
   else if (/CONTROL TCP|\bG234\b|\bG43\.4\b|\bG43\.5\b|\bTRAORI\b|\bM128\b/.test(gcode.toUpperCase())) { coordinates = "part"; reasons.push("the control applies the tool centre point (G234 / G43.4 / TRAORI / M128)") }
+  else if (noTcpFrame === "machine") { coordinates = "machine"; assumed = true; reasons.push("no TCP word and the firmware has none: machine coordinates assumed") }
   else { coordinates = "part"; assumed = true; reasons.push("no TCP word: part coordinates assumed") }
   return { layout, pivot, coordinates, assumed, reasons }
 }
