@@ -1,6 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import type { Feature } from "../../cad/history.ts"
-import { DEFAULT_CUTTERS, findCutter, planOnly, runJob, type CamArtifact, type ManufacturingJob, type OperationSpec } from "./index.ts"
+import { DEFAULT_CUTTERS, findCutter, planOnly, runJob, type CamArtifact, type KernelMachine, type ManufacturingJob, type OperationSpec } from "./index.ts"
 import { findMachine } from "./machines.ts"
 
 setDefaultTimeout(100_000)
@@ -87,7 +87,7 @@ describe("hole breadth in a planned job", () => {
   })
 
   // The planned back-bore with the outline of its pilot declared: a round one of the pilot's size, or a slot the real pilot is not.
-  const withOutline = (outline: ReadonlyArray<{ x: number; y: number }>, post?: string): CamArtifact => {
+  const withOutline = (outline: ReadonlyArray<{ x: number; y: number }>, post?: KernelMachine["post"]): CamArtifact => {
     const under: Feature = { id: "under", type: "plane", from: { kind: "points", points: [[0, 0, 0], [1, 0, 0], [0, -1, 0]] } } as Feature
     const bb = { id: "bb", type: "hole", plane: "under", at: [40, -25], diameter: 12, depth: 30, kind: "counterbore", headDiameter: 16, headDepth: 12 } as Feature
     const machine = findMachine("vmc-standard")!
