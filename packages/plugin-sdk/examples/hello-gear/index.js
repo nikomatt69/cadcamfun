@@ -7776,7 +7776,8 @@ var OffsetUpdateSchema = TaggedStruct("OffsetUpdate", {
   ]),
   axis: Literals(OFFSET_AXES),
   mode: Literals(["set", "add"]),
-  value: ExprSchema
+  value: ExprSchema,
+  reads: optionalKey2(Boolean3)
 });
 var AlarmSchema = TaggedStruct("Alarm", {
   code: Int.check(isBetween({ minimum: 1, maximum: 999 })),
@@ -7786,6 +7787,7 @@ var ReportSchema = TaggedStruct("Report", {
   label: String4.check(isMinLength(1), isMaxLength(40)),
   values: ArraySchema(Struct({ name: String4.check(isMinLength(1), isMaxLength(24)), value: ExprSchema })).check(isMaxLength(32))
 });
+var RotationSchema = TaggedStruct("Rotation", { on: Boolean3, centre: Vec2Schema, angle: ExprSchema });
 var StopSchema = TaggedStruct("Stop", { optional: Boolean3 });
 var MoveSchema = Union2([
   RapidSchema,
@@ -7814,7 +7816,8 @@ var MoveSchema = Union2([
   OffsetUpdateSchema,
   AlarmSchema,
   ReportSchema,
-  StopSchema
+  StopSchema,
+  RotationSchema
 ]);
 var CoolantSchema = Literals(["off", "flood", "mist"]);
 var ProgramUnitsSchema = Literals(["mm", "inch"]);
@@ -7826,7 +7829,9 @@ var ToolpathSchema = Struct({
   spindleRpm: NonNegative,
   coolant: CoolantSchema,
   moves: ArraySchema(MoveSchema),
-  operation: optionalKey2(Struct({ id: String4.check(isMinLength(1)), name: String4 }))
+  operation: optionalKey2(Struct({ id: String4.check(isMinLength(1)), name: String4 })),
+  workOffset: optionalKey2(WorkOffsetSchema2),
+  workOffsetRef: optionalKey2(WorkOffsetRefSchema)
 });
 var ProgramSchema = Struct({
   name: String4.check(isMinLength(1)),
@@ -7876,6 +7881,8 @@ var ToolSchema = Struct({
   stickout: optionalKey2(Positive2),
   angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 180 }))),
   tipRadius: optionalKey2(Positive2),
+  holder: optionalKey2(Struct({ diameter: Positive2, length: Positive2 })),
+  lifeMinutes: optionalKey2(Positive2),
   profile: optionalKey2(ArraySchema(Struct({ r: NonNegative2, z: Finite })))
 });
 var decodeTool = decodeUnknownEffect2(ToolSchema);
@@ -8324,6 +8331,13 @@ var klartextSpindleOrient = {
   blocks: (a) => [`${KLARTEXT_PREFIX}CYCL DEF 13.0 ORIENTATION`, `${KLARTEXT_PREFIX}CYCL DEF 13.1 ANGLE${a}`, `${KLARTEXT_PREFIX}CYCL CALL`]
 };
 
+// packages/core/src/cam/post/klartext-cycles.ts
+var CENTRE_DATUM = [[320, "SET-UP CLEARANCE", 0], [260, "CLEARANCE HEIGHT", undefined], [301, "MOVE TO CLEARANCE", 1], [305, "NUMBER IN TABLE", undefined]];
+var TS_ROWS = [[381, "PROBE IN TS AXIS", 0], [382, "1ST CO. FOR TS AXIS", 0], [383, "2ND CO. FOR TS AXIS", 0], [384, "3RD CO. FOR TS AXIS", 0], [333, "DATUM", 0]];
+var CIRCLE = [[321, "CENTER 1ST AXIS", undefined], [322, "CENTER 2ND AXIS", undefined], [262, "NOMINAL DIAMETER", undefined], [325, "STARTING ANGLE", 0], [247, "STEPPING ANGLE", 90], [261, "MEASURING HEIGHT", undefined], ...CENTRE_DATUM, [331, "DATUM", undefined], [332, "DATUM", undefined], [303, "MEAS. VALUE TRANSFER", undefined], ...TS_ROWS, [423, "NO. OF PROBE POINTS", 4], [365, "TYPE OF TRAVERSE", 1]];
+var RECT = [[321, "CENTER 1ST AXIS", undefined], [322, "CENTER 2ND AXIS", undefined], [323, "1ST SIDE LENGTH", undefined], [324, "2ND SIDE LENGTH", undefined], [261, "MEASURING HEIGHT", undefined], ...CENTRE_DATUM, [331, "DATUM", undefined], [332, "DATUM", undefined], [303, "MEAS. VALUE TRANSFER", undefined], ...TS_ROWS];
+var SLOT = [[321, "CENTER 1ST AXIS", undefined], [322, "CENTER 2ND AXIS", undefined], [311, "WIDTH", undefined], [272, "MEASURING AXIS", undefined], [261, "MEASURING HEIGHT", undefined], ...CENTRE_DATUM, [405, "DATUM", undefined], [303, "MEAS. VALUE TRANSFER", undefined], ...TS_ROWS];
+
 // packages/core/src/cam/post/fanuc.ts
 var fanucProgramNumber = (program) => {
   const requested = Number(program.metadata?.["programNumber"]);
@@ -8743,7 +8757,7 @@ var ToolpathSettingsSchema = Struct({
   stockLength: withDefault2(Positive3, 100),
   spindleDirection: withDefault2(Literals(["cw", "ccw"]), "cw"),
   turningOperation: withDefault2(Literals(["external", "internal", "face"]), "external"),
-  applyToolCompensation: withDefault2(Boolean3, true),
+  applyToolCompensation: withDefault2(Boolean3, false),
   workholding: withDefault2(Literals(["vise", "clamps", "plate", "none"]), "vise"),
   viseJawAxis: withDefault2(Literals(["x", "y"]), "x"),
   clampDepth: withDefault2(NonNegative3, 0),
@@ -8762,7 +8776,7 @@ var ToolpathSettingsSchema = Struct({
   originX: withDefault2(Num2, 0),
   originY: withDefault2(Num2, 0),
   originZ: withDefault2(Num2, 0)
-});
+}).annotate({ identifier: "ToolpathSettings" });
 var DEFAULT_SETTINGS = decodeUnknownSync(ToolpathSettingsSchema)({});
 var StockSchema2 = Struct({
   width: Positive3,
@@ -9007,6 +9021,7 @@ var DEG7 = Math.PI / 180;
 // packages/core/src/cam/viewer/collisions.ts
 var HEAD_SIDE = new Set(["head", "spindle", "fork"]);
 var PART_SIDE = new Set(["table", "cradle", "platter"]);
+var PRINTER_COLLISION_CODES = new Set(["PRINTER_INTO_BED", "PRINTER_HEAD_INTO_BED"]);
 // packages/core/src/cam/verify/schema.ts
 var VerifyToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
 var VerifyToolSchema = Struct({
@@ -9204,7 +9219,7 @@ var CharacteristicWire = Struct({
 var angular = (c, k) => c.kind === "angle" ? { ...c, nominal: c.nominal * k, lower: c.lower * k, upper: c.upper * k } : c;
 var CharacteristicSchema = CharacteristicWire.pipe(decodeTo2(toType2(CharacteristicWire), transform2({ decode: (c) => angular(c, DEG9), encode: (c) => angular(c, 1 / DEG9) })));
 var ProbeActionSchema = Union2([
-  Struct({ kind: Literal2("set-offset"), ref: WorkOffsetRefSchema, axes: Struct(Object.fromEntries(OFFSET_AXES.map((a) => [a, optionalKey2(resultName)]))), policy: UpdatePolicySchema }),
+  Struct({ kind: Literal2("set-offset"), ref: WorkOffsetRefSchema, axes: Struct(Object.fromEntries(OFFSET_AXES.map((a) => [a, optionalKey2(resultName)]))), reads: optionalKey2(Struct(Object.fromEntries(OFFSET_AXES.map((a) => [a, optionalKey2(Finite)])))), policy: UpdatePolicySchema }),
   Struct({ kind: Literal2("rotation"), result: resultName, via: Literals(["g68", "offset-r", "table-c"]), ref: optionalKey2(WorkOffsetRefSchema), policy: UpdatePolicySchema }),
   Struct({ kind: Literal2("tool-offset"), tool: toolNumber, quantity: Literals(["length", "radius"]), result: resultName, part: Literals(["geometry", "wear"]) }),
   Struct({
@@ -9318,6 +9333,7 @@ var CutterSchema = Struct({
   neckDiameter: optionalKey2(positive2),
   formRadius: optionalKey2(positive2),
   headHeight: optionalKey2(positive2),
+  insertWidth: optionalKey2(positive2),
   fluteLength: positive2,
   shankDiameter: positive2,
   stickout: positive2,
@@ -9337,7 +9353,13 @@ var HoleCycleSchema = Union2([
     fullRetractEvery: optionalKey2(Int.check(isGreaterThanOrEqualTo2(0))),
     dwell: optionalKey2(nonNegative3)
   }),
-  Struct({ kind: Literal2("back-bore"), diameter: positive2, pilotDiameter: positive2, face: Finite }),
+  Struct({
+    kind: Literal2("back-bore"),
+    diameter: positive2,
+    pilotDiameter: positive2,
+    face: Finite,
+    pilotOutline: optionalKey2(ArraySchema(Struct({ x: Finite, y: Finite })).check(isMinLength(3), isMaxLength(64)))
+  }),
   Struct({
     kind: Literal2("tilted"),
     peck: optionalKey2(nonNegative3),
@@ -10018,10 +10040,15 @@ var machineConfigOf = (machine) => {
 };
 var DEFAULT_MACHINE_CONFIGS = MACHINE_CATALOGUE.map(machineConfigOf);
 // packages/core/src/cam/kernel/tridexel.ts
+var pieceLo = new Float64Array(16);
+var pieceHi = new Float64Array(16);
 var SCRATCH = 64;
 var loBuf = new Float64Array(SCRATCH);
 var hiBuf = new Float64Array(SCRATCH);
 var keep = new Float32Array(1024);
+var WEDGE_SCRATCH = 512;
+var wedgeLo = new Float64Array(WEDGE_SCRATCH);
+var wedgeHi = new Float64Array(WEDGE_SCRATCH);
 
 // packages/core/src/cam/kernel/engagement.ts
 var TAU17 = Math.PI * 2;
@@ -10057,11 +10084,18 @@ var DEG12 = Math.PI / 180;
 // packages/core/src/cam/probing/actions.ts
 var DEG13 = Math.PI / 180;
 
-// packages/core/src/cam/kernel/probing.ts
+// packages/core/src/cam/probing/rotary-cal.ts
 var DEG14 = Math.PI / 180;
+
+// packages/core/src/cam/probing/calibration.ts
+var DEG15 = Math.PI / 180;
+
+// packages/core/src/cam/kernel/probing.ts
+var DEG16 = Math.PI / 180;
 
 // packages/core/src/cam/kernel/execute.ts
 var RESIDUALS = new WeakMap;
+var SOLIDS3 = new WeakMap;
 // packages/core/src/drawing/title-block.ts
 var DOCUMENT_TYPES = ["part", "assembly", "cam-setup", "cam-program", "sketch"];
 var DOCUMENT_STATUSES = ["draft", "in-review", "released", "obsolete"];
@@ -10094,6 +10128,8 @@ var TitleBlockSchema = Struct({
 });
 // packages/core/src/cam/kernel/verify-nc.ts
 var FAULT_KINDS = new Set(["gouge", "rapid-in-stock", "travel"]);
+// packages/core/src/cam/kernel/setups.ts
+var UNDERCUT_KINDS = new Set(["tslot", "dovetail", "lollipop", "boringbar"]);
 // packages/core/src/cam/program/op.ts
 var OperationSchema = Struct({
   id: String4.check(isMinLength(1)),
@@ -10103,7 +10139,35 @@ var OperationSchema = Struct({
   tool: ToolSchema,
   pocket: optionalKey2(Int.check(isGreaterThanOrEqualTo2(1))),
   enabled: Boolean3,
-  fromPreviousStock: Boolean3
+  fromPreviousStock: Boolean3,
+  workpieceIds: optionalKey2(ArraySchema(String4)),
+  dependsOn: optionalKey2(ArraySchema(String4))
+});
+var OperationTemplateStepSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  name: String4,
+  params: ToolpathSettingsSchema,
+  tool: ToolSchema,
+  pocket: optionalKey2(Int.check(isGreaterThanOrEqualTo2(1))),
+  fromPreviousStock: optionalKey2(Boolean3),
+  dependsOn: optionalKey2(ArraySchema(String4))
+});
+var OperationTemplateSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  name: String4,
+  steps: ArraySchema(OperationTemplateStepSchema).check(isMinLength(1), isMaxLength(16))
+});
+var TemplateUseSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  templateId: String4.check(isMinLength(1)),
+  name: optionalKey2(String4),
+  elementIds: ArraySchema(String4),
+  perElement: optionalKey2(Boolean3),
+  order: optionalKey2(Literals(["perStep", "perFeature"])),
+  workpieceIds: optionalKey2(ArraySchema(String4)),
+  enabled: optionalKey2(Boolean3),
+  position: optionalKey2(Int.check(isGreaterThanOrEqualTo2(0))),
+  overrides: optionalKey2(Record(String4, Union2([Finite, String4, Boolean3])))
 });
 // packages/core/src/cam/program/setup.ts
 var PostConfigSchema = Struct({
@@ -10115,7 +10179,65 @@ var PostConfigSchema = Struct({
   tolerance: Finite.check(isGreaterThanOrEqualTo2(0)),
   lineNumbers: optionalKey2(Struct({ start: Int, step: Int.check(isGreaterThanOrEqualTo2(1)) })),
   stamp: optionalKey2(String4),
-  programNumberBase: Int.check(isGreaterThanOrEqualTo2(1))
+  programNumberBase: Int.check(isGreaterThanOrEqualTo2(1)),
+  swivel: optionalKey2(Struct({
+    dataRecord: String4.check(isMinLength(1)),
+    retraction: optionalKey2(Literals([0, 1, 2, 4])),
+    retractDistance: optionalKey2(Finite.check(isGreaterThan2(0))),
+    status: optionalKey2(Int)
+  }))
+});
+var WorkpieceSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  name: String4,
+  workOffset: WorkOffsetSchema2,
+  workOffsetRef: optionalKey2(WorkOffsetRefSchema),
+  placement: optionalKey2(Struct({ x: Finite, y: Finite, z: Finite })),
+  index: optionalKey2(Struct({ a: optionalKey2(Finite), b: optionalKey2(Finite), c: optionalKey2(Finite) })),
+  indexAs: optionalKey2(Literals(["table", "plane"])),
+  stock: optionalKey2(StockSchema)
+});
+var WorkpieceOrderSchema = Literals(["toolFirst", "partFirst"]);
+var Vec = Struct({ x: Finite, y: Finite, z: Finite });
+var FixtureBoxSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  name: String4,
+  min: Vec,
+  max: Vec
+});
+var SisterToolSchema = Struct({ toolId: String4.check(isMinLength(1)), tool: ToolSchema });
+var Vec2 = Struct({ x: Finite, y: Finite });
+var Unit2 = Struct({ x: Finite.check(isBetween({ minimum: -1, maximum: 1 })), y: Finite.check(isBetween({ minimum: -1, maximum: 1 })) });
+var Depth = { depth: Finite.check(isGreaterThan2(0)), top: optionalKey2(Finite) };
+var Sense = Literals([1, -1]);
+var PartProbeCycleSchema = Union2([
+  Struct({ kind: Literal2("z-surface"), at: Vec2, expectedZ: Finite }),
+  Struct({ kind: Literal2("edge"), at: Struct({ x: Finite, y: Finite, z: Finite }), normal: Unit2 }),
+  Struct({ kind: Literal2("corner"), corner: Vec2, inside: Boolean3, xSense: Sense, ySense: Sense, ...Depth, inset: optionalKey2(Finite.check(isGreaterThan2(0))), touchesPerEdge: optionalKey2(Literals([1, 2])) }),
+  Struct({ kind: Literals(["bore", "boss"]), centre: Vec2, diameter: Finite.check(isGreaterThan2(0)), ...Depth }),
+  Struct({ kind: Literals(["web", "pocket"]), centre: Vec2, width: Finite.check(isGreaterThan2(0)), angle: Finite, ...Depth }),
+  Struct({ kind: Literal2("rectangle"), inside: Boolean3, centre: Vec2, size: Struct({ x: Finite.check(isGreaterThan2(0)), y: Finite.check(isGreaterThan2(0)) }), ...Depth }),
+  Struct({ kind: Literal2("edge-angle"), start: Vec2, along: Unit2, pitch: Finite.check(isGreaterThan2(0)), normal: Unit2, ...Depth })
+]);
+var PartDisplacementSchema = Struct({
+  workpieceId: optionalKey2(String4),
+  x: optionalKey2(Finite),
+  y: optionalKey2(Finite),
+  z: optionalKey2(Finite),
+  rotation: optionalKey2(Finite)
+});
+var PartProbeSchema = Struct({
+  cycles: ArraySchema(PartProbeCycleSchema).check(isMinLength(1), isMaxLength(4)),
+  toolNumber: optionalKey2(Int.check(isBetween({ minimum: 1, maximum: 9999 }))),
+  stylusDiameter: optionalKey2(Finite.check(isGreaterThan2(0))),
+  feed: optionalKey2(Finite.check(isGreaterThan2(0))),
+  search: optionalKey2(Finite.check(isGreaterThan2(0))),
+  clearance: optionalKey2(Finite.check(isGreaterThan2(0))),
+  safeZ: optionalKey2(Finite),
+  placement: optionalKey2(Literals(["first-program", "inline"])),
+  limit: optionalKey2(Finite.check(isGreaterThan2(0))),
+  rotation: optionalKey2(Literals(["g68", "offset-r", "table-c"])),
+  replay: optionalKey2(Struct({ displacements: optionalKey2(ArraySchema(PartDisplacementSchema).check(isMaxLength(48))), tolerance: optionalKey2(Finite.check(isGreaterThan2(0))) }))
 });
 var SetupGroupingSchema = Literals(["single", "perTool", "perOperation"]);
 var SetupSchema = Struct({
@@ -10127,12 +10249,21 @@ var SetupSchema = Struct({
   post: PostConfigSchema,
   grouping: SetupGroupingSchema,
   retractBeforeToolChange: Boolean3,
-  operations: ArraySchema(OperationSchema)
-});
-// packages/core/src/cam/probing/rotary-cal.ts
-var DEG15 = Math.PI / 180;
+  operations: ArraySchema(OperationSchema),
+  workpieces: optionalKey2(ArraySchema(WorkpieceSchema).check(isMaxLength(48))),
+  magazineSize: optionalKey2(Int.check(isGreaterThanOrEqualTo2(1))),
+  workpieceOrder: optionalKey2(WorkpieceOrderSchema),
+  fixtures: optionalKey2(ArraySchema(FixtureBoxSchema).check(isMaxLength(64))),
+  envelope: optionalKey2(Struct({ min: Vec, max: Vec })),
+  sisters: optionalKey2(ArraySchema(SisterToolSchema).check(isMaxLength(64))),
+  templates: optionalKey2(ArraySchema(OperationTemplateSchema).check(isMaxLength(64))),
+  uses: optionalKey2(ArraySchema(TemplateUseSchema).check(isMaxLength(256))),
+  partProbe: optionalKey2(PartProbeSchema)
+}).annotate({ identifier: "CamSetup" });
+// packages/core/src/cam/program/probing.ts
+var DEG17 = Math.PI / 180;
 // packages/core/src/cam/probing/report.ts
-var DEG16 = Math.PI / 180;
+var DEG18 = Math.PI / 180;
 // packages/core/src/drawing/sheet.ts
 var LAYERS = [
   { id: "frame", name: "FRAME", color: "#000000", width: 0.7 },

@@ -99,7 +99,7 @@ describe("CAD file import", () => {
     const result = await readCadFile(new File([binaryGlb()], "model.glb"))
     expect(result.elements).toHaveLength(1)
     expect(result.elements[0]).toMatchObject({ type: "mesh", name: "triangle", faces: [[0, 1, 2]], vertices: [{ x: 10, y: 2, z: 0 }, { x: 12, y: 2, z: 0 }, { x: 10, y: 4, z: 0 }] })
-    expect(result.warnings).toEqual([expect.stringContaining("verify the scale")])
+    expect(result.warnings).toEqual([expect.stringContaining("verify scale")])
   })
 
   test("GLB refuses missing external resources before the loader attempts to fetch them", async () => {

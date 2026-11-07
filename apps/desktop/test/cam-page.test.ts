@@ -2,9 +2,12 @@
  * The CAM page end to end (legacy `pages/cam.tsx` layout): every toolbar control, the tabs, the right sidebar
  * (generator → editor, cycles), the `?loadToolpath` / `?loadTool` hand-offs, over the real sidecar handlers.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { bootLiveApp } from "./helpers/live-app.ts"
 import { useCamStore } from "../src/features/cam/store/camStore.ts"
+
+// Booting the whole UI imports the full app graph cold, which outlasts the 5 s hook default on a busy machine.
+setDefaultTimeout(180_000)
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
 const errors: string[] = []
@@ -65,7 +68,7 @@ describe("CAM page", () => {
       ;(URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => undefined
       proto.click = function (this: HTMLAnchorElement) { downloads.push(this.download) }
       try {
-        await click('button[title="Save G-Code"]')
+        await click('button[title="Export"]')
         await click('[data-testid="workspace-export-file"]')
       } finally {
         proto.click = nativeClick
@@ -182,11 +185,19 @@ describe("CAM page", () => {
   test("import reads a file into the editor", async () => {
     const { dispose } = app.visit("/cam")
     try {
+      await click('button[title="Import G-Code"]')
       const input = await find<HTMLInputElement>('input[type="file"]')
       const file = new window.File(["G21\nG0 X1 Y1\nM30"], "part.nc", { type: "text/plain" })
       Object.defineProperty(input, "files", { value: [file], configurable: true })
       input.dispatchEvent(new window.Event("change", { bubbles: true }))
-      await app.wait(() => editor()?.value.includes("G0 X1 Y1"))
+      // The dialog lists the readable programs; opening one loads it into the editor. Earlier tests left a program in
+      // the page, so the dialog asks before replacing it: the test agrees.
+      const nativeConfirm = window.confirm
+      window.confirm = () => true
+      try {
+        await click('[data-testid="cam-import-programs"] button')
+        await app.wait(() => editor()?.value.includes("G0 X1 Y1"), 30000)
+      } finally { window.confirm = nativeConfirm }
     } finally { dispose() }
   }, 60000)
 

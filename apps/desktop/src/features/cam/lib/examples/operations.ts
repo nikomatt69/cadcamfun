@@ -265,7 +265,9 @@ export const OPERATION_EXAMPLES: ReadonlyArray<OperationExample> = [
     ["lathe-knurling", ["knurling"], "knurling", "turning", "external", { depth: 0.4, stepdown: 0.2 }]
   ] as const).map(([id, cells, operationType, toolType, turningOperation, cut]) => define(id, "lathe", cells, {
     machineType: "lathe", material: "steel", operationType, toolType, turningOperation, spindleDirection: "cw",
-    stockDiameter: 40, stockLength: 80, gripLength: 25, chuckType: "3-jaw", rpm: 1500, feedrate: 150, plungerate: 100, coolant: true, ...cut
+    stockDiameter: 40, stockLength: 80, gripLength: 25, chuckType: "3-jaw", rpm: 1500, feedrate: 150, plungerate: 100, coolant: true,
+    // Internal cuts start from a declared Ø12 pilot bore, which the generator requires.
+    ...(turningOperation === "internal" ? { stockBore: 12 } : {}), ...cut
   }, { kind: "none" })),
 
   // ---- 3D printing: a 0.4 mm nozzle, PLA unless the part asks for more

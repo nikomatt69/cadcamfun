@@ -98,12 +98,12 @@ test("CAM Save exports exact NC and a portable multi-tool path, then imports the
   URL.revokeObjectURL = () => undefined
   window.HTMLAnchorElement.prototype.click = function () { downloads.push({ filename: this.download, blob: blobs.get(this.href)! }) }
   try {
-    await click("button[title='Save G-Code']")
+    await click("button[title='Export']")
     await input("fileName", "Plate finish")
     await click("[data-testid='workspace-export-file']")
     expect(downloads[0]!.filename).toBe("Plate finish.nc")
     expect(await downloads[0]!.blob.text()).toBe(artifact.nc)
-    await click("button[title='Save G-Code']")
+    await click("button[title='Export']")
     await input("fileName", "Plate finish")
     const format = document.querySelector<HTMLSelectElement>("select[name='fileFormat']")!
     format.value = "toolpath"; format.dispatchEvent(new window.Event("change", { bubbles: true }))
@@ -117,9 +117,11 @@ test("CAM Save exports exact NC and a portable multi-tool path, then imports the
     expect(snapshot.kernelArtifact?.identity).toEqual(artifact.identity)
     expect(snapshot.drawing["elements"]).toEqual([plate])
     useCamStore.getState().reset()
+    await click("button[title='Import G-Code']")
     const picker = await app.wait(() => document.querySelector<HTMLInputElement>("input[type='file']"))
     Object.defineProperty(picker, "files", { value: [new window.File([json], "Plate.cam.json", { type: "application/json" })], configurable: true })
     picker.dispatchEvent(new window.Event("change", { bubbles: true }))
+    await click("[data-testid='cam-import-programs'] button")
     await app.wait(() => useCamStore.getState().gcode === artifact.nc)
     expect(useCamStore.getState().program).toEqual(artifact.program)
     expect(useCamStore.getState().kernelArtifact?.identity.nc).toBe(artifact.identity.nc)
@@ -131,7 +133,7 @@ test("CAM Save creates a private project with CAD and CAM, updates with history 
   prepareNative()
   let view = app.visit("/cam")
   try {
-    await click("button[title='Save G-Code']")
+    await click("button[title='Export']")
     await click("[data-testid='workspace-save-as-project']")
     await input("camProgramName", "Native plate")
     await input("projectName", "Machined plate")
@@ -149,7 +151,7 @@ test("CAM Save creates a private project with CAD and CAM, updates with history 
     await app.state.runtime.run(app.client.toolpaths.update({ params: { id: saved.id }, payload: { data: { ...(row.data as Record<string, unknown>), customNote: "Keep this metadata", sourceRevision: "original-revision", verification: { original: true } } } }))
     const changed = `${artifact.nc}\n; edited in CAM`
     useCamStore.getState().setGcode(changed)
-    await click("button[title='Save G-Code']")
+    await click("button[title='Export']")
     await click("[data-testid='workspace-save-as-project']")
     expect(document.querySelector<HTMLSelectElement>("select[name='camSaveDestination']")!.value).toBe("update")
     await click("[data-testid='workspace-save-project']")
@@ -171,7 +173,7 @@ test("CAM Save creates a private project with CAD and CAM, updates with history 
     expect(useCamStore.getState().gcode).toBe(artifact.nc)
     expect(useCamStore.getState().program).toEqual(artifact.program)
     expect(useCamStore.getState().kernelArtifact?.identity).toEqual(artifact.identity)
-    await click("button[title='Save G-Code']")
+    await click("button[title='Export']")
     await click("[data-testid='workspace-save-as-project']")
     expect(document.querySelector<HTMLAnchorElement>("a[href='/toolpaths/" + saved.id + "']")?.textContent).toBe("Manage saved toolpath")
   } finally { view.dispose() }
@@ -251,7 +253,7 @@ test("CAD and CAM share export/project dialog layout and show their contents", a
     expect(cadProject.textContent).toContain("CAD drawing")
     for (const name of ["projectName", "description", "organization", "public"]) expect(cadProject.querySelector(`[name='${name}']`)).not.toBeNull()
     view.dispose(); view = app.visit("/cam")
-    await click("button[title='Save G-Code']")
+    await click("button[title='Export']")
     const camExport = await app.wait(() => document.querySelector("[data-testid='workspace-export-dialog']"))
     expect(camExport.parentElement!.parentElement!.className).toBe(exportClass)
     await click("[data-testid='workspace-save-as-project']")
