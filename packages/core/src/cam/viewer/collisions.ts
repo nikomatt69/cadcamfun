@@ -7,7 +7,8 @@
  *   NEAR_MISS          a rapid, the holder or a head-side body passes within `clearance` of the stock / the part side
  *                      without touching it
  *   MACHINE_COLLISION  a head-side body of the machine model (ram, spindle housing, fork) meets a part-side one (table,
- *                      cradle, platter, workholding, stock) at a move's end or middle
+ *                      cradle, platter, workholding, stock) at a move's end or middle; on a rotary printer, the nozzle or the
+ *                      carriage meets the tilted bed (`setup-checks.ts`)
  *
  * With `live` (3-axis programs) the stock checks run against the material left at that moment: the moves are replayed in
  * order on a height field (`cam/sim`), each one checked before it cuts — a rapid back down into an opened pocket is not a
@@ -22,6 +23,7 @@ import { machineBodies } from "./machine-bodies.ts"
 import { apply4, machinePose, type MachineModel, type Mat4, type ModelBody } from "./machine-model.ts"
 import type { RotarySetup } from "./rotary.ts"
 import { pointOn, type Timeline } from "./timeline.ts"
+import { checkSetup } from "./setup-checks.ts"
 import { StockSim, type SimCutter } from "../sim/stock-sim.ts"
 import { simCutterOfModel } from "../sim/cutters.ts"
 
@@ -101,8 +103,18 @@ export interface CollisionInput {
 const HEAD_SIDE = new Set(["head", "spindle", "fork"])
 const PART_SIDE = new Set(["table", "cradle", "platter"])
 
+/** The set-up findings of a rotary printer that are collisions with its tilted bed. */
+export const PRINTER_COLLISION_CODES: ReadonlySet<string> = new Set(["PRINTER_INTO_BED", "PRINTER_HEAD_INTO_BED"])
+
 export const checkCollisions = (input: CollisionInput): ReadonlyArray<CollisionEvent> => {
   const { setup, timeline } = input
+  if (setup.kind === "3dprinter") {
+    if (setup.rotary === undefined) return []
+    return checkSetup(setup, timeline).filter((f) => PRINTER_COLLISION_CODES.has(f.code)).map((f) => ({
+      code: "MACHINE_COLLISION" as const, severity: f.severity, seconds: timeline.moves[f.move]?.start ?? 0, move: f.move,
+      ...(f.line !== undefined ? { line: f.line } : {}), count: f.count, bodies: ["nozzle", "bed"] as const, message: f.message
+    }))
+  }
   if (setup.kind !== "mill") return []
   const clearance = input.clearance ?? 2
   const stock = setup.stock

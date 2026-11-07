@@ -202,6 +202,46 @@ export const withRotary = (setup: MachineSetup, program: Program, gcode = "", pi
   return { ...setup, rotary, axes: 5 }
 }
 
+/**
+ * The rotary table a library machine describes (`cam.kernel.MachineRotary`, structurally): its layout, pivot (the measured one
+ * after a calibration), whether the control applies TCP and its ranges. It replaces what the program's words let the preview
+ * assume, on a mill and on a printer; a 3-axis program stays 3-axis.
+ */
+export interface ProfileRotary {
+  readonly layout?: "table-AC" | "table-BC"
+  readonly tilt?: { readonly min: number; readonly max: number }
+  readonly rotation?: { readonly min: number; readonly max: number }
+  readonly pivot?: Vec3
+  readonly tcp?: "control" | "program"
+  readonly calibration?: { readonly pivotMeasured?: Vec3 }
+}
+
+export const withProfileRotary = (setup: MachineSetup, profile: ProfileRotary | undefined): MachineSetup => {
+  const rotary = setupRotary(setup)
+  if (profile === undefined || rotary === undefined || setup.kind === "lathe") return setup
+  const reasons = [...rotary.reasons]
+  const pivot = profile.calibration?.pivotMeasured ?? profile.pivot
+  if (profile.layout !== undefined) reasons.push(`the machine profile is a ${profile.layout}`)
+  if (pivot !== undefined) reasons.push(profile.calibration?.pivotMeasured !== undefined ? "pivot measured by the last rotary calibration" : "pivot from the machine profile")
+  if (profile.tcp !== undefined) reasons.push(profile.tcp === "control" ? "the machine's control applies TCP: part coordinates" : "the machine runs without TCP: machine coordinates")
+  const limits = {
+    ...(profile.tilt !== undefined ? { tilt: [profile.tilt.min, profile.tilt.max] as const } : {}),
+    ...(profile.rotation !== undefined ? { rotation: [profile.rotation.min, profile.rotation.max] as const } : {})
+  }
+  // An indexed (Orient) program is in machine coordinates whatever the control can do.
+  const indexed = rotary.reasons.some((r) => r.startsWith("indexed"))
+  const next: RotarySetup = {
+    ...rotary,
+    ...(profile.layout !== undefined ? { layout: profile.layout } : {}),
+    ...(pivot !== undefined ? { pivot } : {}),
+    ...(profile.tcp !== undefined && !indexed ? { coordinates: profile.tcp === "control" ? "part" as const : "machine" as const } : {}),
+    ...(limits.tilt !== undefined || limits.rotation !== undefined ? { limits } : {}),
+    assumed: rotary.assumed && (profile.layout === undefined || pivot === undefined || (profile.tcp === undefined && !indexed)),
+    reasons
+  }
+  return { ...setup, rotary: next }
+}
+
 export interface SetupProblem {
   readonly code: string
   readonly severity: "error" | "warning"

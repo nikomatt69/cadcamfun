@@ -198,24 +198,6 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   }
   if (display.showTriad) root.add(machineTriad(setup, Math.max(30, Math.min(120, input.scale * 0.6))))
 
-  // Moves into the workholding, drawn over the path in red.
-  const hits = v.collidingMoves(setup, timeline, input.tool)
-  if (hits.size > 0) {
-    const positions: number[] = []
-    for (const i of hits) {
-      const m = timeline.moves[i]!
-      const steps = m.center ? 24 : 1
-      for (let k = 0; k < steps; k++) {
-        const a = v.displayPoint(setup, v.pointOn(m, k / steps), m.state.xMode), b = v.displayPoint(setup, v.pointOn(m, (k + 1) / steps), m.state.xMode)
-        positions.push(a.x, a.y, a.z, b.x, b.y, b.z)
-      }
-    }
-    const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
-    const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0xff2d2d, depthTest: false }))
-    lines.renderOrder = 25; lines.name = "collisions"; lines.visible = display.showPathLines !== false
-    root.add(lines)
-  }
-
   // A 4/5-axis printer: its program points in the bed's frame, and where the nozzle is and how it leans for the angles.
   const printerRotary = setup.kind === "3dprinter" ? setup.rotary : undefined
   const onBed = (p: Vec3, angles: cam.viewer.Angles): Vec3 => printerRotary !== undefined ? v.partPointOf(p, angles, printerRotary) : p
@@ -225,6 +207,26 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
       ? { at: v.machinePointOf(p, angles, printerRotary), axis: v.toolAxisInMachine(angles, printerRotary) }
       : { at: v.partPointOf(p, angles, printerRotary), axis: v.toolAxisInPart(angles, printerRotary) }
   }
+  // Moves into the workholding, drawn over the path in red.
+  const hits = v.collidingMoves(setup, timeline, input.tool)
+  if (hits.size > 0) {
+    const positions: number[] = []
+    for (const i of hits) {
+      const m = timeline.moves[i]!
+      const steps = m.center ? 24 : printerRotary !== undefined ? 8 : 1
+      for (let k = 0; k < steps; k++) {
+        // A rotary print's hits are drawn on the bed, for the angles along the move.
+        const at = (f: number) => printerRotary !== undefined ? onBed(v.pointOn(m, f), v.lerpAngles(m.anglesFrom, m.angles, f)) : v.displayPoint(setup, v.pointOn(m, f), m.state.xMode)
+        const a = at(k / steps), b = at((k + 1) / steps)
+        positions.push(a.x, a.y, a.z, b.x, b.y, b.z)
+      }
+    }
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+    const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0xff2d2d, depthTest: false }))
+    lines.renderOrder = 25; lines.name = "collisions"; lines.visible = display.showPathLines !== false
+    ;(printerRotary !== undefined ? statics : root).add(lines)
+  }
+
   let tool: THREE.Group | undefined
   let turned: THREE.Mesh | undefined
   let beads: THREE.LineSegments | undefined
@@ -252,7 +254,8 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   const modelOfPath = (path: number | undefined): cam.ToolModel | undefined => {
     const own = path !== undefined ? input.pathTools?.[path] : undefined
     if (millTurn && path !== undefined && millingPaths[path]) return own?.family === "mill" || own?.family === "probe" ? own : inferredTools?.get(program.toolpaths[path]!.toolId)
-    return own !== undefined && own.family === ownFamily ? own : setup.kind === "mill" ? undefined : setup.tool
+    // A probe cycle on a lathe plays the probe it measures with, not the turning insert.
+    return own !== undefined && (own.family === ownFamily || (setup.kind === "lathe" && own.family === "probe")) ? own : setup.kind === "mill" ? undefined : setup.tool
   }
   const toolObjectOf = (model: cam.ToolModel): THREE.Group => {
     let object = toolObjects.get(model)
@@ -289,7 +292,8 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   } else if (setup.kind === "3dprinter") {
     tool = toolObjectOf(modelOfPath(timeline.moves[0]?.path)!)
     tool.visible = true
-    deposits = v.printerDeposits(timeline, setup.layerHeight)
+    // Layers of a rotary print are its heights above the tilted bed.
+    deposits = v.printerDeposits(timeline, setup.layerHeight, printerRotary !== undefined ? (p, angles) => onBed(p, angles).z : undefined)
     // A rotary print's beads are drawn in the part (bed) frame, with the bed's bodies: View3D turns that group by the bed's
     // rotation in the machine frame, so the part stays on the bed as it tilts.
     const printed = printerRotary !== undefined ? statics : root
@@ -416,7 +420,7 @@ export const createMachineScene = (input: MachineSceneInput): MachineScene => {
   update(0)
 
   // The machine model: one group per link, placed every frame from the joints (`cam.viewer.machinePose`).
-  const model = setup.kind === "mill" && display.showMachine ? cam.viewer.machineModelOf(setup, input.machineOptions) : undefined
+  const model = (setup.kind === "mill" || printerRotary !== undefined) && display.showMachine ? cam.viewer.machineModelOf(setup, input.machineOptions) : undefined
   const linkGroups = new Map<cam.viewer.LinkRole, THREE.Group>()
   if (model !== undefined) {
     const group = new THREE.Group(); group.name = "machine-model"
@@ -504,6 +508,7 @@ export const machineSpatial = (setup: cam.viewer.MachineSetup, machine: MachineS
   return {
     machine: setup.kind,
     ...(setup.kind === "lathe" && setup.turnMill !== undefined ? { kinematics: "mill-turn XYZBC", rotary: pose.angles, rotaryAxes: v.displayRotaryAxes(setup), removal: "turned profile only; local milling removal is not simulated" } : {}),
+    ...(v.setupRotary(setup) !== undefined ? { kinematics: v.setupRotary(setup)!.layout, coordinates: v.setupRotary(setup)!.coordinates, frame: machine.frame, rotary: pose.angles, rotaryAxes: v.displayRotaryAxes(setup) } : {}),
     rotates: kinematics.rotates,
     mapping: setup.kind === "lathe"
       ? `display x = program Z (chuck on the left), display z = ${setup.turret === "rear" ? "+" : "-"}X/2 (X is a diameter), display y = ${setup.turnMill !== undefined ? `${setup.turret === "rear" ? "+" : "-"}program Y` : "0"}; ${setup.turret} turret`

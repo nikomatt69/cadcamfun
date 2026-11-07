@@ -11,7 +11,21 @@ const turning = cam.kernel.planTurning({ profile: [{ diameter: 40, z: 0 }, { dia
 const cases = {
   "Mill B/C": { kind: "mill" as const, code: "(TABLE-BC)\nG17 G21 G90\nM3 S800\nG0 X0 Y0 Z60 B0 C0\nG1 X20 Y0 Z20 B60 C180 F600\nG1 X0 Y20 Z10 B30 C270\nM30" },
   "Mill-turn B/C": { kind: "lathe" as const, code: "G18 G21 G90\nM3 S600\nG0 X44 Y6 Z2 B0 C0\nG1 X40 Y6 Z-25 B90 C180 F90\nG1 Z-45 B45 C270\nM30" },
-  "Turning preview": { kind: "lathe" as const, code: turning }
+  "Turning preview": { kind: "lathe" as const, code: turning },
+  "Printer B/C": { kind: "3dprinter" as const, code: printerBc() },
+  "Probe A/C": { kind: "mill" as const, code: "(TABLE-AC)\nG90 G54\nT99 M6\nG0 X0 Y0 Z50 A0 C0\nG31 Z-5 F150\nG0 Z50\nG0 A45 C90\nG0 X-40 Y0 Z10\nG31 X-20 F150\nG0 X-40\nG0 Z50\nM30" }
+}
+/** A cylinder printed upright, then its side printed with the bed tilted 45° and turning in C (machine coordinates, no TCP). */
+function printerBc(): string {
+  const lines = ["G28", "G90", "M83", "G1 Z0.2 F3000"]
+  for (let layer = 0; layer < 30; layer++) {
+    const z = 0.2 + layer * 0.4
+    for (let k = 0; k <= 36; k++) { const a = k * Math.PI / 18; lines.push(`G1 X${(110 + 20 * Math.cos(a)).toFixed(3)} Y${(110 + 20 * Math.sin(a)).toFixed(3)} Z${z.toFixed(2)} E0.05 F1800`) }
+  }
+  lines.push("G1 Z60 F3000", "G1 B45 C0 F1200")
+  for (let k = 0; k <= 72; k++) lines.push(`G1 X${(110 + 22 * Math.SQRT1_2).toFixed(3)} Y110 Z${(20 + 22 * Math.SQRT1_2).toFixed(3)} C${k * 5} E0.04 F900`)
+  lines.push("G1 Z80 F3000", "M30")
+  return lines.join("\n")
 }
 function Fixture() {
   const [name, setName] = createSignal<keyof typeof cases>("Mill B/C")
@@ -22,8 +36,11 @@ function Fixture() {
   const settings = createMemo(() => cam.generator.withMachineDefaults(cam.generator.decodeSettings({ machineType: current().kind, stockDiameter: 44, stockLength: 60, noseRadius: 0 })))
   const setup = createMemo(() => previewSetup(current().kind, settings(), stock, { program: analysis().program, gcode: current().code }))
   const timeline = createMemo(() => cam.viewer.buildTimeline(analysis().program, analysis().motion, cam.viewer.DEFAULT_RAPID_RATE, cam.viewer.programStart(current().kind, analysis().program)))
-  const tools = createMemo(() => current().kind === "lathe" ? cam.viewer.turnMillToolModels(analysis().program, analysis().motion, current().code) : cam.headerToolModels(current().code, "mill"))
-  createEffect(() => { current(); setPlaying(false); setSeconds(timeline().duration * 0.65) })
+  const tools = createMemo(() => current().kind === "lathe" ? cam.viewer.turnMillToolModels(analysis().program, analysis().motion, current().code) : current().kind === "3dprinter" ? new Map<string, cam.ToolModel>() : cam.headerToolModels(current().code, "mill"))
+  const fallbackTool = (): cam.ToolModel => name() === "Probe A/C" ? cam.toolModelOf({ type: "probe", diameter: 6 }) : cam.toolForOperation(settings(), current().kind)
+  // `?t=0.9` opens each case at that fraction of its program (default 0.65).
+  const fraction = Number(new URLSearchParams(location.search).get("t") ?? "0.65")
+  createEffect(() => { current(); setPlaying(false); setSeconds(timeline().duration * fraction) })
   createEffect(() => {
     if (!playing()) return
     let previous = performance.now(), frame = 0
@@ -42,7 +59,7 @@ function Fixture() {
     </header>
     <div style={{ flex: 1, "min-height": "0", position: "relative" }}>
       <ToolpathVisualizer program={analysis().program} motion={analysis().motion} gcode={current().code} machine={setup()}
-        toolModels={tools()} defaultToolModel={cam.toolForOperation(settings(), current().kind)} stock={stock} workpiece={{ x: 50, y: 50, z: 100 }}
+        toolModels={tools()} defaultToolModel={fallbackTool()} stock={stock} workpiece={{ x: 50, y: 50, z: 100 }}
         playing={playing()} playbackTime={seconds()} playbackRate={1} playbackDuration={timeline().duration} onPlayingChange={setPlaying} onPlaybackTimeChange={setSeconds} />
     </div>
   </div>

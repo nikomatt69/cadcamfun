@@ -120,7 +120,7 @@ export function currentDrawingContext(app: AppState) {
         duration: estimateTime(toolpath, RAPID_RATE_MM_PER_MIN)
       })),
       verification: verificationState(),
-      preview: previewSummary({ gcode, kernelNc: camStore.kernelArtifact?.nc, generatorGcode: generator.currentGCode, settings: generator.settings, override: camStore.machineOverride, motion: camStore.motion }) ?? null
+      preview: previewSummary({ gcode, kernelNc: camStore.kernelArtifact?.nc, generatorGcode: generator.currentGCode, settings: generator.settings, override: camStore.machineOverride, motion: camStore.motion, program: camStore.program }) ?? null
     }
   }
 }

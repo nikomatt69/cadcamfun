@@ -353,7 +353,12 @@ export function View3D(props: View3DProps) {
       probeReached = undefined
       const spec = props.probeOverlay
       if (spec === undefined) { props.onProbeContact?.(undefined); return }
-      probe = createProbeOverlay(spec.model, { ...(spec.layers !== undefined ? { layers: spec.layers } : {}), ...(spec.triadLength !== undefined ? { triadLength: spec.triadLength } : {}) })
+      // A rotary program in machine coordinates: each contact turned back onto the part by the angles at its time.
+      const turn = rotary, timeline = machineScene?.timeline
+      const toPart = turn !== undefined && turn.coordinates === "machine" && timeline !== undefined
+        ? (p: Vec3, time: number | undefined) => cam.viewer.partPointOf(p, cam.viewer.poseAt(timeline, time ?? timeline.duration).angles, turn)
+        : undefined
+      probe = createProbeOverlay(spec.model, { ...(spec.layers !== undefined ? { layers: spec.layers } : {}), ...(spec.triadLength !== undefined ? { triadLength: spec.triadLength } : {}), ...(toPart !== undefined ? { toPart } : {}) })
       probe.highlight(spec.highlight)
       probe.update(seconds)
       scene.add(probe.root)
@@ -367,7 +372,7 @@ export function View3D(props: View3DProps) {
     const zAxis = new THREE.Vector3(0, 0, 1)
     /** Where the tool is and how it leans at `seconds` on a rotary mill, and how the table is turned (machine frame). */
     /** Tip-to-spindle-nose length of a toolpath's tool as it is drawn (its holder, or the assumed one). */
-    const gaugeOf = (path: number): number => gaugeOfTool(modelFor(props.program?.toolpaths[path]?.toolId ?? ""), props.toolpathDisplay?.showHolder !== false)
+    const gaugeOf = (path: number): number => props.machine?.kind === "3dprinter" ? 0 : gaugeOfTool(modelFor(props.program?.toolpaths[path]?.toolId ?? ""), props.toolpathDisplay?.showHolder !== false)
     const rotaryPose = (seconds: number): { readonly at: Vec3; readonly axis: THREE.Vector3; readonly table?: THREE.Matrix4 } | undefined => {
       const lathe = props.machine
       if (lathe?.kind === "lathe" && lathe.turnMill !== undefined && machineScene !== undefined) {
@@ -405,7 +410,7 @@ export function View3D(props: View3DProps) {
       const target = table ?? new THREE.Matrix4()
       const bodies = props.machine?.kind === "lathe" ? undefined : machineScene?.root.getObjectByName("machine-bodies")
       let changed = false
-      for (const group of [content, bodies]) {
+      for (const group of [content, bodies, probe?.part]) {
         if (!group) continue
         if (!group.matrix.equals(target)) { group.matrixAutoUpdate = false; group.matrix.copy(target); group.matrixWorldNeedsUpdate = true; changed = true }
       }
@@ -652,7 +657,10 @@ export function View3D(props: View3DProps) {
       const track = machineScene?.timeline.track
       // Program -> display: the identity, except on a lathe (spindle axis horizontal, X as a radius).
       // Rotary mills: every point in the part frame (a machine-coordinate program is turned back by its move's angles).
+      const rotaryBefore = rotary
       rotary = cam.viewer.setupRotary(machine)
+      // The probe overlay maps its contacts with the rotary set-up: redraw it when that changes.
+      if (probe !== undefined && (rotary !== undefined || rotaryBefore !== undefined)) rebuildProbe()
       anglesOf.clear()
       const timed = new Map<string, cam.viewer.TimedMove>()
       if (machineScene && (rotary || machine?.kind === "lathe" && machine.turnMill !== undefined)) for (const m of machineScene.timeline.moves) { anglesOf.set(`${m.path}:${m.index}`, m.angles); timed.set(`${m.path}:${m.index}`, m) }

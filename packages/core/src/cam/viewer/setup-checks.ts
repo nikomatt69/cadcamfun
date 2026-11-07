@@ -9,6 +9,7 @@ import { displayPoint } from "./frames.ts"
 import { latheStockEnds, machineBodies, type Body } from "./machine-bodies.ts"
 import type { MachineSetup } from "./machine-setup.ts"
 import { pointOn, type Timeline } from "./timeline.ts"
+import { lerpAngles, machinePointOf, partPointOf, rotationOf, type RotarySetup } from "./rotary.ts"
 
 export interface SetupFinding {
   readonly code: string
@@ -106,9 +107,14 @@ export const checkSetup = (setup: MachineSetup, timeline: Timeline, tool: ToolEn
   } else {
     const { width, depth, origin } = setup.bed
     const x0 = origin === "corner" ? 0 : -width / 2, y0 = origin === "corner" ? 0 : -depth / 2
+    const rotary = setup.rotary
+    // A rotary print is checked on the bed: each point in the bed's frame for the angles of its move.
+    const onBed = (p: Vec3, angles: Parameters<typeof partPointOf>[1]): Vec3 => rotary !== undefined ? partPointOf(p, angles, rotary) : p
+    if (rotary !== undefined) printerRotaryCollisions(setup.bed, rotary, timeline, tool, firstMove, report)
     let first = true
-    timeline.moves.forEach((move, i) => {
-      if (move.kind !== "feed" || move.state.extrude <= 1e-9) return
+    timeline.moves.forEach((raw, i) => {
+      if (raw.kind !== "feed" || raw.state.extrude <= 1e-9) return
+      const move = rotary === undefined ? raw : { ...raw, from: onBed(raw.from, raw.anglesFrom), to: onBed(raw.to, raw.angles) }
       const line = move.state.line !== undefined ? { line: move.state.line } : {}
       if (first) {
         first = false
@@ -122,6 +128,68 @@ export const checkSetup = (setup: MachineSetup, timeline: Timeline, tool: ToolEn
     })
   }
   return [...found.values()]
+}
+
+/** Height of the carriage's underside above the nozzle tip, and its half width, mm (a typical direct-drive hot end). */
+export const PRINTER_CARRIAGE = { clearance: 30, half: 28 } as const
+
+/**
+ * A rotary printer's nozzle and carriage against its tilted bed. The bed is a plane: within a disc round the tool its highest
+ * point is on the disc's rim or on the bed's edge, so those are sampled. The nozzle tip below the bed top (bed frame z < 0) runs
+ * into the bed; a bed point higher than the carriage's underside within its footprint hits the carriage.
+ */
+const printerRotaryCollisions = (
+  bed: { readonly width: number; readonly depth: number; readonly origin: "corner" | "center" },
+  rotary: RotarySetup, timeline: Timeline, tool: ToolEnvelope, firstMove: number,
+  report: (key: string, f: Omit<SetupFinding, "count">) => void
+): void => {
+  const x0 = bed.origin === "corner" ? 0 : -bed.width / 2, y0 = bed.origin === "corner" ? 0 : -bed.depth / 2
+  const x1 = x0 + bed.width, y1 = y0 + bed.depth
+  const inBed = (p: Vec3) => p.x >= x0 - 1e-6 && p.x <= x1 + 1e-6 && p.y >= y0 - 1e-6 && p.y <= y1 + 1e-6
+  // The bed's rim and a circle of the carriage's footprint, in the bed's own frame (z = 0 is its top).
+  const rim: Vec3[] = []
+  const step = Math.max(2, Math.min(bed.width, bed.depth) / 40)
+  for (let x = x0; x <= x1 + 1e-9; x += step) rim.push({ x, y: y0, z: 0 }, { x, y: y1, z: 0 })
+  for (let y = y0; y <= y1 + 1e-9; y += step) rim.push({ x: x0, y, z: 0 }, { x: x1, y, z: 0 })
+  const half = Math.max(PRINTER_CARRIAGE.half, tool.radius)
+  const clearance = Math.min(PRINTER_CARRIAGE.clearance, tool.length)
+  timeline.moves.forEach((move, i) => {
+    if (move.kind === "dwell") return
+    const line = move.state.line !== undefined ? { line: move.state.line } : {}
+    const n = i === firstMove ? 1 : Math.min(64, Math.max(1, Math.ceil(Math.hypot(move.to.x - move.from.x, move.to.y - move.from.y, move.to.z - move.from.z) / 5)))
+    for (let k = i === firstMove ? 1 : 0; k <= n; k++) {
+      const f = k / n
+      const angles = lerpAngles(move.anglesFrom, move.angles, f)
+      const p = pointOn(move, f)
+      const onBed = partPointOf(p, angles, rotary)
+      if (onBed.z < -1e-3 && inBed(onBed)) {
+        report("PRINTER_INTO_BED", { code: "PRINTER_INTO_BED", severity: "error", bodyId: "bed", move: i, at: p, assumed: false, ...line, message: `The nozzle goes ${Math.round(-onBed.z * 1000) / 1000} mm into the tilted bed (bed frame X${Math.round(onBed.x * 1000) / 1000} Y${Math.round(onBed.y * 1000) / 1000})` })
+        return
+      }
+      // The bed in the machine, for these angles; the tool tip in the machine.
+      const tip = machinePointOf(p, angles, rotary)
+      const r = rotationOf(angles, rotary), pv = rotary.pivot
+      const toMachine = (q: Vec3): Vec3 => {
+        const d = { x: q.x - pv.x, y: q.y - pv.y, z: q.z - pv.z }
+        return { x: r[0] * d.x + r[1] * d.y + r[2] * d.z + pv.x, y: r[3] * d.x + r[4] * d.y + r[5] * d.z + pv.y, z: r[6] * d.x + r[7] * d.y + r[8] * d.z + pv.z }
+      }
+      const disc: Vec3[] = []
+      for (let a = 0; a < 24; a++) {
+        const q = partPointOf({ x: tip.x + half * Math.cos(a * Math.PI / 12), y: tip.y + half * Math.sin(a * Math.PI / 12), z: tip.z }, angles, { ...rotary, coordinates: "machine" })
+        // The rim point of the footprint on the bed plane (z = 0 in the bed frame), along the machine's vertical.
+        const up = partPointOf({ x: tip.x + half * Math.cos(a * Math.PI / 12), y: tip.y + half * Math.sin(a * Math.PI / 12), z: tip.z + 1 }, angles, { ...rotary, coordinates: "machine" })
+        const dz = up.z - q.z
+        if (Math.abs(dz) < 1e-9) continue
+        const t = -q.z / dz
+        disc.push({ x: q.x + (up.x - q.x) * t, y: q.y + (up.y - q.y) * t, z: 0 })
+      }
+      const high = [...rim, ...disc].filter(inBed).map(toMachine).find((m) => Math.hypot(m.x - tip.x, m.y - tip.y) <= half + 1e-6 && m.z > tip.z + clearance + 1e-6)
+      if (high !== undefined) {
+        report("PRINTER_HEAD_INTO_BED", { code: "PRINTER_HEAD_INTO_BED", severity: "error", bodyId: "bed", move: i, at: p, assumed: true, ...line, message: `The tilted bed rises ${Math.round((high.z - tip.z) * 100) / 100} mm above the nozzle, past the carriage (assumed ${clearance} mm clearance)` })
+        return
+      }
+    }
+  })
 }
 
 /** Timeline moves that run into a body (every finding but the first-layer height), for the red segments of the preview. */

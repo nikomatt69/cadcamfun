@@ -36,6 +36,8 @@ export interface RotarySetup {
   /** Layout, pivot or frame were not stated by the program: read from its axes, shown as an assumption. */
   readonly assumed: boolean
   readonly reasons: ReadonlyArray<string>
+  /** The machine's rotary ranges, degrees, when its profile states them (`tilt`: A or B; `rotation`: C). */
+  readonly limits?: { readonly tilt?: readonly [number, number]; readonly rotation?: readonly [number, number] }
 }
 
 /**

@@ -26,17 +26,22 @@ export interface Deposits {
 /** Heights closer than this are one layer (float noise of the slicer); a spiral (vase) is quantised to `vaseStep`. */
 const LAYER_EPS = 1e-3
 
-export const printerDeposits = (timeline: Timeline, vaseStep = 0.2): Deposits => {
+/**
+ * `height` is the height a point is printed at: the program's Z, or on a rotary printer its height above the tilted bed (the
+ * bed frame), so a print made on a turning bed still reads in layers.
+ */
+export const printerDeposits = (timeline: Timeline, vaseStep = 0.2, height?: (p: Vec3, angles: Timeline["moves"][number]["angles"]) => number): Deposits => {
   const extruding = timeline.moves.map((m, i) => ({ m, i })).filter(({ m }) => m.kind === "feed" && m.state.extrude > 1e-9)
+  const top = (m: Timeline["moves"][number]): number => height === undefined ? Math.max(m.from.z, m.to.z) : Math.max(height(m.from, m.anglesFrom), height(m.to, m.angles))
   const travels = timeline.moves.flatMap((m, i) => (m.kind !== "dwell" && m.state.extrude <= 1e-9 ? [i] : []))
   // A spiral prints at a different Z on every move: quantise to the layer step instead of making thousands of layers.
-  const distinct = new Set(extruding.map(({ m }) => Math.round(m.to.z / LAYER_EPS)))
+  const distinct = new Set(extruding.map(({ m }) => Math.round(top(m) / LAYER_EPS)))
   const quantum = distinct.size > 5000 ? Math.max(vaseStep, LAYER_EPS) : LAYER_EPS
   const key = (z: number) => Math.round(z / quantum)
-  const keys = [...new Set(extruding.map(({ m }) => key(Math.max(m.from.z, m.to.z))))].sort((a, b) => a - b)
+  const keys = [...new Set(extruding.map(({ m }) => key(top(m))))].sort((a, b) => a - b)
   const layerOf = new Map(keys.map((k, i) => [k, i]))
   return {
-    beads: extruding.map(({ m, i }) => ({ from: m.from, to: m.to, start: m.start, end: m.start + m.duration, layer: layerOf.get(key(Math.max(m.from.z, m.to.z)))!, move: i })),
+    beads: extruding.map(({ m, i }) => ({ from: m.from, to: m.to, start: m.start, end: m.start + m.duration, layer: layerOf.get(key(top(m)))!, move: i })),
     layers: keys.map((k) => k * quantum),
     travels
   }
