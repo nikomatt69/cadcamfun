@@ -69245,6 +69245,27 @@
                                     },
                                     "face": {
                                       "type": "number"
+                                    },
+                                    "pilotOutline": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "minItems": 3,
+                                      "maxItems": 64
                                     }
                                   },
                                   "required": [
@@ -74121,6 +74142,27 @@
                                           },
                                           "face": {
                                             "type": "number"
+                                          },
+                                          "pilotOutline": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "x": {
+                                                  "type": "number"
+                                                },
+                                                "y": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "required": [
+                                                "x",
+                                                "y"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 3,
+                                            "maxItems": 64
                                           }
                                         },
                                         "required": [
@@ -78692,6 +78734,27 @@
                                     },
                                     "face": {
                                       "type": "number"
+                                    },
+                                    "pilotOutline": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "x",
+                                          "y"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "minItems": 3,
+                                      "maxItems": 64
                                     }
                                   },
                                   "required": [
@@ -83568,6 +83631,27 @@
                                           },
                                           "face": {
                                             "type": "number"
+                                          },
+                                          "pilotOutline": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "x": {
+                                                  "type": "number"
+                                                },
+                                                "y": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "required": [
+                                                "x",
+                                                "y"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 3,
+                                            "maxItems": 64
                                           }
                                         },
                                         "required": [
@@ -88422,6 +88506,27 @@
                                           },
                                           "face": {
                                             "type": "number"
+                                          },
+                                          "pilotOutline": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "x": {
+                                                  "type": "number"
+                                                },
+                                                "y": {
+                                                  "type": "number"
+                                                }
+                                              },
+                                              "required": [
+                                                "x",
+                                                "y"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 3,
+                                            "maxItems": 64
                                           }
                                         },
                                         "required": [
