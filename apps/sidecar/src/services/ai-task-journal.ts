@@ -6,6 +6,7 @@
  */
 import type { BackgroundTask, BackgroundTaskJournal } from "@cadcamfun/ai"
 import { Database, schema } from "@cadcamfun/db"
+import { hostname } from "node:os"
 import { eq } from "drizzle-orm"
 import { Effect, Schema } from "effect"
 import type { KvStore } from "./kv.ts"
@@ -43,8 +44,20 @@ const decode = Schema.decodeUnknownOption(StoredTask)
 
 const LEASE_KEY = "ai.task-runtime-lease"
 const LEASE_MS = 30_000
-const Lease = Schema.Struct({ owner: Schema.String, expiresAt: Schema.Number })
+/** `pid` and `host` say who to ask whether the owner still lives; leases written before they existed carry neither. */
+const Lease = Schema.Struct({ owner: Schema.String, expiresAt: Schema.Number, pid: Schema.optional(Schema.Number), host: Schema.optional(Schema.String) })
 const decodeLease = Schema.decodeUnknownOption(Lease)
+
+const processAlive = (pid: number): boolean => {
+  try { process.kill(pid, 0); return true } catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM" }
+}
+/**
+ * A lease whose owner is a process on this machine that no longer exists. A killed sidecar (the shell's kill deadline, a crash, a force
+ * quit) leaves its lease valid for up to `LEASE_MS`; without this its replacement would refuse to start and the shell, which restarts
+ * once, would give up. A lease from another host cannot be checked and still has to expire.
+ */
+const abandoned = (lease: { readonly pid?: number | undefined; readonly host?: string | undefined }): boolean =>
+  lease.pid !== undefined && lease.pid !== process.pid && lease.host === hostname() && !processAlive(lease.pid)
 
 /** Supplying Database enables an atomic process lease; KV-only adapters remain useful in isolated contract fixtures. */
 export const kvTaskJournal = (kv: KvStore["Service"], database?: Database["Service"]): BackgroundTaskJournal => {
@@ -68,7 +81,7 @@ export const kvTaskJournal = (kv: KvStore["Service"], database?: Database["Servi
   }
   const writeLease = (tx: Tx) => {
     const now = new Date()
-    const value = { owner, expiresAt: now.getTime() + LEASE_MS }
+    const value = { owner, expiresAt: now.getTime() + LEASE_MS, pid: process.pid, host: hostname() }
     tx.insert(table).values({ key: LEASE_KEY, value, updatedAt: now })
       .onConflictDoUpdate({ target: table.key, set: { value, updatedAt: now } }).run()
   }
@@ -82,7 +95,7 @@ export const kvTaskJournal = (kv: KvStore["Service"], database?: Database["Servi
   ...(database === undefined ? {} : {
     acquire: () => transaction("acquire", (tx) => {
       const lease = currentLease(tx)
-      if (lease !== undefined && lease.owner !== owner && lease.expiresAt > Date.now()) throw new Error("Another AI task runtime owns the execution lease")
+      if (lease !== undefined && lease.owner !== owner && lease.expiresAt > Date.now() && !abandoned(lease)) throw new Error("Another AI task runtime owns the execution lease")
       writeLease(tx)
     }),
     heartbeat: () => transaction("heartbeat", (tx) => { assert(tx); writeLease(tx) }),

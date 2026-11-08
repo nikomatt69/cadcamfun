@@ -26,13 +26,18 @@ export interface RetryOptions {
   readonly sleep?: (ms: number) => Promise<void>
 }
 
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+/** Waits `ms`, or less when the request is aborted: an interrupted call must not linger for the length of a backoff. */
+const wait = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
+  const done = () => { clearTimeout(timer); signal?.removeEventListener("abort", done); resolve() }
+  const timer = setTimeout(done, ms)
+  if (signal?.aborted === true) done()
+  else signal?.addEventListener("abort", done, { once: true })
+})
 
 export const retryingWrites = (base: typeof fetch, options: RetryOptions = {}): typeof fetch => {
   const attempts = Math.max(1, Math.floor(options.attempts ?? 5))
   const delayMs = options.delayMs ?? 250
   const maxDelayMs = options.maxDelayMs ?? 3000
-  const sleep = options.sleep ?? wait
   const transport = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const request = input instanceof Request && init === undefined ? input : new Request(input, init)
     const path = new URL(request.url).pathname
@@ -45,12 +50,17 @@ export const retryingWrites = (base: typeof fetch, options: RetryOptions = {}): 
     const keyed = new Request(request, { headers })
     let last: { response?: Response; error?: unknown } = {}
     for (let attempt = 0; attempt < attempts; attempt++) {
-      if (attempt > 0) await sleep(Math.min(delayMs * 2 ** (attempt - 1), maxDelayMs))
+      if (attempt > 0) {
+        const pause = Math.min(delayMs * 2 ** (attempt - 1), maxDelayMs)
+        await (options.sleep === undefined ? wait(pause, request.signal) : options.sleep(pause))
+      }
       if (request.signal.aborted) throw request.signal.reason ?? new DOMException("Aborted", "AbortError")
       try {
         // A copy goes out each time, so the body is still there for the next attempt.
         const response = await base(keyed.clone())
         if (!GATEWAY.has(response.status)) return response
+        // The answer that is being replaced holds its connection until the body is read or cancelled.
+        void last.response?.body?.cancel().catch(() => undefined)
         last = { response }
       } catch (error) {
         if (request.signal.aborted) throw error

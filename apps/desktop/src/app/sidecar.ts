@@ -199,7 +199,8 @@ export const followingFetch = (endpoint: Endpoint, base: typeof fetch = globalTh
     try {
       return await base(input, init)
     } catch (error) {
-      if (ours && signal?.aborted !== true) await refreshEndpoint().catch(() => undefined)
+      // `fetch` rejects with a TypeError when the connection itself failed (refused, reset, no route): that is when the port may have moved.
+      if (ours && error instanceof TypeError && signal?.aborted !== true) await refreshEndpoint().catch(() => undefined)
       throw error
     }
   }
