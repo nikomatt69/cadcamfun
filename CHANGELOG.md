@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.108 (November 2026)
+
+## Desktop
+
+- Ensure proper handling of Request bodies in fetch calls; implement queuing for native preparation of meshes with CORS compliance for idempotent writes
+
 ## v0.1.107 (November 2026)
 
 ## Core
