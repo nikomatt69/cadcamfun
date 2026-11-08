@@ -3,6 +3,12 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.109 (November 2026)
+
+## Database
+
+- A migration that recreates a table no longer cascade-deletes its children
+
 ## v0.1.108 (November 2026)
 
 ## Desktop
