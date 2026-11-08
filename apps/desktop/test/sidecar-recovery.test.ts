@@ -70,3 +70,50 @@ test("the person is told about a restart once, about the recovery, and about a p
   // A second crash after a recovery is announced again; malformed payloads change nothing.
   expect(replay([{ state: "restarting" }, { state: "ready", port: 1 }, { state: "restarting" }, null, 7, {}])).toEqual(["restarting", "recovered", "restarting"])
 })
+
+const recorder = () => {
+  const urls: string[] = []
+  const base = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => { urls.push(new Request(input, init).url); return new Response("ok") }, { preconnect: fetch.preconnect })
+  return { urls, base }
+}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 10))
+
+test("a call made while the sidecar restarts waits for the new port instead of failing against the old one", async () => {
+  const { urls, base } = recorder()
+  const transport = followingFetch(endpoint, base)
+  acceptSidecarStatus({ state: "ready", port: 4001 })
+  acceptSidecarStatus({ state: "restarting" })
+  const pending = transport(`${endpoint.baseUrl}/api/projects`)
+  await tick()
+  expect(urls).toEqual([])
+  acceptSidecarStatus({ state: "ready", port: 4002 })
+  await pending
+  expect(urls).toEqual(["http://127.0.0.1:4002/api/projects"])
+})
+
+test("a permanent failure, a reset and an abort all release the calls that wait", async () => {
+  for (const release of [() => acceptSidecarStatus({ state: "failed", message: "x" }), () => resetEndpoint()]) {
+    const { urls, base } = recorder()
+    acceptSidecarStatus({ state: "restarting" })
+    const pending = followingFetch(endpoint, base)(`${endpoint.baseUrl}/api/projects`)
+    await tick()
+    expect(urls).toEqual([])
+    release()
+    await pending
+    expect(urls).toHaveLength(1)
+  }
+  const { urls, base } = recorder()
+  acceptSidecarStatus({ state: "restarting" })
+  const abort = new AbortController()
+  const pending = followingFetch(endpoint, base)(`${endpoint.baseUrl}/api/projects`, { signal: abort.signal })
+  abort.abort()
+  await pending.catch(() => undefined)
+  expect(urls.length).toBeLessThanOrEqual(1)
+})
+
+test("another origin never waits for the sidecar", async () => {
+  const { urls, base } = recorder()
+  acceptSidecarStatus({ state: "restarting" })
+  await followingFetch(endpoint, base)("https://example.com/x")
+  expect(urls).toEqual(["https://example.com/x"])
+})

@@ -17,6 +17,56 @@ export const isTauri = (): boolean =>
 let cached: Promise<Endpoint> | undefined
 let liveBaseUrl: string | undefined
 
+/** Longest a call waits for a restarting sidecar: the shell's own ready deadline. */
+const RESTART_WAIT_MS = 60_000
+/** Closed from `restarting` until the next `ready` (or `failed`): the old port is dead and the new one is not known yet. */
+let restartGate: { readonly open: Promise<void>; readonly release: () => void } | undefined
+const closeRestartGate = (): void => {
+  if (restartGate !== undefined) return
+  let release!: () => void
+  const open = new Promise<void>((resolve) => { release = resolve })
+  restartGate = { open, release }
+}
+const openRestartGate = (): void => {
+  restartGate?.release()
+  restartGate = undefined
+}
+
+/** Resolves when the gate opens, the wait runs out, or the request is aborted; never rejects. */
+const waitForRestart = async (signal?: AbortSignal | null): Promise<void> => {
+  const gate = restartGate
+  if (gate === undefined || signal?.aborted === true) return
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let release!: () => void
+  const bounds = new Promise<void>((resolve) => {
+    release = resolve
+    timer = setTimeout(resolve, RESTART_WAIT_MS)
+  })
+  const abort = (): void => release()
+  signal?.addEventListener("abort", abort, { once: true })
+  try { await Promise.race([gate.open, bounds]) }
+  finally { clearTimeout(timer); signal?.removeEventListener("abort", abort) }
+}
+
+let refreshing: Promise<void> | undefined
+/**
+ * Asks the shell where the sidecar is now. The shell answers only once a restarting sidecar is ready, so after a failed call
+ * this is what turns "the old port refused" into "the new port". One lookup serves every call that failed at the same time.
+ */
+export const refreshEndpoint = (): Promise<void> => {
+  if (!isTauri()) return Promise.resolve()
+  refreshing ??= (async () => {
+    cached = undefined
+    const lookup = getEndpoint()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const found = await Promise.race([lookup, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("the sidecar did not report an address")), RESTART_WAIT_MS) })])
+      liveBaseUrl = found.baseUrl
+    } finally { clearTimeout(timer); refreshing = undefined }
+  })()
+  return refreshing
+}
+
 export function getEndpoint(): Promise<Endpoint> {
   cached ??= (async () => {
     if (isTauri()) {
@@ -37,6 +87,7 @@ export function getEndpoint(): Promise<Endpoint> {
 export const resetEndpoint = (): void => {
   cached = undefined
   liveBaseUrl = undefined
+  openRestartGate()
 }
 
 /** Overrides the endpoint, for tests and for the browser fallback. */
@@ -76,10 +127,14 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
 export const acceptSidecarStatus = (payload: unknown): void => {
   if (payload === null || typeof payload !== "object") return
   const status = payload as { state?: unknown; port?: unknown }
+  // Calls made while the sidecar restarts wait for its new port instead of failing against the old one.
+  if (status.state === "restarting") { closeRestartGate(); return }
+  if (status.state === "failed") { openRestartGate(); return }
   if (status.state !== "ready" || typeof status.port !== "number" || !Number.isInteger(status.port) || status.port < 1 || status.port > 65535) return
   liveBaseUrl = `http://127.0.0.1:${status.port}`
   // The next direct apiFetch resolves the current shell endpoint too.
   cached = undefined
+  openRestartGate()
 }
 
 /** Register before boot resolves the endpoint, so a ready event cannot fall between boot and listener setup. */
@@ -116,17 +171,29 @@ export const listenForSidecarNotices = async (onNotice: (notice: SidecarNotice) 
   })
 }
 
-/** Rewrite only this client's sidecar origin. Request bodies, authorization and abort signals survive the move. No writes are retried. */
+/**
+ * Rewrite only this client's sidecar origin. Request bodies, authorization and abort signals survive the move. A call made while the
+ * sidecar restarts waits for the new port; a call that still fails to connect looks the port up again before the error goes on, so
+ * the caller's retry reaches the new sidecar. No writes are retried here (see `retryingWrites`).
+ */
 export const followingFetch = (endpoint: Endpoint, base: typeof fetch = globalThis.fetch): typeof fetch => {
   const origin = new URL(endpoint.baseUrl).origin
-  const transport = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const transport = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(input instanceof Request ? input.url : String(input))
-    if (liveBaseUrl !== undefined && url.origin === origin) {
+    const ours = url.origin === origin
+    const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined)
+    if (ours) await waitForRestart(signal)
+    if (ours && liveBaseUrl !== undefined) {
       const target = new URL(liveBaseUrl)
       url.host = target.host
       input = input instanceof Request ? new Request(url, input) : url
     }
-    return base(input, init)
+    try {
+      return await base(input, init)
+    } catch (error) {
+      if (ours && signal?.aborted !== true) await refreshEndpoint().catch(() => undefined)
+      throw error
+    }
   }
   return Object.assign(transport, { preconnect: base.preconnect })
 }

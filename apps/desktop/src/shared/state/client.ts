@@ -30,7 +30,7 @@ export type Client = HttpApiClient.ForApi<typeof Api>
 const IDENTITY_HEADER = "x-identity-token"
 
 /** Session on every call; the account access token only on cloud routes, so the rest of the app stays the local profile. */
-const authorize = (request: HttpClientRequest.HttpClientRequest) => Effect.gen(function*() {
+export const authorize = (request: HttpClientRequest.HttpClientRequest) => Effect.gen(function*() {
   const signed = yield* withSessionToken(request)
   if (!isCloudRequestPath(signed.url)) return signed
   const token = yield* Effect.promise(() => identityAccessToken())

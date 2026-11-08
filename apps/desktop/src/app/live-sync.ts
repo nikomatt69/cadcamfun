@@ -6,7 +6,7 @@ import { reconcileSavedProgram } from "../features/cam/lib/saved-program.ts"
 import { useCamStore } from "../features/cam/store/camStore.ts"
 import { applyProbeEvent } from "../features/cam/lib/probing/live.ts"
 import { useWorkOffsetStore } from "../features/cam/store/workOffsetStore.ts"
-import { isTauri } from "./sidecar.ts"
+import { isTauri, listenForSidecarNotices } from "./sidecar.ts"
 
 /** Renew the native App Nap lease during quiet phases of a long kernel run. */
 const JOB_ACTIVITY_RENEW_MS = 30_000
@@ -81,8 +81,16 @@ export function startLiveSync(app: AppState): () => void {
       reconcile = false
     }, 16)
   }
+  let delay = 1000
+  let wake: (() => void) | undefined
+  // A recovered sidecar is a new process: do not sit out a backoff that grew while it was down. The greeting that follows reloads state.
+  let stopNotices: (() => void) | undefined
+  void listenForSidecarNotices((notice) => {
+    if (notice !== "recovered") return
+    delay = 1000
+    wake?.()
+  }).then((stop) => { if (controller.signal.aborted) stop(); else stopNotices = stop }).catch(() => undefined)
   void (async () => {
-    let delay = 1000
     while (!controller.signal.aborted) {
       try {
         await app.runtime.run(Effect.flatMap(app.client.events.subscribeAll(), (stream) =>
@@ -91,7 +99,8 @@ export function startLiveSync(app: AppState): () => void {
       } catch { /* A reconnect greeting repairs missed events; writes are never retried. */ }
       if (controller.signal.aborted) break
       await new Promise<void>((resolve) => {
-        const finish = () => { clearTimeout(pause); controller.signal.removeEventListener("abort", finish); resolve() }
+        const finish = () => { clearTimeout(pause); controller.signal.removeEventListener("abort", finish); wake = undefined; resolve() }
+        wake = finish
         const pause = setTimeout(finish, delay)
         controller.signal.addEventListener("abort", finish, { once: true })
         if (controller.signal.aborted) finish()
@@ -101,6 +110,7 @@ export function startLiveSync(app: AppState): () => void {
   })()
   return () => {
     controller.abort()
+    stopNotices?.()
     clearTimeout(timer)
     for (const [runId, renewal] of nativeRuns) {
       clearInterval(renewal)
