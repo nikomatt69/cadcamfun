@@ -255,5 +255,12 @@ test("the build planner completes for all six release targets without installing
     expect(stdout).not.toMatch(/\bbun (?:--no-env-file )?(?:run )?test\b/);
     expect(stdout).toContain('"beforeBuildCommand":""');
     expect(stdout).toContain("nothing was changed");
+    if (triple.includes("apple-darwin")) {
+      expect(stdout).toContain("--bundles app");
+      expect(stdout).not.toContain("--bundles app,dmg");
+      expect(stdout).toContain("hdiutil");
+    } else {
+      expect(stdout).not.toContain("hdiutil");
+    }
   }));
 }, 20_000);

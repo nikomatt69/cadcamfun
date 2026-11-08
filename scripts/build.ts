@@ -24,8 +24,10 @@
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
+import { configuredBundleTargets, createDarwinDiskImage, darwinBundleArgument, darwinDmgLayout } from "./darwin-dmg.ts";
 import { APPLE_SIGNING_ENV, assertSigningConfig, bundleRoot, indexArtifacts, previousReleaseTag, releaseVersion, signingStatement, targetInfo, type SigningPlan } from "./release-helpers.ts";
 
 import { gitCommits, renderNotes as renderChangelogNotes } from "./changelog.ts";
@@ -359,6 +361,7 @@ async function stepBundle(): Promise<void> {
   // variable as a request to import a real certificate, even when it is empty.
   if (adHoc) for (const name of APPLE_SIGNING_ENV) delete signingEnv[name];
   if (adHoc) say("   no Apple certificate configured — the bundle is ad-hoc signed and not notarised");
+  const selection = platform === "darwin" ? darwinBundleArgument(bundles, configuredBundleTargets(config)) : { argument: bundles, packageDmg: false };
   const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
     build: { beforeBuildCommand: "" },
     bundle: {
@@ -367,8 +370,63 @@ async function stepBundle(): Promise<void> {
       ...(adHoc ? { macOS: { signingIdentity: "-" } } : {}),
     },
   })];
-  if (bundles !== undefined) tauri.push("--bundles", bundles);
+  if (selection.argument !== undefined && selection.argument !== "") tauri.push("--bundles", selection.argument);
   await run(tauri, { cwd: DESKTOP, env: signingEnv });
+  if (selection.packageDmg) await writeDarwinDmg(triple, config);
+}
+
+async function detachProductVolumes(volumeName: string): Promise<void> {
+  let names: string[] = [];
+  try {
+    names = await readdir("/Volumes");
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (name !== volumeName && !name.startsWith(`${volumeName} `)) continue;
+    const child = Bun.spawn(["hdiutil", "detach", join("/Volumes", name), "-force"], {
+      stdout: "ignore",
+      stderr: "ignore",
+      stdin: "ignore",
+    });
+    await child.exited;
+  }
+}
+
+async function writeDarwinDmg(triple: string, config: { productName?: unknown; version?: unknown }): Promise<void> {
+  if (typeof config.productName !== "string" || config.productName === "" || typeof config.version !== "string" || config.version === "") {
+    throw new BuildError("tauri.conf.json is missing productName or version");
+  }
+  const productName = config.productName;
+  const version = config.version;
+  const { arch } = targetInfo(triple);
+  const root = bundleRoot(SRC_TAURI, triple, process.env.CARGO_TARGET_DIR ? resolve(DESKTOP, process.env.CARGO_TARGET_DIR) : undefined);
+  const layout = darwinDmgLayout({ productName, version, arch, bundleDir: root });
+  const appPath = join(root, "macos", `${productName}.app`);
+  say(`   disk image ${rel(layout.dmgPath)}`);
+  say("   hdiutil creates the image from the signed app; Finder is not involved");
+  if (dryRun) {
+    say("   [dry-run] would copy the app and run hdiutil");
+    return;
+  }
+  await requirePath(appPath, "macOS app bundle");
+  await rm(layout.stageDir, { recursive: true, force: true });
+  await mkdir(layout.stageDir, { recursive: true });
+  try {
+    // ditto keeps the code signature, resource forks and extended attributes.
+    await run(["ditto", appPath, join(layout.stageDir, `${productName}.app`)]);
+    await createDarwinDiskImage({
+      dmgPath: layout.dmgPath,
+      stageDir: layout.stageDir,
+      volumeName: layout.volumeName,
+      scratchPath: join(tmpdir(), `cadcamfun-${arch}-${process.pid}.dmg`),
+      run: async (command) => { await run(command); },
+      detachVolumes: () => detachProductVolumes(productName),
+    });
+  } finally {
+    await rm(layout.stageDir, { recursive: true, force: true });
+  }
+  say(`   wrote ${rel(layout.dmgPath)}`);
 }
 
 // ──────────────────────────────── step 6 ──────────────────────────────────
@@ -627,7 +685,9 @@ Options:
   --skip=<a,b>        skip these steps
   --skip-install      alias for --skip=install
   --target=<triple>   Rust target triple (default: the host triple from \`rustc -vV\`)
-  --bundles=<list>    forwarded to \`tauri build --bundles\` (e.g. deb,rpm)
+  --bundles=<list>    forwarded to \`tauri build --bundles\` (e.g. deb,rpm).
+                      On macOS, \`dmg\` is omitted from that list and the disk
+                      image is created with hdiutil after the app is signed.
   --no-updater        build installers without updater archives/signatures
   --out-dir=<path>    where step 6 writes SHA256SUMS and RELEASE_NOTES.md
                       (default: apps/desktop/src-tauri/target/release-artifacts)
