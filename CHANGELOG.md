@@ -3,6 +3,37 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.107 (November 2026)
+
+## Core
+
+- Type the back-bore outline test's post as PostId
+- Add optional pilotOutline to back-bore cycle for non-round pilots
+- The probe replay builds several features as one solid (bores, pockets at any angle, outlines), puts a feature on a turned face, and runs a part probed in a tilted plane in the plane: the plane's deltas reach the register along the machine's axes
+- Every register is carved into the fixture's one body, turned and tilted parts included: moves and tool axes are carried into the fixture frame, clamps and blanks stay where they are (no bounding boxes), a tilted tool is judged on sampled tool points, and the reach of arcs counts
+- Complete 5-axis coverage of the toolpath preview across machines
+- Show 5-axis operations in the toolpath visualizer for printers and probe cycles
+
+## Desktop
+
+- A restart right after a kill takes over the dead owner's task lease instead of dying at boot; desktop: cancel discarded retry bodies, abortable backoff, rebind only on connection errors; chaos test against a real killed sidecar
+- Review findings: a failed sidecar fails calls at once, a lookup timeout no longer pins the cached endpoint, reads retry gateway answers, a recovery during a subscription is not lost
+- Calls wait out a sidecar restart and find its new port; reads are retried, the live stream reconnects at once on recovery, the typed client sends the identity token on cloud routes
+- Update operation examples and test cases for consistency
+
+## Sidecar
+
+- Measure the event loop and warn when it stalls, with a gauge for the longest delay per window
+- An unawaited rejection is logged instead of killing the process; an uncaught exception is logged and exits
+
+## Web
+
+- Regenerate the API reference
+
+## Documentation
+
+- Spec 74 records the one fixture body that carves turned and tilted parts, and the sampled tool test for a tilted axis
+
 ## v0.1.106 (November 2026)
 
 ## Core
