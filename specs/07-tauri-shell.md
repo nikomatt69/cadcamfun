@@ -99,7 +99,15 @@ All coordinates must be finite and quantizable to safe integers at Three.js's 1e
 precision. Output must agree byte-for-byte with Three.js on the regression corpus, including
 degenerate, duplicate, non-manifold, reversed and non-indexed faces.
 
+2026-11-08 owner-requested performance follow-up: WP7 may queue eligible assembly meshes for
+the existing single native worker without packing queued meshes or extracting their edges
+synchronously in the webview. The queue is capped at 32; overflow retains the existing
+Three.js fallback. Disposal removes queued work, stale sources are skipped, and native
+failure retains the Three.js fallback. Output and redraw behavior remain unchanged.
+
 ## 6. Change log
+
+- 2026-11-08: queued at most 32 eligible viewport meshes behind the existing Rust worker, avoiding synchronous edge extraction for ordinary assemblies. Tests cover overflow, source changes, disposal and native failure; the 50-case Rust/Three.js differential corpus remains byte-identical.
 
 - 2026-10-20: Follow-up connected the shared native display adapter to CADCanvas and View3D/ToolpathVisualizer,
   with existing thresholds, browser/small-mesh fallback, single invalidation and disposal cancellation.

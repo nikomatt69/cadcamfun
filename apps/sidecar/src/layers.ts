@@ -207,17 +207,17 @@ export const ApiRoutes = Layer.mergeAll(
   // product contract and must not appear in the generated API reference.
   MetricsRouteLive
 ).pipe(
-  Layer.provide(HttpRouter.middleware(
-    // No fixed header list: the preflight echoes what the client asks for. The Effect client adds
-    // `traceparent`, and an allowlist would silently break every call from a webview.
-    HttpMiddleware.cors({ allowedOrigins: isAllowedOrigin, maxAge: 600 }),
-    { global: true }
-  )),
   // The request metrics. Effect's HTTP server already creates the request span above this
   // middleware and records the matched route on it, so the metrics read the route from there.
   Layer.provide(HttpRouter.middleware(httpMetrics, { global: true })),
   // `Idempotency-Key`: a retried write gets its stored answer (no-op without the header). Needs `KvStore`, from `Services`.
   Layer.provide(HttpRouter.middleware(idempotency, { global: true })),
+  Layer.provide(HttpRouter.middleware(
+    // This must wrap idempotency, whose replay and refusal responses bypass the route.
+    // Echo requested headers so trace and idempotency headers survive preflight.
+    HttpMiddleware.cors({ allowedOrigins: isAllowedOrigin, maxAge: 600 }),
+    { global: true }
+  )),
   Layer.provide(Handlers),
   Layer.provide(AuthorizationLive),
   Layer.provide(Services)

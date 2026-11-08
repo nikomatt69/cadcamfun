@@ -9,11 +9,13 @@ describe("CORS for the Tauri webview", () => {
   test("a preflight from the webview origin is answered without the token", async () => {
     const r = await app.call("/api/projects", {
       method: "OPTIONS", auth: false,
-      headers: { origin: "tauri://localhost", "access-control-request-method": "POST", "access-control-request-headers": "authorization,content-type,traceparent" }
+      headers: { origin: "tauri://localhost", "access-control-request-method": "POST", "access-control-request-headers": "authorization,content-type,idempotency-key,traceparent,x-identity-token" }
     })
     expect(r.status).toBe(204)
     expect(r.headers.get("access-control-allow-origin")).toBe("tauri://localhost")
     expect(r.headers.get("access-control-allow-headers")).toContain("traceparent")
+    expect(r.headers.get("access-control-allow-headers")).toContain("idempotency-key")
+    expect(r.headers.get("access-control-allow-headers")).toContain("x-identity-token")
   })
 
   test("authorized responses carry the origin header; unknown origins get none", async () => {
@@ -30,5 +32,17 @@ describe("CORS for the Tauri webview", () => {
     const r = await app.call("/api/plugins", { auth: false, headers: { origin: "tauri://localhost" } })
     expect(r.status).toBe(401)
     expect(r.headers.get("access-control-allow-origin")).toBe("tauri://localhost")
+  })
+
+  test("idempotent writes, replays and conflicts retain webview CORS", async () => {
+    const headers = { origin: "tauri://localhost", "idempotency-key": "cors-project" }
+    const first = await app.call("/api/projects", { method: "POST", json: { name: "CORS project" }, headers })
+    const replay = await app.call("/api/projects", { method: "POST", json: { name: "CORS project" }, headers })
+    const conflict = await app.call("/api/projects", { method: "POST", json: { name: "Changed" }, headers })
+    const untrusted = await app.call("/api/projects", { method: "POST", json: { name: "CORS project" }, headers: { ...headers, origin: "https://evil.example" } })
+    expect([first.status, replay.status, conflict.status]).toEqual([201, 201, 422])
+    expect(replay.headers.get("idempotent-replayed")).toBe("true")
+    for (const response of [first, replay, conflict]) expect(response.headers.get("access-control-allow-origin")).toBe("tauri://localhost")
+    expect(untrusted.headers.get("access-control-allow-origin")).toBeNull()
   })
 })

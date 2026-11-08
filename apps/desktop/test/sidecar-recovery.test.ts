@@ -1,9 +1,44 @@
 import { afterEach, expect, test } from "bun:test"
 import { acceptSidecarStatus, followingFetch, resetEndpoint, sidecarNotice, type Endpoint } from "../src/app/sidecar.ts"
 import { clientLayer, readClient, runtimeForLayer } from "../src/app/client.ts"
+import { retryingWrites } from "../src/app/retrying-writes.ts"
 
 const endpoint: Endpoint = { baseUrl: "http://127.0.0.1:3001", token: "launch-token" }
 afterEach(resetEndpoint)
+
+test("ready events send replayable byte bodies without Request-as-init upload streams", async () => {
+  for (const port of [undefined, 3001, 4999]) for (const binary of [false, true]) {
+    resetEndpoint()
+    if (port !== undefined) acceptSidecarStatus({ state: "ready", port })
+    const controller = new AbortController()
+    const payload = binary ? new Uint8Array([0, 255, 12, 0]) : '{"email":"fixture@example.test","password":"fixture"}'
+    const expected = typeof payload === "string" ? new TextEncoder().encode(payload) : payload
+    const keys: Array<string | null> = []
+    const original = new Request(`${endpoint.baseUrl}/api/auth/signin-direct`, {
+      method: "POST", body: payload, signal: controller.signal, credentials: "omit", redirect: "error",
+      headers: { authorization: "Bearer launch-token", "content-type": binary ? "application/octet-stream" : "application/json" },
+    })
+    const base = Object.assign(async (input: RequestInfo | URL, init?: RequestInit) => {
+      // WebKit must receive concrete bytes, never a ReadableStream from Request.body.
+      expect(input).not.toBeInstanceOf(Request)
+      expect(init?.body).toBeInstanceOf(ArrayBuffer)
+      expect([...new Uint8Array(init?.body as ArrayBuffer)]).toEqual([...expected])
+      expect(String(input)).toBe(`http://127.0.0.1:${port ?? 3001}/api/auth/signin-direct`)
+      expect(init?.credentials).toBe(original.credentials)
+      expect(init?.redirect).toBe("error")
+      const headers = new Headers(init?.headers)
+      expect(headers.get("authorization")).toBe("Bearer launch-token")
+      keys.push(headers.get("idempotency-key"))
+      return keys.length === 1 ? new Response(null, { status: 503 }) : Response.json({ ok: true })
+    }, { preconnect: fetch.preconnect })
+    const transport = retryingWrites(followingFetch(endpoint, base), { sleep: async () => {} })
+    const response = await transport(original)
+    expect(response.status).toBe(200)
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[0]).toBe(keys[1])
+  }
+})
 
 test("an already constructed typed client follows the ready port, preserving auth and schema decoding", async () => {
   const seen: Array<{ url: string; auth: string | null }> = []

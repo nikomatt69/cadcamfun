@@ -4,6 +4,23 @@ import { prepareViewportEdges, type ViewportEdgesInput } from "../../src-tauri/g
 
 type PrepareEdges = (input: ViewportEdgesInput) => Promise<Float32Array>
 let nativePreparationPending = false
+const waiting = new Set<() => void>()
+const MAX_WAITING = 32
+
+/** Queue only closures, never packed IPC buffers. Rust still owns the one-job limit. */
+const schedule = (work: () => void): (() => void) => {
+  if (!nativePreparationPending) {
+    nativePreparationPending = true
+    work()
+  } else waiting.add(work)
+  return () => { waiting.delete(work) }
+}
+
+const finished = (): void => {
+  const next = waiting.values().next().value
+  if (next) { waiting.delete(next); queueMicrotask(next); return }
+  nativePreparationPending = false
+}
 
 /** Existing small/browser meshes stay synchronous; large desktop meshes use bounded Rust IPC. */
 export function createDisplayEdges(
@@ -17,7 +34,7 @@ export function createDisplayEdges(
   const indexArray = indices?.array
   const positionArray = positions?.array
   const triangles = (indices?.count ?? positions?.count ?? 0) / 3
-  if (!prepare || !onReady || nativePreparationPending || triangles < 1024 || triangles > 250_000 ||
+  if (!prepare || !onReady || (nativePreparationPending && waiting.size >= MAX_WAITING) || triangles < 1024 || triangles > 250_000 ||
       !(positions instanceof THREE.BufferAttribute) || !(positionArray instanceof Float32Array) || positions.itemSize !== 3 || positions.normalized ||
       indices?.normalized || (indexArray !== undefined && !(indexArray instanceof Uint16Array || indexArray instanceof Uint32Array))) {
     return new THREE.EdgesGeometry(source, thresholdAngle)
@@ -26,7 +43,8 @@ export function createDisplayEdges(
   const target = new THREE.BufferGeometry()
   // No placeholder attribute: it could acquire a GPU buffer before being replaced.
   const controller = new AbortController()
-  const cancel = () => controller.abort()
+  let removeWaiting = () => {}
+  const cancel = () => { controller.abort(); removeWaiting(); cleanup() }
   target.addEventListener("dispose", cancel)
   source.addEventListener("dispose", cancel)
   const positionVersion = positions.version, indexVersion = indices?.version
@@ -46,9 +64,9 @@ export function createDisplayEdges(
   // The source remains authoritative and is never detached. Disposal invalidates both
   // native success and fallback; a late result cannot recreate a discarded GPU buffer.
   // Admit before packing: a large assembly must not enqueue one binary IPC copy per mesh.
-  nativePreparationPending = true
-  void (async () => {
+  const run = () => { void (async () => {
     try {
+      if (!current()) return
       let endpoints: Float32Array
       try {
         endpoints = await prepare({ positions: positionArray, indices: indexArray, thresholdAngle, signal: controller.signal })
@@ -64,11 +82,12 @@ export function createDisplayEdges(
       install(new THREE.BufferAttribute(endpoints, 3))
     } finally {
       cleanup()
-      nativePreparationPending = false
+      finished()
     }
   })().catch(() => {
     // A malformed source/callback must not leave an unhandled asynchronous rejection.
     // Native errors already take the same Three.js fallback as browser rendering.
-  })
+  }) }
+  removeWaiting = schedule(run)
   return target
 }

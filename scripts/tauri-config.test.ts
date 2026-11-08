@@ -79,6 +79,11 @@ describe("Tauri native boundary configuration", () => {
     expect(frontend.includes("@tauri-apps/plugin-clipboard-manager")).toBe(true)
   })
 
+  test("the title bar can invoke Tauri's native drag region", () => {
+    expect(frontend).toContain("data-tauri-drag-region")
+    expect(main && permissionIds(main)).toContain("core:window:allow-start-dragging")
+  })
+
   test("the initialization-only reload guard has no frontend permission surface", () => {
     expect(permissions.filter((id) => id.startsWith("prevent-default:"))).toEqual([])
   })
@@ -146,6 +151,7 @@ const PENDING_CALLER: Readonly<Record<string, string>> = {
 const CALLER_EVIDENCE: Readonly<Record<string, RegExp>> = {
   "core:default": /@tauri-apps\/api\/(core|event|window)/,
   "core:window:allow-destroy": /\.destroy\(/,
+  "core:window:allow-start-dragging": /data-tauri-drag-region/,
   "log:default": /@tauri-apps\/plugin-log/,
   "notification:allow-is-permission-granted": /@tauri-apps\/plugin-notification/,
   "notification:allow-request-permission": /@tauri-apps\/plugin-notification/,

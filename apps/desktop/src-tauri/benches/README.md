@@ -25,7 +25,9 @@ Keep the existing Three/Worker adapter for unavailable native IPC, oversized mes
 busy admission and timeouts. Retain geometry identity or a revision/AbortSignal across
 the await, and discard stale results **before** creating GPU resources.
 The adapter checks attribute identity/version as well as disposal, allocates no placeholder
-GPU attribute, and admits one IPC job in the webview before packing any binary body. The guest adapter
+GPU attribute, and admits one IPC job in the webview before packing any binary body. Up to 32
+other eligible meshes wait without packed buffers; disposal removes queued work, and overflow
+keeps the synchronous Three.js fallback. The guest adapter
 checks cancellation before/after IPC; it does not pretend to interrupt a native thread.
 Invalidate the owning viewport once when installing a result and dispose any replaced
 line geometry. Do not retain every response in a cache.

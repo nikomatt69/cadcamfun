@@ -37,4 +37,17 @@ describe("SQLite-backed KvStore", () => {
     expect(Exit.isFailure(exit)).toBe(true)
     if (Exit.isFailure(exit)) expect(JSON.stringify(exit.cause)).toContain("KvError")
   })
+
+  test("prefix lookup preserves startsWith and database order for Unicode and literal metacharacters", async () => {
+    await Effect.runPromise(Effect.gen(function*() {
+      const kv = yield* KvStore
+      const keys = ["ui.theme", "ui.Theme", "ui_%", "ui_😀x", "ui_😀y", "ui_😁", "ui_\ud7ff", "ui_\ue000", "ui_\u{10ffff}", "ui_\u{10ffff}x", "\u{10ffff}", "\u{10ffff}x", "other"]
+      for (const key of keys) yield* kv.set(key, key)
+      const all = yield* kv.list()
+      for (const prefix of ["", "ui", "ui_", "ui_%", "ui_😀", "ui_\ud83d", "ui_\ud7ff", "ui_\u{10ffff}", "\u{10ffff}", "missing", "ui_\0"]) {
+        const matches = yield* kv.list(prefix)
+        expect(matches).toEqual(all.filter((entry) => entry.key.startsWith(prefix)))
+      }
+    }).pipe(Effect.provide(layer)))
+  })
 })

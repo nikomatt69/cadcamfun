@@ -59,6 +59,12 @@ pure function (`quit_plan`) so it is tested without a window.
 
 ### C. The client follows the sidecar (webview)
 
+2026-11-08 transport repair: rebinding a Fetch `Request` must materialize its body bytes and
+copy its request options explicitly. Passing a Request as RequestInit exposes its body as an
+upload ReadableStream and breaks WebKit writes. Preserve headers, cancellation and fetch
+policies across same-port ready events and changed-port recovery. Verify nonempty JSON and
+binary writes through the composed desktop transport.
+
 `app/sidecar.ts` gains `trackSidecarStatus()` (Tauri only): on `{state:"ready",port}` it stores the live base URL and refreshes the cached
 endpoint; on other states nothing changes. `followingFetch(endpoint, base = fetch)` is the transport given to `clientLayer` in the desktop
 app: a request whose origin is the endpoint the client was built with is re-addressed to the **live** base URL. The Bearer token is unchanged
@@ -74,6 +80,10 @@ temp file in the same directory, `fsync`, `rename` (atomic; a crash never leaves
 on cancel. All download call sites use this helper, including JSON, STL/OBJ/GLTF, STEP, DXF, BOM, NC, portable CAM and drawing SVG/PDF/setup sheets. The narrow `setupSheet.ts` export edit preserves its concurrent title-block changes. Blob URLs for PDF rendering and cursor images remain local rendering resources.
 
 ### E. Least privilege and release hygiene (config, no behaviour change)
+
+2026-11-08 verification repair: the existing `data-tauri-drag-region` title-bar caller needs
+`core:window:allow-start-dragging` on the main window. Grant this narrow window-only action
+and test the caller/permission relationship; the missing grant caused native ACL rejections.
 
 - Remove the five `fs:allow-*` grants and `dialog:default` from `capabilities/main.json`, drop `tauri-plugin-fs` (crate and `init()`), keeping the
   `dialog` plugin crate (Rust `app.dialog()` uses it). A Bun lint test (`scripts/tauri-config.test.ts`) fails if a capability grants `fs:*`

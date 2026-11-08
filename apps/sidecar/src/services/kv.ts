@@ -1,5 +1,5 @@
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
-import { eq } from "drizzle-orm"
+import { and, eq, gte, lt } from "drizzle-orm"
 import { Context, Data, Effect, Layer } from "effect"
 
 export class KvError extends Data.TaggedError("KvError")<{ readonly operation: string; readonly cause: unknown }> {}
@@ -11,6 +11,21 @@ export interface KvEntry {
 }
 
 const toKvError = (operation: string) => (cause: DatabaseError) => new KvError({ operation, cause })
+
+/** Upper bound in SQLite's UTF-8 binary order, or no range for malformed UTF-16. */
+const prefixBounds = (prefix: string): { readonly lower: string; readonly upper?: string } | undefined => {
+  if (!prefix || prefix.includes("\0")) return undefined
+  const characters = Array.from(prefix)
+  const points = characters.map((character) => character.codePointAt(0) ?? 0)
+  if (points.some((point) => point >= 0xd800 && point <= 0xdfff)) return undefined
+  for (let index = points.length - 1; index >= 0; index--) {
+    const point = points[index] ?? 0
+    if (point === 0x10ffff) continue
+    const next = point === 0xd7ff ? 0xe000 : point + 1
+    return { lower: prefix, upper: characters.slice(0, index).join("") + String.fromCodePoint(next) }
+  }
+  return { lower: prefix }
+}
 
 const isJsonValue = (value: unknown, seen = new Set<object>()): boolean => {
   if (value === null || typeof value === "string" || typeof value === "boolean") return true
@@ -63,7 +78,11 @@ export class KvStore extends Context.Service<KvStore, {
     }).pipe(Effect.mapError(toKvError("delete")))
 
     const list = (prefix?: string) => query("kv.list", async (db) => {
-      const rows = await db.select().from(table).orderBy(table.key)
+      const bounds = prefix === undefined ? undefined : prefixBounds(prefix)
+      const filter = bounds === undefined ? undefined : bounds.upper === undefined
+        ? gte(table.key, bounds.lower)
+        : and(gte(table.key, bounds.lower), lt(table.key, bounds.upper))
+      const rows = await db.select().from(table).where(filter).orderBy(table.key)
       return rows.filter((row) => prefix === undefined || row.key.startsWith(prefix))
         .map((row) => ({ key: row.key, value: row.value, updatedAt: row.updatedAt.toISOString() }))
     }).pipe(Effect.mapError(toKvError("list")))

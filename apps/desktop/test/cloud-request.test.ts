@@ -24,3 +24,12 @@ test("a phone token is taken only from a private cloud pairing link", () => {
   expect(deviceTokenFromLink("https://example.com")).toBeUndefined()
   expect(deviceTokenFromLink("not a link")).toBeUndefined()
 })
+
+test("the desktop client sends its account token on enrollment but not ordinary project requests", async () => {
+  // Keep the fixture account out of the shared test process and its later cloud screens.
+  const child = Bun.spawn([process.execPath, "--no-env-file", new URL("./fixtures/cloud-account-client.ts", import.meta.url).pathname], {
+    stdout: "pipe", stderr: "pipe",
+  })
+  const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()])
+  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+})

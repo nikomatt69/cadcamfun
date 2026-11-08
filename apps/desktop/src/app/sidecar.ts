@@ -194,7 +194,21 @@ export const followingFetch = (endpoint: Endpoint, base: typeof fetch = globalTh
     if (ours && liveBaseUrl !== undefined) {
       const target = new URL(liveBaseUrl)
       url.host = target.host
-      input = input instanceof Request ? new Request(url, input) : url
+      if (!(input instanceof Request)) input = url
+    }
+    if (ours && input instanceof Request) {
+      const request = init === undefined ? input : new Request(input, init)
+      // Request-as-RequestInit exposes .body as a ReadableStream upload in WebKit.
+      // Send concrete bytes even before the first ready event; retry clones must be safe too.
+      init = {
+        method: request.method, headers: request.headers,
+        body: request.body === null ? undefined : await request.arrayBuffer(),
+        signal: request.signal, credentials: request.credentials, mode: request.mode,
+        cache: request.cache, redirect: request.redirect, referrer: request.referrer,
+        referrerPolicy: request.referrerPolicy, integrity: request.integrity,
+        keepalive: request.keepalive,
+      }
+      input = url
     }
     try {
       return await base(input, init)

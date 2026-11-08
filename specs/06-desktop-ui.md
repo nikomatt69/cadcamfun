@@ -418,6 +418,8 @@ Secondary resources follow nikcli ownership: queries accept cancellation through
 
 ## Account identity integration (2026-10-16)
 
+2026-11-08: the desktop client regression checks that cloud enrollment carries the account token while ordinary project requests retain the local profile.
+
 Owner-requested cross-WP scope and verification are defined in `30-identity.md`. Add dedicated CADCAMFUN OAuth account sign-in to desktop and mobile while retaining scoped companion pairing and local profile access.
 
 ## Generator CAD selection (2026-10-21)

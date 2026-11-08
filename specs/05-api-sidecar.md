@@ -1,5 +1,18 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Desktop transport recovery (2026-11-08)
+
+Status: implemented and regression-checked. Owner-requested integration repair: webview CORS covers every sidecar response, including idempotency replays and refusals. Project writes and replays are checked through the desktop client and sidecar. No HTTP contract changes.
+
+Change log: 2026-11-08 — placed CORS outside idempotency and covered preflight, replay, conflict and untrusted-origin responses.
+
+## Key-value prefix lookup (2026-11-08)
+
+Owner-requested performance follow-up: WP4 may constrain well-formed nonempty prefix lookups
+to an indexed SQLite key range before decoding values. Preserve exact JavaScript `startsWith`
+semantics, key order, empty/absent prefixes and unusual Unicode inputs; retain the existing
+fallback when a safe indexed range cannot represent the requested prefix. No API change.
+
 ## Probing and inspection (2026-11-05)
 
 Spec 73 §3 adds the `camProbing` group (plan, emit, simulate, calibrate-rotary, work offsets, probe config, reports), `probe.progress` / `probe.result` frames and the `ProbeReportRepo`, `WorkOffsetStore` and `Probing` services. `CamKernelArtifact` gains the probe strategy, cut, claim and `probing` block. `/api/cam/probe/plan|emit` are deprecated. Clients, snapshot and API reference are regenerated.
