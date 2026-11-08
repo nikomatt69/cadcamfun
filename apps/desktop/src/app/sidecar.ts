@@ -31,6 +31,8 @@ const openRestartGate = (): void => {
   restartGate?.release()
   restartGate = undefined
 }
+/** The shell gave up restarting: there is no new port to wait for, so calls fail at once with their own error. */
+let sidecarFailed = false
 
 /** Resolves when the gate opens, the wait runs out, or the request is aborted; never rejects. */
 const waitForRestart = async (signal?: AbortSignal | null): Promise<void> => {
@@ -54,7 +56,7 @@ let refreshing: Promise<void> | undefined
  * this is what turns "the old port refused" into "the new port". One lookup serves every call that failed at the same time.
  */
 export const refreshEndpoint = (): Promise<void> => {
-  if (!isTauri()) return Promise.resolve()
+  if (!isTauri() || sidecarFailed) return Promise.resolve()
   refreshing ??= (async () => {
     cached = undefined
     const lookup = getEndpoint()
@@ -62,6 +64,10 @@ export const refreshEndpoint = (): Promise<void> => {
     try {
       const found = await Promise.race([lookup, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("the sidecar did not report an address")), RESTART_WAIT_MS) })])
       liveBaseUrl = found.baseUrl
+    } catch (error) {
+      // A lookup that never answered must not stay as the cached endpoint for every later caller.
+      if (cached === lookup) cached = undefined
+      throw error
     } finally { clearTimeout(timer); refreshing = undefined }
   })()
   return refreshing
@@ -87,6 +93,7 @@ export function getEndpoint(): Promise<Endpoint> {
 export const resetEndpoint = (): void => {
   cached = undefined
   liveBaseUrl = undefined
+  sidecarFailed = false
   openRestartGate()
 }
 
@@ -128,12 +135,13 @@ export const acceptSidecarStatus = (payload: unknown): void => {
   if (payload === null || typeof payload !== "object") return
   const status = payload as { state?: unknown; port?: unknown }
   // Calls made while the sidecar restarts wait for its new port instead of failing against the old one.
-  if (status.state === "restarting") { closeRestartGate(); return }
-  if (status.state === "failed") { openRestartGate(); return }
+  if (status.state === "restarting") { sidecarFailed = false; closeRestartGate(); return }
+  if (status.state === "failed") { sidecarFailed = true; openRestartGate(); return }
   if (status.state !== "ready" || typeof status.port !== "number" || !Number.isInteger(status.port) || status.port < 1 || status.port > 65535) return
   liveBaseUrl = `http://127.0.0.1:${status.port}`
   // The next direct apiFetch resolves the current shell endpoint too.
   cached = undefined
+  sidecarFailed = false
   openRestartGate()
 }
 

@@ -4,9 +4,8 @@
  * unless the caller set it), and the same request is sent again with the same key, so the sidecar answers the stored result when
  * the first attempt had in fact been applied instead of writing twice.
  *
- * Reads (GET/HEAD) are retried too, but only when the request never got an answer (a thrown network error): a restart makes every
- * read in that window fail the same way, and repeating a read is always safe. They need no key, and an answer, whatever its
- * status, is returned as it is. Streams (`/events`, `/stream`) are not repeated here: their callers reconnect and resync.
+ * Reads (GET/HEAD) are retried the same way (a thrown network error or a 502/503/504): a restart makes every read in that window
+ * fail alike, and repeating a read is safe. They need no key; any other answer is returned as it is. Streams (`/events`, `/stream`) are not repeated here: their callers reconnect and resync.
  *
  * Not retried: a 500 (the server may have applied part of the work), a request the caller aborted, a body that cannot be sent
  * twice, and a write to `/api/ai/` (a chat turn is a stream the server cannot replay). A retry goes back through `base`, so when
@@ -51,7 +50,7 @@ export const retryingWrites = (base: typeof fetch, options: RetryOptions = {}): 
       try {
         // A copy goes out each time, so the body is still there for the next attempt.
         const response = await base(keyed.clone())
-        if (read || !GATEWAY.has(response.status)) return response
+        if (!GATEWAY.has(response.status)) return response
         last = { response }
       } catch (error) {
         if (request.signal.aborted) throw error

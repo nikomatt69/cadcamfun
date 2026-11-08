@@ -83,10 +83,13 @@ export function startLiveSync(app: AppState): () => void {
   }
   let delay = 1000
   let wake: (() => void) | undefined
+  /** A recovery that arrives while a subscription is being made: the next reconnect must not wait. Cleared by the first event. */
+  let recovered = false
   // A recovered sidecar is a new process: do not sit out a backoff that grew while it was down. The greeting that follows reloads state.
   let stopNotices: (() => void) | undefined
   void listenForSidecarNotices((notice) => {
     if (notice !== "recovered") return
+    recovered = true
     delay = 1000
     wake?.()
   }).then((stop) => { if (controller.signal.aborted) stop(); else stopNotices = stop }).catch(() => undefined)
@@ -94,10 +97,11 @@ export function startLiveSync(app: AppState): () => void {
     while (!controller.signal.aborted) {
       try {
         await app.runtime.run(Effect.flatMap(app.client.events.subscribeAll(), (stream) =>
-          Stream.runForEach(stream, (event) => Effect.sync(() => { delay = 1000; refresh(event) })),
+          Stream.runForEach(stream, (event) => Effect.sync(() => { delay = 1000; recovered = false; refresh(event) })),
         ), { signal: controller.signal })
       } catch { /* A reconnect greeting repairs missed events; writes are never retried. */ }
       if (controller.signal.aborted) break
+      if (recovered) { recovered = false; delay = 1000; continue }
       await new Promise<void>((resolve) => {
         const finish = () => { clearTimeout(pause); controller.signal.removeEventListener("abort", finish); wake = undefined; resolve() }
         wake = finish

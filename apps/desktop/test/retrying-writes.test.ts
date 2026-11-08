@@ -72,17 +72,23 @@ test("an aborted request is not retried, and the waits double", async () => {
   expect(waits).toEqual([100, 200])
 })
 
-test("a read that never got an answer is sent again; an answer of any status is returned at once", async () => {
+test("a read that never got an answer, or got a gateway answer, is sent again; any other status is returned at once", async () => {
   const lost = scripted([new TypeError("fetch failed"), new TypeError("fetch failed"), Response.json([{ id: "p1" }])])
   const response = await retryingWrites(lost.base, fast)(new Request("http://127.0.0.1:3001/api/projects"))
   expect(await response.json()).toEqual([{ id: "p1" }])
   expect(lost.seen).toHaveLength(3)
   expect(lost.seen.every((s) => s.key === null)).toBe(true)
-  for (const status of [404, 500, 503]) {
+  for (const status of [404, 409, 500]) {
     const answered = scripted([new Response("", { status }), Response.json({})])
     expect((await retryingWrites(answered.base, fast)(new Request("http://127.0.0.1:3001/api/projects"))).status).toBe(status)
     expect(answered.seen).toHaveLength(1)
   }
+})
+
+test("a read answered 503 while the sidecar restarts is repeated until it is answered", async () => {
+  const restarting = scripted([new Response("", { status: 503 }), new Response("", { status: 502 }), Response.json([])])
+  expect((await retryingWrites(restarting.base, fast)(new Request("http://127.0.0.1:3001/api/projects"))).status).toBe(200)
+  expect(restarting.seen).toHaveLength(3)
 })
 
 test("the default attempts wait out a restart, and the waits stop doubling at the cap", async () => {
