@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { Database as SQLite } from "bun:sqlite"
 import { Effect } from "effect"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { sql } from "drizzle-orm"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -208,6 +208,92 @@ describe("Database upgrade safety", () => {
     inspect(config.path, (sqlite) => {
       expect(sqlite.query("PRAGMA table_info(__drizzle_migrations)").all()).toHaveLength(5)
       expect(sqlite.query("SELECT * FROM original").all()).toEqual([{ value: "retry" }])
+    })
+  })
+
+  test("a table recreation keeps child rows that cascade from it and leaves enforcement on", async () => {
+    const config = fixture()
+    migration(config.migrationsFolder, 1, [
+      "CREATE TABLE parent (id TEXT PRIMARY KEY, value TEXT);",
+      "CREATE TABLE child (id TEXT PRIMARY KEY, parentId TEXT NOT NULL REFERENCES parent(id) ON DELETE CASCADE);",
+      "CREATE TABLE pinned (id TEXT PRIMARY KEY, parentId TEXT NOT NULL REFERENCES parent(id));"
+    ].join("\n--> statement-breakpoint\n"))
+    await start(config)
+    inspect(config.path, (sqlite) => {
+      sqlite.run("INSERT INTO parent VALUES ('p', 'kept')")
+      sqlite.run("INSERT INTO child VALUES ('c', 'p')")
+      sqlite.run("INSERT INTO pinned VALUES ('r', 'p')")
+    })
+    // The shape drizzle-kit generates for an SQLite column change.
+    migration(config.migrationsFolder, 2, [
+      "PRAGMA foreign_keys=OFF;",
+      "CREATE TABLE `__new_parent` (id TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '');",
+      "INSERT INTO `__new_parent`(id, value) SELECT id, value FROM `parent`;",
+      "DROP TABLE `parent`;",
+      "ALTER TABLE `__new_parent` RENAME TO `parent`;",
+      "PRAGMA foreign_keys=ON;"
+    ].join("--> statement-breakpoint\n"))
+    await Effect.runPromise(Effect.gen(function*() {
+      const { query } = yield* Database
+      const orphan = yield* query("orphan", (db) => db.run(sql`INSERT INTO child VALUES ('x', 'missing')`)).pipe(Effect.flip)
+      expect(orphan._tag).toBe("DatabaseError")
+    }).pipe(Effect.provide(Database.layer(config))))
+    inspect(config.path, (sqlite) => {
+      expect(sqlite.query("SELECT * FROM parent").all()).toEqual([{ id: "p", value: "kept" }])
+      expect(sqlite.query("SELECT * FROM child").all()).toEqual([{ id: "c", parentId: "p" }])
+      expect(sqlite.query("SELECT * FROM pinned").all()).toEqual([{ id: "r", parentId: "p" }])
+      expect(sqlite.query("PRAGMA foreign_key_check").all()).toEqual([])
+    })
+  })
+
+  test("a migration that leaves a dangling reference rolls back", async () => {
+    const config = fixture()
+    migration(config.migrationsFolder, 1, [
+      "CREATE TABLE parent (id TEXT PRIMARY KEY);",
+      "CREATE TABLE child (id TEXT PRIMARY KEY, parentId TEXT NOT NULL REFERENCES parent(id) ON DELETE CASCADE);"
+    ].join("\n--> statement-breakpoint\n"))
+    await start(config)
+    inspect(config.path, (sqlite) => {
+      sqlite.run("INSERT INTO parent VALUES ('p')")
+      sqlite.run("INSERT INTO child VALUES ('c', 'p')")
+    })
+    const journal = inspect(config.path, (sqlite) => sqlite.query("SELECT * FROM __drizzle_migrations").all())
+    migration(config.migrationsFolder, 2, "DELETE FROM parent;")
+    const error = await failure(config)
+    expect(error.operation).toBe("migrate")
+    expect(String(error.cause)).toContain("child -> parent")
+    inspect(config.path, (sqlite) => {
+      expect(sqlite.query("SELECT * FROM parent").all()).toEqual([{ id: "p" }])
+      expect(sqlite.query("SELECT * FROM child").all()).toEqual([{ id: "c", parentId: "p" }])
+      expect(sqlite.query("SELECT * FROM __drizzle_migrations").all()).toEqual(journal)
+    })
+  })
+
+  test("upgrading across the real Toolpath recreation keeps its versions, comments and estimates", async () => {
+    const config = fixture()
+    const real = new URL("../drizzle", import.meta.url).pathname
+    const names = readdirSync(real).filter((name) => /^\d{14}_/.test(name)).sort()
+    const at = names.findIndex((name) => name.includes("empty_ezekiel"))
+    expect(at).toBeGreaterThan(0)
+    for (const name of names.slice(0, at)) cpSync(join(real, name), join(config.migrationsFolder, name), { recursive: true })
+    await start(config)
+    inspect(config.path, (sqlite) => {
+      sqlite.run("INSERT INTO User (id, createdAt, updatedAt) VALUES ('u', 1, 1)")
+      sqlite.run("INSERT INTO Project (id, name, createdAt, updatedAt, ownerId) VALUES ('p', 'P', 1, 1, 'u')")
+      sqlite.run("INSERT INTO Toolpath (id, name, projectId, createdAt, updatedAt, createdBy) VALUES ('t', 'T', 'p', 1, 1, 'u')")
+      sqlite.run("INSERT INTO ToolpathVersion (id, toolpathId, userId, createdAt) VALUES ('v', 't', 'u', 1)")
+      sqlite.run("INSERT INTO ToolpathComment (id, toolpathId, content, userId, createdAt, updatedAt) VALUES ('c', 't', 'note', 'u', 1, 1)")
+      sqlite.run(`INSERT INTO ProductionCostEstimate (id, toolpathId, materialCost, toolWearCost, machineTime, machineTimeCost, operatorTime,
+        operatorTimeCost, setupCost, totalCost, details, createdAt, updatedAt, ownerId) VALUES ('e', 't', 1, 1, 1, 1, 1, 1, 1, 4, '{}', 1, 1, 'u')`)
+    })
+    for (const name of names.slice(at)) cpSync(join(real, name), join(config.migrationsFolder, name), { recursive: true })
+    await start(config)
+    inspect(config.path, (sqlite) => {
+      expect(sqlite.query("SELECT id FROM Toolpath").all()).toEqual([{ id: "t" }])
+      expect(sqlite.query("SELECT id FROM ToolpathVersion").all()).toEqual([{ id: "v" }])
+      expect(sqlite.query("SELECT id FROM ToolpathComment").all()).toEqual([{ id: "c" }])
+      expect(sqlite.query("SELECT id FROM ProductionCostEstimate").all()).toEqual([{ id: "e" }])
+      expect(sqlite.query("PRAGMA foreign_key_check").all()).toEqual([])
     })
   })
 

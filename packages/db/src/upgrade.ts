@@ -59,9 +59,33 @@ export function backupDatabase(sqlite: Database, path: string, directory = join(
   for (const file of [...backups, name].slice(0, -5)) rmSync(join(directory, file))
 }
 
+/** Dangling references per child/parent table pair; rowids are not stable across drizzle's table recreation. */
+function foreignKeyViolations(sqlite: Database): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const row of sqlite.query<{ table: string; parent: string }, []>("PRAGMA foreign_key_check").all()) {
+    const key = `${row.table} -> ${row.parent}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
+}
+
 export function applyUpgrade(sqlite: Database, plan: ReturnType<typeof planUpgrade>) {
+  // `PRAGMA foreign_keys` is a no-op inside a transaction, so the `PRAGMA foreign_keys=OFF` that drizzle-kit emits around
+  // a table recreation would be ignored and its `DROP TABLE` would cascade-delete (or block on) every child row. Disable
+  // enforcement around the transaction instead, and refuse to commit any dangling reference the migrations introduced.
+  const enforced = sqlite.query<{ foreign_keys: number }, []>("PRAGMA foreign_keys").get()?.foreign_keys === 1
+  if (enforced) sqlite.run("PRAGMA foreign_keys = OFF")
+  try {
+    migrateAtomically(sqlite, plan)
+  } finally {
+    if (enforced) sqlite.run("PRAGMA foreign_keys = ON")
+  }
+}
+
+function migrateAtomically(sqlite: Database, plan: ReturnType<typeof planUpgrade>) {
   // Drizzle beta.22 mutates the journal before BEGIN; include it in our transaction instead.
   sqlite.transaction(() => {
+    const before = foreignKeyViolations(sqlite)
     sqlite.run(`CREATE TABLE IF NOT EXISTS "__drizzle_migrations" (
       id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC, name TEXT, applied_at TEXT
     )`)
@@ -73,6 +97,9 @@ export function applyUpgrade(sqlite: Database, plan: ReturnType<typeof planUpgra
       }
     }
     for (const migration of plan.pending) applyMigration(sqlite, migration)
+    for (const [pair, count] of foreignKeyViolations(sqlite)) {
+      if (count > (before.get(pair) ?? 0)) throw new Error(`Migration left ${count} dangling foreign key reference(s) in ${pair}`)
+    }
   }).immediate()
 }
 

@@ -46,3 +46,13 @@ Share only the successfully generated `cadcamfun-demo.db`, not `data/`, a real
 database, or migration backups. No command uploads anything. A remote destination
 must be selected separately. Uploading a copy does not reduce local storage;
 compaction and appropriate future retention policies address that independently.
+
+## Migrations and foreign keys
+
+Pending migrations run in one SQLite transaction with foreign-key enforcement
+switched off around it, because `PRAGMA foreign_keys` is ignored inside a
+transaction: the `DROP TABLE` of a drizzle-kit table recreation would otherwise
+cascade-delete (or be blocked by) every child row. Before committing, the runner
+compares `PRAGMA foreign_key_check` with the state before the migrations and rolls
+everything back if a migration left a new dangling reference. A migration must
+therefore delete child rows explicitly; it cannot rely on `ON DELETE CASCADE`.
