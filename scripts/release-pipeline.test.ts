@@ -255,5 +255,18 @@ test("the build planner completes for all six release targets without installing
     expect(stdout).not.toMatch(/\bbun (?:--no-env-file )?(?:run )?test\b/);
     expect(stdout).toContain('"beforeBuildCommand":""');
     expect(stdout).toContain("nothing was changed");
+    const tauri = stdout.split("\n").filter((line) => line.includes("[dry-run] would run:") && line.includes("tauri") && line.includes("--ci"));
+    if (triple.endsWith("-apple-darwin")) {
+      expect(tauri).toHaveLength(2);
+      expect(tauri[0]).not.toContain("--bundles");
+      expect(tauri[0]).not.toContain("--verbose");
+      expect(stdout).toContain("if bundle_dmg.sh fails");
+      expect(tauri[1]).toContain("tauri --verbose build");
+      expect(tauri[1]).toContain("--bundles dmg");
+    } else {
+      expect(tauri).toHaveLength(1);
+      expect(stdout).not.toContain("bundle_dmg.sh");
+      expect(stdout).not.toContain("--verbose");
+    }
   }));
 }, 20_000);
