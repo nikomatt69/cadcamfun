@@ -1,4 +1,5 @@
-import { Effect, Exit, Layer, Metric, Option, Tracer } from "effect"
+import { monitorEventLoopDelay } from "node:perf_hooks"
+import { Duration, Effect, Exit, Layer, Metric, Option, Schedule, Tracer } from "effect"
 import { HttpMiddleware, HttpServerError, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { PrometheusMetrics } from "effect/unstable/observability"
 import { AppConfigService } from "./config.ts"
@@ -209,3 +210,31 @@ export const scrubbingLogRecordProcessor = (delegate: LogRecordProcessorLike): L
   forceFlush: () => delegate.forceFlush(),
   shutdown: () => delegate.shutdown()
 })
+
+/** Longest the event loop stood still in the last window, in milliseconds. */
+export const eventLoopDelayMax = Metric.gauge("cadcamfun_event_loop_delay_max_ms", {
+  description: "Longest event loop delay in the last sampling window, in milliseconds"
+})
+
+/** A stall this long makes the webview's calls hang and counts against the shell's health probe (5 s timeout). */
+export const EVENT_LOOP_STALL_MS = 1000
+
+/**
+ * Samples the event loop and says so when it stood still. The shell restarts a sidecar whose `/health` stays unanswered for three
+ * probes, and the webview sees a stall as a transport error long before that; without this the log only shows a slow request.
+ * One warning per window that crossed the threshold, carrying the worst delay, so a stall is on record with its length.
+ */
+export const eventLoopWatch = (window: Duration.Input) => Layer.effectDiscard(Effect.gen(function*() {
+  const histogram = monitorEventLoopDelay({ resolution: 20 })
+  yield* Effect.acquireRelease(Effect.sync(() => histogram.enable()), () => Effect.sync(() => { histogram.disable() }))
+  const sample = Effect.gen(function*() {
+    // The histogram counts nanoseconds; an empty window reports NaN for the max.
+    const maxMs = Number.isFinite(histogram.max) ? histogram.max / 1e6 : 0
+    histogram.reset()
+    yield* Metric.update(eventLoopDelayMax, maxMs)
+    if (maxMs >= EVENT_LOOP_STALL_MS) yield* Effect.logWarning("event loop stalled", { maxDelayMs: Math.round(maxMs) })
+  })
+  yield* sample.pipe(Effect.repeat(Schedule.spaced(window)), Effect.forkScoped)
+}))
+
+export const EventLoopWatchLive = eventLoopWatch("5 seconds")

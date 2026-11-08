@@ -4,7 +4,7 @@ import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { KernelJobsLive } from "@cadcamfun/ai"
 import { AppConfigService } from "./config.ts"
 import { ApiRoutes, DatabaseLive } from "./layers.ts"
-import { ObservabilityLive } from "./observability.ts"
+import { EventLoopWatchLive, ObservabilityLive } from "./observability.ts"
 import { awaitShutdown } from "./shutdown.ts"
 import { markAnnounced, setLocalPort } from "./startup.ts"
 import { restoreHostedState } from "./services/cloud-checkpoint.ts"
@@ -26,7 +26,7 @@ const Ready = Layer.effectDiscard(Effect.gen(function*() {
   markAnnounced()
 }))
 
-const Server = Layer.mergeAll(HttpRouter.serve(ApiRoutes), Ready).pipe(
+const Server = Layer.mergeAll(HttpRouter.serve(ApiRoutes), Ready, EventLoopWatchLive).pipe(
   // `BunHttpServer.layer` supplies both the listening server and the HTTP platform
   // services. `HttpServer.layerServices` must NOT be added here: that layer is the
   // no-op `HttpPlatform` meant for in-process tests, and providing it shadows the
