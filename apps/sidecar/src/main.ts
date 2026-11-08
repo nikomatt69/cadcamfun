@@ -38,6 +38,18 @@ const Server = Layer.mergeAll(HttpRouter.serve(ApiRoutes), Ready).pipe(
 
 // stdout is reserved for the ready/error events the shell parses; logs go to stderr.
 
+// A rejection nobody awaited (a detached fiber, a worker callback) must not take down every request in flight: say so on stderr, where the
+// shell's log shows it, and keep serving. An uncaught exception leaves the process in an unknown state: report it, then exit non-zero so
+// the shell restarts the sidecar with the cause on record.
+const describeFailure = (reason: unknown): string => reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)
+process.on("unhandledRejection", (reason) => {
+  console.error(JSON.stringify({ level: "error", message: "unhandled rejection", reason: describeFailure(reason) }))
+})
+process.on("uncaughtException", (error) => {
+  console.error(JSON.stringify({ level: "fatal", message: "uncaught exception", reason: describeFailure(error) }))
+  process.exit(1)
+})
+
 
 function BunServer() {
   // No idle timeout: Bun closes a connection that is silent for 10 s, and a model writing a long tool call is silent that long.
