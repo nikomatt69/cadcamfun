@@ -12,7 +12,9 @@
  *
  * The script never reads `.env*` and never prints secret values. Every step is
  * announced, spawns its command with the inherited environment, and a non-zero
- * exit code aborts the run immediately (fail fast).
+ * exit code aborts the run immediately (fail fast). The macOS DMG bundle is the
+ * exception: `hdiutil` on GitHub's runners exits while `diskimages-help` is still
+ * busy, after the `.app` is already signed, and that step is retried.
  *
  * Run a subset while iterating:
  *   bun scripts/build.ts --help
@@ -64,7 +66,128 @@ const STEP_ALIASES: Readonly<Record<string, StepName>> = {
   release: "artifacts",
 };
 
-class BuildError extends Error {}
+class BuildError extends Error {
+  constructor(message: string, readonly log = "") {
+    super(message);
+  }
+}
+
+/**
+ * How many times the macOS DMG may be attempted. The first attempt is the normal
+ * bundle; the rest run only after `bundle_dmg.sh` has failed.
+ */
+export const DMG_BUNDLE_ATTEMPTS = 3;
+
+/** Bytes of bundler output kept when deciding whether a failure was the DMG step. */
+const DMG_LOG_TAIL = 64 * 1024;
+
+type Bytes = Uint8Array<ArrayBufferLike>;
+
+const DMG_BUNDLER_MARKER = "bundle_dmg.sh";
+
+export interface DmgBundlePlan {
+  /** True when this platform's bundle list produces a DMG. */
+  dmg: boolean;
+}
+
+/**
+ * macOS release builds ask Tauri for an `.app` and a `.dmg`. The DMG is the step
+ * that fails on its own; other platforms have nothing to retry.
+ */
+export function dmgBundlePlan(bundles: string | undefined, platform: string): DmgBundlePlan {
+  if (platform !== "darwin") return { dmg: false };
+  const requested = (bundles ?? "app,dmg").split(",").map((part) => part.trim()).filter((part) => part !== "");
+  return { dmg: requested.includes("dmg") };
+}
+
+/** The bundler prints this when `bundle_dmg.sh` exits non-zero. A compile error does not. */
+export function isDmgBundlerFailure(log: string): boolean {
+  return log.includes(DMG_BUNDLER_MARKER);
+}
+
+export function shouldRetryDmgBundle(platform: string, bundles: string | undefined, log: string): boolean {
+  return dmgBundlePlan(bundles, platform).dmg && isDmgBundlerFailure(log);
+}
+
+/**
+ * The first attempt still builds the application, so only a `bundle_dmg.sh`
+ * failure is worth repeating. A later attempt builds the DMG alone, and a
+ * failure there is that same step.
+ */
+export function dmgAttemptIsRetryable(attempt: number, platform: string, bundles: string | undefined, log: string): boolean {
+  if (attempt > 1) return true;
+  return shouldRetryDmgBundle(platform, bundles, log);
+}
+
+/**
+ * Keeps at most `limit` bytes, preferring the end of the stream.
+ * The DMG error is the last thing Tauri prints; the compile log in front of it is not retained.
+ */
+export function rememberTail(previous: Bytes, chunk: Bytes, limit: number): Bytes {
+  if (chunk.length >= limit) return chunk.slice(chunk.length - limit);
+  if (previous.length + chunk.length <= limit) {
+    const next = new Uint8Array(previous.length + chunk.length);
+    next.set(previous);
+    next.set(chunk, previous.length);
+    return next;
+  }
+  const next = new Uint8Array(limit);
+  const keep = limit - chunk.length;
+  next.set(previous.subarray(previous.length - keep));
+  next.set(chunk, keep);
+  return next;
+}
+
+/**
+ * Device nodes of disk images this build left mounted.
+ *
+ * `hdiutil info` groups each image under a line of `=`. Only an image whose path
+ * is one of our temporary `rw.*.dmg` files, or whose volume is this product, is
+ * detached. Other mounted images stay as they are.
+ */
+export function diskImagesToDetach(info: string, productName: string): string[] {
+  const devices: string[] = [];
+  for (const block of info.split(/\n(?==+\n)/)) {
+    const image = /^\s*image-path\s*:\s*(.+)$/m.exec(block)?.[1]?.trim() ?? "";
+    if (!image.endsWith(".dmg")) continue;
+    const ours = image.includes("/rw.")
+      || image.includes(`${productName}_`)
+      || block.includes(`/${productName}`)
+      || block.includes(`\t${productName}`);
+    if (!ours) continue;
+    const device = /^(\/dev\/disk\d+)\s/m.exec(block)?.[1];
+    if (device !== undefined && !devices.includes(device)) devices.push(device);
+  }
+  return devices;
+}
+
+/**
+ * Runs the bundle, and when `bundle_dmg.sh` is what failed, detaches leftover
+ * images and tries the DMG again. Any other failure stops immediately.
+ */
+export async function retryDmgBundle(options: {
+  attempts: number;
+  bundle: (attempt: number) => Promise<void>;
+  retryable: (error: unknown, attempt: number) => boolean;
+  recover: () => Promise<void>;
+  wait: (failedAttempt: number) => Promise<void>;
+  warn: (message: string) => void;
+}): Promise<void> {
+  let last: unknown;
+  for (let attempt = 1; attempt <= options.attempts; attempt++) {
+    try {
+      await options.bundle(attempt);
+      return;
+    } catch (error) {
+      last = error;
+      if (attempt === options.attempts || !options.retryable(error, attempt)) break;
+      options.warn(`DMG bundler failed; detaching leftover disk images and retrying (${attempt + 1} of ${options.attempts})`);
+      await options.recover();
+      await options.wait(attempt);
+    }
+  }
+  throw last;
+}
 
 interface Options {
   steps: readonly StepName[];
@@ -128,7 +251,7 @@ function quote(value: string): string {
 /** Spawns a command, streaming its output; returns stdout for commands we parse. */
 async function run(
   command: readonly string[],
-  options: { cwd?: string; capture?: boolean; env?: Record<string, string | undefined> } = {},
+  options: { cwd?: string; capture?: boolean; watchDmg?: boolean; env?: Record<string, string | undefined> } = {},
 ): Promise<CommandResult> {
   const cwd = options.cwd ?? ROOT;
   if (dryRun) {
@@ -139,26 +262,65 @@ async function run(
   const executable = command[0];
   const argv = executable === "bun" ? [process.execPath, "--no-env-file", ...command.slice(1)]
     : executable === "bunx" ? [process.execPath, "--no-env-file", "x", ...command.slice(1)] : [...command];
+  // `watchDmg` still streams the build. Only the last slice of that stream is kept,
+  // so a DMG failure can be told from a compile failure without holding the cargo log.
+  const watch = options.watchDmg === true && options.capture !== true;
   const child = Bun.spawn(argv, {
     cwd,
     stdin: "inherit",
-    stdout: options.capture ? "pipe" : "inherit",
-    stderr: options.capture ? "pipe" : "inherit",
+    stdout: options.capture === true || watch ? "pipe" : "inherit",
+    stderr: options.capture === true || watch ? "pipe" : "inherit",
     env: options.env ?? childEnv(),
   });
+  const tails: { stdout: Bytes; stderr: Bytes } = { stdout: new Uint8Array(0), stderr: new Uint8Array(0) };
   const [stdout, stderr, code] = await Promise.all([
-    options.capture ? new Response(child.stdout as ReadableStream).text() : Promise.resolve(""),
-    options.capture ? new Response(child.stderr as ReadableStream).text() : Promise.resolve(""),
+    options.capture === true
+      ? new Response(child.stdout as ReadableStream).text()
+      : watch
+        ? streamTail(child.stdout, process.stdout, (next) => { tails.stdout = next; })
+        : Promise.resolve(""),
+    options.capture === true
+      ? new Response(child.stderr as ReadableStream).text()
+      : watch
+        ? streamTail(child.stderr, process.stderr, (next) => { tails.stderr = next; })
+        : Promise.resolve(""),
     child.exited,
   ]);
   if (code !== 0) {
-    if (options.capture) {
+    if (options.capture === true) {
       process.stderr.write(stdout);
       process.stderr.write(stderr);
     }
-    throw new BuildError(`\`${command.map(quote).join(" ")}\` failed with exit code ${code}`);
+    const sawDmg = watch && (tailHasDmgMarker(tails.stdout) || tailHasDmgMarker(tails.stderr));
+    throw new BuildError(`\`${command.map(quote).join(" ")}\` failed with exit code ${code}`, sawDmg ? DMG_BUNDLER_MARKER : "");
   }
   return { stdout, stderr };
+}
+
+async function streamTail(
+  stream: ReadableStream<Bytes> | number | null | undefined,
+  dest: NodeJS.WriteStream,
+  keep: (next: Bytes) => void,
+): Promise<string> {
+  if (stream === null || stream === undefined || typeof stream === "number") return "";
+  const reader = stream.getReader();
+  let tail: Bytes = new Uint8Array(0);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value === undefined || value.byteLength === 0) continue;
+    // Wait when the log pipe is full. The child then blocks too, so the compile
+    // log is not queued in this process.
+    if (!dest.write(value)) await new Promise<void>((resolve) => dest.once("drain", resolve));
+    tail = rememberTail(tail, value, DMG_LOG_TAIL);
+    keep(tail);
+  }
+  keep(tail);
+  return "";
+}
+
+function tailHasDmgMarker(tail: Bytes): boolean {
+  return new TextDecoder().decode(tail).includes(DMG_BUNDLER_MARKER);
 }
 
 /**
@@ -359,16 +521,86 @@ async function stepBundle(): Promise<void> {
   // variable as a request to import a real certificate, even when it is empty.
   if (adHoc) for (const name of APPLE_SIGNING_ENV) delete signingEnv[name];
   if (adHoc) say("   no Apple certificate configured — the bundle is ad-hoc signed and not notarised");
-  const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
+  const configJson = JSON.stringify({
     build: { beforeBuildCommand: "" },
     bundle: {
       createUpdaterArtifacts: updaterArtifacts,
       ...(thumbprint && platform === "windows" ? { windows: { certificateThumbprint: thumbprint } } : {}),
       ...(adHoc ? { macOS: { signingIdentity: "-" } } : {}),
     },
-  })];
-  if (bundles !== undefined) tauri.push("--bundles", bundles);
-  await run(tauri, { cwd: DESKTOP, env: signingEnv });
+  });
+  const retryDmg = dmgBundlePlan(bundles, platform).dmg;
+  const tauri = (bundleList: string | undefined, verbose: boolean): string[] => {
+    const command = ["bunx", "tauri"];
+    if (verbose) command.push("--verbose");
+    command.push("build", "--ci", "--target", triple, "--config", configJson);
+    if (bundleList !== undefined) command.push("--bundles", bundleList);
+    return command;
+  };
+  // The first attempt builds every requested bundle. A later attempt builds only
+  // the DMG, with Tauri's debug log, so hdiutil's own error is visible. A compile
+  // error never reaches that retry. Dry-run prints the retry after the real command.
+  if (!retryDmg || dryRun) {
+    await run(tauri(bundles, false), { cwd: DESKTOP, env: signingEnv });
+    if (dryRun && retryDmg) {
+      say(`   if bundle_dmg.sh fails, detach leftover disk images and retry up to ${DMG_BUNDLE_ATTEMPTS - 1} more times`);
+      await run(tauri("dmg", true), { cwd: DESKTOP, env: signingEnv });
+    }
+    return;
+  }
+  const productName = typeof config.productName === "string" && config.productName !== "" ? config.productName : "CADCAM FUN";
+  await retryDmgBundle({
+    attempts: DMG_BUNDLE_ATTEMPTS,
+    bundle: async (attempt) => {
+      await run(attempt === 1 ? tauri(bundles, false) : tauri("dmg", true), {
+        cwd: DESKTOP,
+        env: signingEnv,
+        watchDmg: attempt === 1,
+      });
+    },
+    retryable: (error, attempt) => error instanceof BuildError && dmgAttemptIsRetryable(attempt, platform, bundles, error.log),
+    recover: () => recoverFailedDmg(triple, productName),
+    wait: (failedAttempt) => Bun.sleep(5_000 * failedAttempt),
+    warn: say,
+  });
+}
+
+/** Detaches a disk image this build left mounted and deletes the temporary read-write image. */
+async function recoverFailedDmg(triple: string, productName: string): Promise<void> {
+  try {
+    const info = Bun.spawn(["hdiutil", "info"], {
+      stdout: "pipe",
+      stderr: "pipe",
+      stdin: "ignore",
+      env: childEnv(),
+    });
+    const [stdout, , code] = await Promise.all([
+      new Response(info.stdout as ReadableStream).text(),
+      new Response(info.stderr as ReadableStream).text(),
+      info.exited,
+    ]);
+    if (code === 0) {
+      for (const device of diskImagesToDetach(stdout, productName)) {
+        say(`   detaching ${device}`);
+        const detach = Bun.spawn(["hdiutil", "detach", device, "-force"], {
+          stdout: "inherit",
+          stderr: "inherit",
+          stdin: "ignore",
+          env: childEnv(),
+        });
+        await detach.exited;
+      }
+    }
+  } catch (error) {
+    say(`   could not inspect disk images: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const macos = join(bundleRoot(SRC_TAURI, triple), "macos");
+  if (!existsSync(macos)) return;
+  for (const name of await readdir(macos)) {
+    if (!name.startsWith("rw.") || !name.endsWith(".dmg")) continue;
+    say(`   removing leftover ${name}`);
+    await rm(join(macos, name), { force: true });
+  }
 }
 
 // ──────────────────────────────── step 6 ──────────────────────────────────
