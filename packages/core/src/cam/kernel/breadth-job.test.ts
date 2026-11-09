@@ -1,5 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import type { Feature } from "../../cad/history.ts"
+import type { PostId } from "../post/types.ts"
 import { DEFAULT_CUTTERS, findCutter, planOnly, runJob, type CamArtifact, type ManufacturingJob, type OperationSpec } from "./index.ts"
 import { findMachine } from "./machines.ts"
 import type { PostId } from "../post/types.ts"
