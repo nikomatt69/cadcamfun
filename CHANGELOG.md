@@ -3,6 +3,16 @@
 <!-- UNRELEASED:START -->
 <!-- UNRELEASED:END -->
 
+## v0.1.110 (November 2026)
+
+## Core
+
+- Exact Measure inspector on the canvas (kernel + UI)
+
+## Desktop
+
+- Draft and zebra surface analysis on the canvas
+
 ## v0.1.109 (November 2026)
 
 ## Database
