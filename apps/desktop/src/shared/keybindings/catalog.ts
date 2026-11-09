@@ -114,6 +114,7 @@ export const COMMANDS: ReadonlyArray<CommandDef> = [
   def("cad.create.cone", "cad", "create", ["Shift+N"]),
   def("cad.create.torus", "cad", "create", ["Shift+T"]),
   def("cad.create.parametric", "cad", "create", ["Shift+P"]),
+  def("cad.inspect.measure", "cad", "view", ["I"]),
   def("cad.boolean.union", "cad", "boolean", ["Mod+Alt+U"]),
   def("cad.boolean.subtract", "cad", "boolean", ["Mod+Alt+D"]),
   def("cad.boolean.intersect", "cad", "boolean", ["Mod+Alt+I"]),

@@ -130,5 +130,6 @@
   "keys.group.create": "Créer",
   "keys.cmd.cad.draw.line": "Tracer des lignes (cliquez sur le départ, puis sur l'arrivée)",
   "keys.cmd.cad.draw.circle": "Tracer des cercles (centre, puis un point du cercle)",
-  "keys.cmd.cad.draw.rectangle": "Tracer des rectangles (deux coins)"
+  "keys.cmd.cad.draw.rectangle": "Tracer des rectangles (deux coins)",
+  "keys.cmd.cad.inspect.measure": "Mesurer"
 }

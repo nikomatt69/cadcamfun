@@ -130,5 +130,6 @@
   "keys.group.create": "Erstellen",
   "keys.cmd.cad.draw.line": "Linien zeichnen (Start klicken, Ende klicken)",
   "keys.cmd.cad.draw.circle": "Kreise zeichnen (Mittelpunkt, dann ein Punkt darauf)",
-  "keys.cmd.cad.draw.rectangle": "Rechtecke zeichnen (zwei Eckpunkte)"
+  "keys.cmd.cad.draw.rectangle": "Rechtecke zeichnen (zwei Eckpunkte)",
+  "keys.cmd.cad.inspect.measure": "Messen"
 }

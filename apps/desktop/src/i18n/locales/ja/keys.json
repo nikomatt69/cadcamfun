@@ -130,5 +130,6 @@
   "keys.group.create": "作成",
   "keys.cmd.cad.draw.line": "直線を描く（始点をクリック、終点をクリック）",
   "keys.cmd.cad.draw.circle": "円を描く（中心をクリック、次に円上の点をクリック）",
-  "keys.cmd.cad.draw.rectangle": "長方形を描く（2つの角）"
+  "keys.cmd.cad.draw.rectangle": "長方形を描く（2つの角）",
+  "keys.cmd.cad.inspect.measure": "計測"
 }

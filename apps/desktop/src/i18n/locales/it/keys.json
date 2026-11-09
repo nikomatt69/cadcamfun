@@ -130,5 +130,6 @@
   "keys.group.create": "Crea",
   "keys.cmd.cad.draw.line": "Disegna linee (clicca l'inizio, clicca la fine)",
   "keys.cmd.cad.draw.circle": "Disegna cerchi (centro, poi un punto sul cerchio)",
-  "keys.cmd.cad.draw.rectangle": "Disegna rettangoli (due angoli)"
+  "keys.cmd.cad.draw.rectangle": "Disegna rettangoli (due angoli)",
+  "keys.cmd.cad.inspect.measure": "Misura"
 }

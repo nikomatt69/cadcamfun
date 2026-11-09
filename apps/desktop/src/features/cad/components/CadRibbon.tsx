@@ -1,5 +1,5 @@
 import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
-import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText, Maximize2, Cylinder } from "lucide-solid"
+import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText, Maximize2, Cylinder, Ruler } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -66,6 +66,10 @@ export default function CadRibbon(props: Props): JSX.Element {
     const chord = name === undefined || keys === undefined ? undefined : keys.keymap().entry(`cad.create.${name}`)?.chords[0]
     return chord === undefined || keys === undefined ? label : `${label} (${displayChord(chord, keys.platform)})`
   }
+  const measureHint = (): string => {
+    const chord = keys?.keymap().entry("cad.inspect.measure")?.chords[0]
+    return chord === undefined || keys === undefined ? t("cad.measure.hint") : `${t("cad.measure.hint")} (${displayChord(chord, keys.platform)})`
+  }
   const activeLayer = () => layers.layers.find(layer => layer.id === layers.activeLayer)
   const creationBlocked = () => !props.ready || !activeLayer() || activeLayer()?.locked === true
   const singleSelected = () => {
@@ -106,6 +110,8 @@ export default function CadRibbon(props: Props): JSX.Element {
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.inspect")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.inspect")}</span>
       <div class="cad-ribbon-actions">
+        <Action label={t("cad.measure.title")} icon={<Ruler size={14} />} active={cad.measureActive} disabled={!props.ready}
+          hint={measureHint()} onClick={() => cad.setMeasureActive(!cad.measureActive)} />
         <Action label={t("cad.section")} icon={<Scissors size={14} />} active={cad.section.enabled} onClick={toggleSection} />
         <Action label={t("cad.explode.title")} icon={<Maximize2 size={14} />} active={cad.explodedView.enabled}
           disabled={!props.ready || (!cad.explodedView.enabled && cad.explodablePartCount < 2)}

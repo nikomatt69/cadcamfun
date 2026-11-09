@@ -130,5 +130,6 @@
   "keys.group.create": "बनाएँ",
   "keys.cmd.cad.draw.line": "रेखाएँ बनाएँ (शुरुआत पर क्लिक करें, अंत पर क्लिक करें)",
   "keys.cmd.cad.draw.circle": "वृत्त बनाएँ (केंद्र, फिर उस पर एक बिंदु)",
-  "keys.cmd.cad.draw.rectangle": "आयत बनाएँ (दो कोने)"
+  "keys.cmd.cad.draw.rectangle": "आयत बनाएँ (दो कोने)",
+  "keys.cmd.cad.inspect.measure": "मापें"
 }

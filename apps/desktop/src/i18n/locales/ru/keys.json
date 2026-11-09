@@ -130,5 +130,6 @@
   "keys.group.create": "Создание",
   "keys.cmd.cad.draw.line": "Рисовать линии (щёлкните начало, щёлкните конец)",
   "keys.cmd.cad.draw.circle": "Рисовать окружности (центр, затем точка на ней)",
-  "keys.cmd.cad.draw.rectangle": "Рисовать прямоугольники (две точки)"
+  "keys.cmd.cad.draw.rectangle": "Рисовать прямоугольники (две точки)",
+  "keys.cmd.cad.inspect.measure": "Измерить"
 }

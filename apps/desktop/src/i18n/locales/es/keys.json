@@ -130,5 +130,6 @@
   "keys.group.create": "Crear",
   "keys.cmd.cad.draw.line": "Dibujar líneas (haz clic en el inicio y en el final)",
   "keys.cmd.cad.draw.circle": "Dibujar círculos (centro y luego un punto de la circunferencia)",
-  "keys.cmd.cad.draw.rectangle": "Dibujar rectángulos (dos esquinas)"
+  "keys.cmd.cad.draw.rectangle": "Dibujar rectángulos (dos esquinas)",
+  "keys.cmd.cad.inspect.measure": "Medir"
 }

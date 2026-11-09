@@ -63,6 +63,8 @@ import { CUBE_FACES } from "../../../viewport/view-cube-model.ts"
 import { anchorOf, elementFromPoints, nextStart, previewOutline, type DrawTool, type Point3 as DrawPoint } from "../lib/draw-tools.ts"
 import type { SnapType } from "../lib/enanchedSnapService.ts"
 import { createPlacementReference } from "../lib/placement-reference.ts"
+import { nextTargets, runMeasure, type MeasureTarget } from "../lib/measure.ts"
+import MeasurePanel from "./MeasurePanel.tsx"
 
 type TransformMode = "translate" | "rotate" | "scale"
 type Point3 = { x: number; y: number; z: number }
@@ -219,6 +221,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   /** The face or edge of an exact solid under the cursor, and the one last clicked. */
   const [hoveredSub, setHoveredSub] =createSignal<SubEntityPick | undefined>(undefined)
   const [pickedSub, setPickedSub] = createSignal<SubEntityPick | undefined>(undefined)
+  /** The Measure inspector's picks with what the canvas hit (for the highlight); the targets themselves live in the store. */
+  const [measurePicks, setMeasurePicks] = createSignal<ReadonlyArray<{ readonly target: MeasureTarget; readonly sub?: SubEntityPick }>>([])
   const [isSelectionMode, setSelectionMode] = createSignal(false)
   const [isMultiSelectMode, setMultiSelectMode] = createSignal(false)
   const [isFullscreen, setFullscreen] = createSignal(false)
@@ -807,6 +811,45 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   createEffect(on(selectedIds, (ids) => { const picked = pickedSub(); if (picked !== undefined && !ids.includes(picked.elementId)) { setPickedSub(undefined); cad.setPickedEntity(null) } }, { defer: true }))
   onCleanup(() => { for (const kind of Object.keys(subOverlays) as SubHighlightKind[]) disposeSubHighlight(subOverlays[kind]) })
 
+  // ---------------------------------------------------------------------------------------------------- measure
+  // The picks stay valid across a rebuild only by index; a rebuilt part may have other faces, so a rebuild drops them.
+  createEffect(on(rebuilds, () => { if (cad.measureTargets.length > 0) { cad.setMeasureTargets([]); setMeasurePicks([]) } }, { defer: true }))
+  createEffect(on(() => cad.measureActive, (active) => { if (!active) setMeasurePicks([]) }, { defer: true }))
+  const measureOutcome = createMemo(() => (cad.measureActive ? runMeasure(cad.measureTargets, elements.elements as never) : undefined))
+  let measureOverlays: THREE.Object3D[] = []
+  const clearMeasureOverlays = () => {
+    for (const overlay of measureOverlays) {
+      if (overlay.userData.isSubHighlight === true) { disposeSubHighlight(overlay); continue }
+      overlay.removeFromParent()
+      overlay.traverse((object) => { (object as THREE.Mesh).geometry?.dispose?.(); ((object as THREE.Mesh).material as THREE.Material | undefined)?.dispose?.() })
+    }
+    measureOverlays = []
+  }
+  createEffect(() => {
+    const outcome = measureOutcome()
+    const picks = measurePicks()
+    clearMeasureOverlays()
+    if (!scene || !cad.measureActive) { invalidate(); return }
+    for (const pick of picks) if (pick.sub !== undefined && pick.sub.object.parent !== null) { const overlay = createSubHighlight(pick.sub, "picked"); scene.add(overlay); measureOverlays.push(overlay) }
+    const between = outcome?.ok === true ? outcome.between : undefined
+    if (between !== undefined) {
+      // The dimension: the shortest segment between the two picks with a dot at each end, drawn over the parts (model + origin offset = scene).
+      const offset = originOffset()
+      const a = new THREE.Vector3(between.pointA.x + offset.x, between.pointA.y + offset.y, between.pointA.z + offset.z)
+      const b = new THREE.Vector3(between.pointB.x + offset.x, between.pointB.y + offset.y, between.pointB.z + offset.z)
+      const group = new THREE.Group()
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial({ color: 0xffab00, depthTest: false, transparent: true }))
+      const dots = new THREE.Points(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.PointsMaterial({ color: 0xffab00, size: 9, sizeAttenuation: false, depthTest: false, transparent: true }))
+      for (const part of [line, dots]) { part.renderOrder = 10; part.frustumCulled = false; part.raycast = () => undefined }
+      group.add(line, dots)
+      group.userData.isMeasureOverlay = true
+      scene.add(group)
+      measureOverlays.push(group)
+    }
+    invalidate()
+  })
+  onCleanup(clearMeasureOverlays)
+
   // The joints of the assembly (revolute, prismatic, ...) as glyphs at their origin, when the assembly panel shows them.
   let jointMarkers: THREE.Object3D | undefined
   createEffect(() => {
@@ -1225,6 +1268,19 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (joint !== undefined) { cad.setPickedJoint(joint.jointId); return }
     if (cad.pickedJoint !== null) cad.setPickedJoint(null)
     const id = elementIdAt()
+    if (cad.measureActive) {
+      // Measure: the click picks what to measure (a face, edge or corner of an exact solid, else the whole part) and leaves the selection alone.
+      if (!id) { if (!down.additive) { cad.setMeasureTargets([]); setMeasurePicks([]) } return }
+      const sub = pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id), vertexPicking())
+      const target: MeasureTarget = sub === undefined ? { elementId: id, kind: "body", index: 0 } : { elementId: id, kind: sub.kind, index: sub.index }
+      const next = nextTargets(cad.measureTargets, target)
+      const keyOf = (t: MeasureTarget) => `${t.elementId}:${t.kind}:${t.kind === "body" ? 0 : t.index}`
+      const picks = new Map(measurePicks().map((pick) => [keyOf(pick.target), pick] as const))
+      picks.set(keyOf(target), { target, ...(sub !== undefined ? { sub } : {}) })
+      setMeasurePicks(next.map((t) => picks.get(keyOf(t))!).filter((pick) => pick !== undefined))
+      cad.setMeasureTargets(next)
+      return
+    }
     if (id && !isLocked(id)) {
       selection.selectElement(id, down.additive)
       const sub = pickSubEntity(lastHits.filter((hit) => ownerOf(hit.object) === id), vertexPicking())
@@ -1357,6 +1413,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const off = app.keys.register({
       // Escape undoes whatever is in flight, then deselects: one press clears the whole editing state.
       "edit.cancel": () => {
+        // Measure first: Esc clears the picks, a second Esc leaves the inspector.
+        if (cad.measureActive) {
+          if (cad.measureTargets.length > 0) { cad.setMeasureTargets([]); setMeasurePicks([]) } else cad.setMeasureActive(false)
+          return
+        }
         // A shape being drawn goes first: Esc drops the point, a second Esc leaves the tool, and only then the selection.
         if (drawTool()) {
           if (drawStart()) { setDrawStart(undefined); clearDrawPreview() } else stopDrawing()
@@ -1371,6 +1432,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       },
       "file.save": () => { if (props.onSave === undefined) return false; props.onSave() },
       "edit.undo": () => { elements.undo() },
+      "cad.inspect.measure": () => { cad.setMeasureActive(!cad.measureActive) },
       "edit.redo": () => { elements.redo() },
       "view.zoomIn": () => { zoom(1 / 1.2) },
       "view.zoomOut": () => { zoom(1.2) },
@@ -1476,6 +1538,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
       <Show when={pickedSub()}>
         {(pick) => <div class="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-md border border-[color:var(--ent-line)] bg-[color:var(--ent-surface)] px-3 py-1.5 text-xs text-[color:var(--ent-text)] shadow-lg" data-testid="picked-entity">{describeSubEntity(pick(), { face: (index) => t("cad.sub.face", { index }), edge: (index) => t("cad.sub.edge", { index }), vertex: (index) => t("cad.sub.vertex", { index }) })}</div>}
+      </Show>
+
+      <Show when={cad.measureActive}>
+        <MeasurePanel outcome={measureOutcome()} units={app.settings.settings().units} decimals={app.settings.settings().decimals}
+          nameOf={(id) => { const element = elements.elements.find((candidate) => candidate.id === id) as { name?: unknown; type?: unknown } | undefined; return typeof element?.name === "string" && element.name !== "" ? element.name : String(element?.type ?? id) }}
+          onClear={() => { cad.setMeasureTargets([]); setMeasurePicks([]) }} onClose={() => cad.setMeasureActive(false)} />
       </Show>
 
       <Show when={issueItems().length > 0}>

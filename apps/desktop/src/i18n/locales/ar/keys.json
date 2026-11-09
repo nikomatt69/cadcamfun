@@ -130,5 +130,6 @@
   "keys.group.create": "إنشاء",
   "keys.cmd.cad.draw.line": "رسم خطوط (انقر البداية، ثم النهاية)",
   "keys.cmd.cad.draw.circle": "رسم دوائر (المركز، ثم نقطة على المحيط)",
-  "keys.cmd.cad.draw.rectangle": "رسم مستطيلات (زاويتان)"
+  "keys.cmd.cad.draw.rectangle": "رسم مستطيلات (زاويتان)",
+  "keys.cmd.cad.inspect.measure": "قياس"
 }

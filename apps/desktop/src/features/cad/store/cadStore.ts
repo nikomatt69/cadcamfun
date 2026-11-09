@@ -3,6 +3,7 @@ import { create } from "../../../shared/state/zustand.ts";
 import { DEFAULT_TOLERANCE } from "@cadcamfun/core";
 import { useElementsStore } from "./elementsStore.ts";
 import { DEFAULT_SECTION, type SectionState } from "../lib/section.ts";
+import type { MeasureTarget } from "../lib/measure.ts";
 import { DEFAULT_EXPLODED_VIEW, type ExplodedViewState } from "../lib/exploded-view.ts";
 import { DEFAULT_DISPLAY_MODE, isDisplayMode, type DisplayMode } from "../lib/display-mode.ts";
 import { bindViewPrefs } from "../lib/view-prefs.ts";
@@ -143,6 +144,12 @@ interface CADState {
   explodedView: ExplodedViewState;
   explodablePartCount: number;
   setExplodedView: (patch: Partial<ExplodedViewState>) => void;
+  /** The Measure inspector (`lib/measure.ts`): while on, a click picks a face, edge, corner or part to measure instead of selecting. */
+  measureActive: boolean;
+  setMeasureActive: (active: boolean) => void;
+  /** The picked measure targets, at most two (a third starts a new pair). */
+  measureTargets: ReadonlyArray<MeasureTarget>;
+  setMeasureTargets: (targets: ReadonlyArray<MeasureTarget>) => void;
 }
 
 export const useCADStore = create<CADState>((set, get) => ({
@@ -168,6 +175,10 @@ export const useCADStore = create<CADState>((set, get) => ({
       amount: patch.amount === undefined || !Number.isFinite(patch.amount) ? state.explodedView.amount : Math.max(0, Math.min(3, patch.amount)) },
     ...(patch.enabled ? { viewMode: "3d" as const } : {})
   })),
+  measureActive: false,
+  setMeasureActive: (active) => set({ measureActive: active === true, measureTargets: [], ...(active === true ? { viewMode: "3d" as const } : {}) }),
+  measureTargets: [],
+  setMeasureTargets: (targets) => set({ measureTargets: targets.slice(0, 2) }),
   section: DEFAULT_SECTION,
   setSection: (patch) => set((state) => ({ section: { ...state.section, ...patch } })),
   tolerance: DEFAULT_TOLERANCE,

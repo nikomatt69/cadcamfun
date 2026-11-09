@@ -130,5 +130,6 @@
   "keys.group.create": "Create",
   "keys.cmd.cad.draw.line": "Draw lines (click start, click end)",
   "keys.cmd.cad.draw.circle": "Draw circles (centre, then a point on it)",
-  "keys.cmd.cad.draw.rectangle": "Draw rectangles (two corners)"
+  "keys.cmd.cad.draw.rectangle": "Draw rectangles (two corners)",
+  "keys.cmd.cad.inspect.measure": "Measure"
 }
