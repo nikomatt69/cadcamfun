@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { brep } from "@cadcamfun/core"
 import { installDom } from "./helpers/dom.ts"
 
 test("the ribbon's Measure toggles the inspector in 3D and clears its picks", async () => {
@@ -27,7 +28,6 @@ test("the ribbon's Measure toggles the inspector in 3D and clears its picks", as
 test("the Measure panel shows the exact distance, angle and parallel gap of two faces in the display unit", async () => {
   installDom("http://localhost/cad")
   const { render } = await import("solid-js/web")
-  const { brep } = await import("@cadcamfun/core")
   const { default: MeasurePanel } = await import("../src/features/cad/components/MeasurePanel.tsx")
   const { runMeasure } = await import("../src/features/cad/lib/measure.ts")
   const make = (id: string, x: number) => ({ id, type: "brep", name: id.toUpperCase(), x, y: 0, z: 0, brep: brep.makeBox(10, 10, 10) })
