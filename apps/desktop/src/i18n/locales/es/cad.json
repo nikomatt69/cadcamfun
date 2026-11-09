@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "Ángulo",
   "cad.measure.gap": "Separación paralela",
   "cad.measure.pointA": "Punto más cercano A",
-  "cad.measure.pointB": "Punto más cercano B"
+  "cad.measure.pointB": "Punto más cercano B",
+  "cad.analysis.draft": "Desmoldeo",
+  "cad.analysis.draftHint": "Colorea las caras según el ángulo de desmoldeo respecto a la dirección de extracción: verde tiene desmoldeo, amarillo es vertical, rojo es una contrasalida.",
+  "cad.analysis.zebra": "Cebra",
+  "cad.analysis.zebraHint": "Franjas reflejadas: un quiebre indica una ruptura de tangencia, un salto un hueco.",
+  "cad.analysis.controls": "Ajustes de análisis",
+  "cad.analysis.pull": "Dirección de extracción",
+  "cad.analysis.minimum": "Desmoldeo mínimo",
+  "cad.analysis.stripes": "Franjas",
+  "cad.analysis.legend": "Leyenda de desmoldeo",
+  "cad.analysis.positive": "Positivo",
+  "cad.analysis.vertical": "Vertical",
+  "cad.analysis.negative": "Contrasalida"
 }

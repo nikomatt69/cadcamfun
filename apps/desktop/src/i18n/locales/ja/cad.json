@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "角度",
   "cad.measure.gap": "平行間隔",
   "cad.measure.pointA": "最近点 A",
-  "cad.measure.pointB": "最近点 B"
+  "cad.measure.pointB": "最近点 B",
+  "cad.analysis.draft": "抜き勾配",
+  "cad.analysis.draftHint": "抜き方向に対する勾配角で面を色分けします: 緑は勾配あり、黄は垂直、赤はアンダーカット。",
+  "cad.analysis.zebra": "ゼブラ",
+  "cad.analysis.zebraHint": "反射ストライプ: 折れは接線不連続、ずれは隙間を示します。",
+  "cad.analysis.controls": "解析設定",
+  "cad.analysis.pull": "抜き方向",
+  "cad.analysis.minimum": "最小勾配",
+  "cad.analysis.stripes": "ストライプ数",
+  "cad.analysis.legend": "抜き勾配の凡例",
+  "cad.analysis.positive": "正",
+  "cad.analysis.vertical": "垂直",
+  "cad.analysis.negative": "アンダーカット"
 }

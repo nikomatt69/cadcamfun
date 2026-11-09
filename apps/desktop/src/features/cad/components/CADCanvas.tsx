@@ -64,6 +64,7 @@ import { anchorOf, elementFromPoints, nextStart, previewOutline, type DrawTool, 
 import type { SnapType } from "../lib/enanchedSnapService.ts"
 import { createPlacementReference } from "../lib/placement-reference.ts"
 import { nextTargets, runMeasure, type MeasureTarget } from "../lib/measure.ts"
+import { buildAnalysisOverlay, createAnalysisMaterial, draftSummary, removeAnalysisOverlay, updateAnalysisMaterial } from "../lib/analysis.ts"
 import MeasurePanel from "./MeasurePanel.tsx"
 
 type TransformMode = "translate" | "rotate" | "scale"
@@ -810,6 +811,30 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   createEffect(() => showSub("picked", pickedSub()))
   createEffect(on(selectedIds, (ids) => { const picked = pickedSub(); if (picked !== undefined && !ids.includes(picked.elementId)) { setPickedSub(undefined); cad.setPickedEntity(null) } }, { defer: true }))
   onCleanup(() => { for (const kind of Object.keys(subOverlays) as SubHighlightKind[]) disposeSubHighlight(subOverlays[kind]) })
+
+  // ---------------------------------------------------------------------------------------------------- surface analysis
+  // Draft / zebra overlays share the parts' geometry and one shader; rebuilt when the parts are, retuned in place otherwise.
+  let analysisOverlay: THREE.Group | undefined
+  let analysisMaterial: THREE.ShaderMaterial | undefined
+  createEffect(() => {
+    rebuilds()
+    const mode = cad.analysis.mode
+    if (!ready() || !scene) return
+    removeAnalysisOverlay(analysisOverlay); analysisOverlay = undefined
+    if (mode === "off") { analysisMaterial?.dispose(); analysisMaterial = undefined; cad.setAnalysisSummary(null); invalidate(); return }
+    analysisMaterial ??= createAnalysisMaterial(untrack(() => cad.analysis))
+    analysisOverlay = buildAnalysisOverlay(cadObjects(), analysisMaterial)
+    scene.add(analysisOverlay)
+    invalidate()
+  })
+  createEffect(() => {
+    const state = cad.analysis
+    rebuilds()
+    if (analysisMaterial !== undefined) { updateAnalysisMaterial(analysisMaterial, state); invalidate() }
+    if (state.mode !== "draft" || !ready()) return
+    cad.setAnalysisSummary(draftSummary(cadObjects(), state.pull, state.angleDeg))
+  })
+  onCleanup(() => { removeAnalysisOverlay(analysisOverlay); analysisMaterial?.dispose() })
 
   // ---------------------------------------------------------------------------------------------------- measure
   // The picks stay valid across a rebuild only by index; a rebuilt part may have other faces, so a rebuild drops them.

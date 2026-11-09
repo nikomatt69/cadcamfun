@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import type { brep as Brep } from "@cadcamfun/core"
 import { installDom } from "./helpers/dom.ts"
 
 test("the ribbon's Measure toggles the inspector in 3D and clears its picks", async () => {
@@ -32,7 +33,7 @@ test("the Measure panel shows the exact distance, angle and parallel gap of two 
   const { runMeasure } = await import("../src/features/cad/lib/measure.ts")
   const make = (id: string, x: number) => ({ id, type: "brep", name: id.toUpperCase(), x, y: 0, z: 0, brep: brep.makeBox(10, 10, 10) })
   const a = make("a", 0), b = make("b", 25.4)
-  const side = (body: brep.Brep, sign: number) => body.faces.findIndex((f) => f.surface.kind === "plane" && Math.abs((f.reversed ? -1 : 1) * f.surface.frame.z.x - sign) < 1e-9)
+  const side = (body: Brep.Brep, sign: number) => body.faces.findIndex((f: Brep.Face) => f.surface.kind === "plane" && Math.abs((f.reversed ? -1 : 1) * f.surface.frame.z.x - sign) < 1e-9)
   const outcome = runMeasure([{ elementId: "a", kind: "face", index: side(a.brep, 1) }, { elementId: "b", kind: "face", index: side(b.brep, -1) }], [a, b])
   const root = document.createElement("div")
   document.body.append(root)
@@ -61,4 +62,38 @@ test("a refused measurement shows the kernel's reason", async () => {
   try {
     expect(root.querySelector('[data-testid="measure-error"]')?.textContent).toContain("no exact solid")
   } finally { dispose(); root.remove() }
+}, 60000)
+
+test("the ribbon's Draft and Zebra toggle one analysis at a time and show the draft legend from the canvas summary", async () => {
+  installDom("http://localhost/cad")
+  const { render } = await import("solid-js/web")
+  const { default: Ribbon } = await import("../src/features/cad/components/CadRibbon.tsx")
+  const { useCADStore } = await import("../src/features/cad/store/cadStore.ts")
+  const { DEFAULT_ANALYSIS } = await import("../src/features/cad/lib/analysis.ts")
+  useCADStore.setState({ analysis: DEFAULT_ANALYSIS, analysisSummary: null, viewMode: "2d" })
+  const root = document.createElement("div")
+  document.body.append(root)
+  const dispose = render(() => Ribbon({ ready: true, onSurface: () => {}, onBoolean: () => {} }), root)
+  const button = (text: string) => [...root.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === text)!
+  try {
+    expect(root.querySelector('[data-testid="analysis-controls"]')).toBeNull()
+    button("Draft").click()
+    expect(useCADStore.getState().analysis.mode).toBe("draft")
+    expect(useCADStore.getState().viewMode).toBe("3d")
+    useCADStore.getState().setAnalysisSummary({ positive: 200, vertical: 1800, negative: 200, total: 2200 })
+    await Promise.resolve()
+    expect(root.querySelector('[data-testid="draft-positive"]')?.textContent).toBe("9.1%")
+    expect(root.querySelector('[data-testid="draft-vertical"]')?.textContent).toBe("81.8%")
+    const pull = root.querySelector<HTMLSelectElement>('select[aria-label="Pull direction"]')!
+    pull.value = "-x"
+    pull.dispatchEvent(new Event("change", { bubbles: true }))
+    expect(useCADStore.getState().analysis.pull).toBe("-x")
+    button("Zebra").click()
+    expect(useCADStore.getState().analysis.mode).toBe("zebra")
+    await Promise.resolve()
+    expect(root.querySelector('[data-testid="draft-legend"]')).toBeNull()
+    button("Zebra").click()
+    expect(useCADStore.getState().analysis.mode).toBe("off")
+    expect(useCADStore.getState().analysisSummary).toBeNull()
+  } finally { dispose(); root.remove(); useCADStore.setState({ analysis: DEFAULT_ANALYSIS, analysisSummary: null, viewMode: "3d" }) }
 }, 60000)

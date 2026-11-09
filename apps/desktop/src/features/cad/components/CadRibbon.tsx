@@ -1,5 +1,5 @@
 import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
-import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText, Maximize2, Cylinder, Ruler } from "lucide-solid"
+import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText, Maximize2, Cylinder, Ruler, Spline, Waves } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -14,6 +14,7 @@ import { useAppOptional } from "../../../shared/state/context.ts"
 import { displayChord } from "../../../shared/keybindings/chord.ts"
 import { isSectionAxis } from "../lib/section.ts"
 import { isExplodeAxis } from "../lib/exploded-view.ts"
+import { DRAFT_COLORS, PULL_DIRECTIONS, isPullDirection, type AnalysisMode } from "../lib/analysis.ts"
 
 interface Props {
   readonly ready: boolean
@@ -83,6 +84,12 @@ export default function CadRibbon(props: Props): JSX.Element {
     return !props.ready || selected.length < 2 || selected.some(element =>
       element.locked === true || layers.layers.find(layer => layer.id === element.layerId)?.locked !== false)
   }
+  const toggleAnalysis = (mode: AnalysisMode) => cad.setAnalysis({ mode: cad.analysis.mode === mode ? "off" : mode })
+  const percent = (part: number) => {
+    const total = cad.analysisSummary?.total ?? 0
+    return total > 0 ? `${((100 * part) / total).toFixed(1)}%` : "—"
+  }
+  const swatch = (color: number) => `#${color.toString(16).padStart(6, "0")}`
   const toggleSection = () => {
     const enabled = !cad.section.enabled
     if (enabled) cad.setViewMode("3d")
@@ -113,6 +120,10 @@ export default function CadRibbon(props: Props): JSX.Element {
         <Action label={t("cad.measure.title")} icon={<Ruler size={14} />} active={cad.measureActive} disabled={!props.ready}
           hint={measureHint()} onClick={() => cad.setMeasureActive(!cad.measureActive)} />
         <Action label={t("cad.section")} icon={<Scissors size={14} />} active={cad.section.enabled} onClick={toggleSection} />
+        <Action label={t("cad.analysis.draft")} icon={<Spline size={14} />} active={cad.analysis.mode === "draft"} disabled={!props.ready}
+          hint={t("cad.analysis.draftHint")} onClick={() => toggleAnalysis("draft")} />
+        <Action label={t("cad.analysis.zebra")} icon={<Waves size={14} />} active={cad.analysis.mode === "zebra"} disabled={!props.ready}
+          hint={t("cad.analysis.zebraHint")} onClick={() => toggleAnalysis("zebra")} />
         <Action label={t("cad.explode.title")} icon={<Maximize2 size={14} />} active={cad.explodedView.enabled}
           disabled={!props.ready || (!cad.explodedView.enabled && cad.explodablePartCount < 2)}
           hint={t("cad.explode.hint")} onClick={() => cad.setExplodedView({ enabled: !cad.explodedView.enabled })} />
@@ -168,6 +179,33 @@ export default function CadRibbon(props: Props): JSX.Element {
             <output class="w-9 tabular-nums">{Math.round(cad.explodedView.amount * 100)}%</output>
           </label>
           <Action label={t("cad.explode.assemble")} icon={<Box size={14} />} onClick={() => cad.setExplodedView({ enabled: false })} />
+        </div>
+      </div>
+    </Show>
+    <Show when={cad.analysis.mode !== "off"}>
+      <div class="cad-ribbon-group" role="group" aria-label={t("cad.analysis.controls")} data-testid="analysis-controls">
+        <span class="cad-ribbon-heading">{cad.analysis.mode === "draft" ? t("cad.analysis.draft") : t("cad.analysis.zebra")}</span>
+        <div class="cad-ribbon-actions">
+          <select aria-label={t("cad.analysis.pull")} title={t("cad.analysis.pull")} value={cad.analysis.pull} onChange={event => {
+            const pull = event.currentTarget.value
+            if (isPullDirection(pull)) cad.setAnalysis({ pull })
+          }}><For each={PULL_DIRECTIONS}>{direction => <option value={direction}>{direction.toUpperCase()}</option>}</For></select>
+          <Show when={cad.analysis.mode === "draft"} fallback={
+            <label class="cad-ribbon-position"><span class="w-[70px]"><NumberField label={t("cad.analysis.stripes")} value={cad.analysis.stripes} step={1}
+              onChange={stripes => cad.setAnalysis({ stripes })} class="w-full" /></span></label>
+          }>
+            <label class="cad-ribbon-position"><span class="w-[70px]"><NumberField label={t("cad.analysis.minimum")} value={cad.analysis.angleDeg} step={0.5}
+              onChange={angleDeg => cad.setAnalysis({ angleDeg })} class="w-full" /></span><span>°</span></label>
+            <ul class="flex items-center gap-2 text-[11px]" aria-label={t("cad.analysis.legend")} data-testid="draft-legend">
+              <For each={[["positive", "cad.analysis.positive"], ["vertical", "cad.analysis.vertical"], ["negative", "cad.analysis.negative"]] as const}>{([kind, label]) =>
+                <li class="flex items-center gap-1" title={t(label)}>
+                  <span class="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: swatch(DRAFT_COLORS[kind]) }} />
+                  <span>{t(label)}</span>
+                  <output class="tabular-nums" data-testid={`draft-${kind}`}>{percent(cad.analysisSummary?.[kind] ?? 0)}</output>
+                </li>
+              }</For>
+            </ul>
+          </Show>
         </div>
       </div>
     </Show>

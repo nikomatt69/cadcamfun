@@ -4,6 +4,7 @@ import { DEFAULT_TOLERANCE } from "@cadcamfun/core";
 import { useElementsStore } from "./elementsStore.ts";
 import { DEFAULT_SECTION, type SectionState } from "../lib/section.ts";
 import type { MeasureTarget } from "../lib/measure.ts";
+import { DEFAULT_ANALYSIS, clampAnalysis, type AnalysisState, type DraftSummary } from "../lib/analysis.ts";
 import { DEFAULT_EXPLODED_VIEW, type ExplodedViewState } from "../lib/exploded-view.ts";
 import { DEFAULT_DISPLAY_MODE, isDisplayMode, type DisplayMode } from "../lib/display-mode.ts";
 import { bindViewPrefs } from "../lib/view-prefs.ts";
@@ -150,6 +151,12 @@ interface CADState {
   /** The picked measure targets, at most two (a third starts a new pair). */
   measureTargets: ReadonlyArray<MeasureTarget>;
   setMeasureTargets: (targets: ReadonlyArray<MeasureTarget>) => void;
+  /** Surface analysis overlay (draft / zebra, `lib/analysis.ts`); presentation only. */
+  analysis: AnalysisState;
+  setAnalysis: (patch: Partial<AnalysisState>) => void;
+  /** The draft areas of the drawn parts, written by the canvas while the draft analysis is on (null otherwise). */
+  analysisSummary: DraftSummary | null;
+  setAnalysisSummary: (summary: DraftSummary | null) => void;
 }
 
 export const useCADStore = create<CADState>((set, get) => ({
@@ -177,6 +184,13 @@ export const useCADStore = create<CADState>((set, get) => ({
   })),
   measureActive: false,
   setMeasureActive: (active) => set({ measureActive: active === true, measureTargets: [], ...(active === true ? { viewMode: "3d" as const } : {}) }),
+  analysis: DEFAULT_ANALYSIS,
+  setAnalysis: (patch) => set((state) => {
+    const analysis = clampAnalysis({ ...state.analysis, ...patch })
+    return { analysis, ...(analysis.mode !== "off" ? { viewMode: "3d" as const } : { analysisSummary: null }) }
+  }),
+  analysisSummary: null,
+  setAnalysisSummary: (summary) => set({ analysisSummary: summary }),
   measureTargets: [],
   setMeasureTargets: (targets) => set({ measureTargets: targets.slice(0, 2) }),
   section: DEFAULT_SECTION,

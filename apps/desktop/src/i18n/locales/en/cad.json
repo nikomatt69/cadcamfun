@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "Angle",
   "cad.measure.gap": "Parallel gap",
   "cad.measure.pointA": "Closest point A",
-  "cad.measure.pointB": "Closest point B"
+  "cad.measure.pointB": "Closest point B",
+  "cad.analysis.draft": "Draft",
+  "cad.analysis.draftHint": "Colour faces by draft angle against the pull direction: green has the draft, yellow is vertical, red is an undercut.",
+  "cad.analysis.zebra": "Zebra",
+  "cad.analysis.zebraHint": "Reflected stripes: a kink shows a tangency break, a jump a gap.",
+  "cad.analysis.controls": "Analysis settings",
+  "cad.analysis.pull": "Pull direction",
+  "cad.analysis.minimum": "Minimum draft",
+  "cad.analysis.stripes": "Stripes",
+  "cad.analysis.legend": "Draft legend",
+  "cad.analysis.positive": "Positive",
+  "cad.analysis.vertical": "Vertical",
+  "cad.analysis.negative": "Undercut"
 }

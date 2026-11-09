@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "Ângulo",
   "cad.measure.gap": "Afastamento paralelo",
   "cad.measure.pointA": "Ponto mais próximo A",
-  "cad.measure.pointB": "Ponto mais próximo B"
+  "cad.measure.pointB": "Ponto mais próximo B",
+  "cad.analysis.draft": "Saída",
+  "cad.analysis.draftHint": "Colore as faces pelo ângulo de saída em relação à direção de extração: verde tem saída, amarelo é vertical, vermelho é contrassaída.",
+  "cad.analysis.zebra": "Zebra",
+  "cad.analysis.zebraHint": "Faixas refletidas: uma quebra indica descontinuidade de tangência, um salto uma folga.",
+  "cad.analysis.controls": "Definições de análise",
+  "cad.analysis.pull": "Direção de extração",
+  "cad.analysis.minimum": "Saída mínima",
+  "cad.analysis.stripes": "Faixas",
+  "cad.analysis.legend": "Legenda de saída",
+  "cad.analysis.positive": "Positiva",
+  "cad.analysis.vertical": "Vertical",
+  "cad.analysis.negative": "Contrassaída"
 }

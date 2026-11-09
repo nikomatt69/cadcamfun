@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "कोण",
   "cad.measure.gap": "समानांतर अंतर",
   "cad.measure.pointA": "निकटतम बिंदु A",
-  "cad.measure.pointB": "निकटतम बिंदु B"
+  "cad.measure.pointB": "निकटतम बिंदु B",
+  "cad.analysis.draft": "ड्राफ्ट",
+  "cad.analysis.draftHint": "पुल दिशा के सापेक्ष ड्राफ्ट कोण से फ़ेस रंगें: हरा में ड्राफ्ट है, पीला ऊर्ध्वाधर है, लाल अंडरकट है।",
+  "cad.analysis.zebra": "ज़ेबरा",
+  "cad.analysis.zebraHint": "परावर्तित धारियाँ: मोड़ स्पर्शरेखा टूटना और उछाल अंतराल दिखाता है।",
+  "cad.analysis.controls": "विश्लेषण सेटिंग्स",
+  "cad.analysis.pull": "पुल दिशा",
+  "cad.analysis.minimum": "न्यूनतम ड्राफ्ट",
+  "cad.analysis.stripes": "धारियाँ",
+  "cad.analysis.legend": "ड्राफ्ट लेजेंड",
+  "cad.analysis.positive": "धनात्मक",
+  "cad.analysis.vertical": "ऊर्ध्वाधर",
+  "cad.analysis.negative": "अंडरकट"
 }

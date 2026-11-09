@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "Angle",
   "cad.measure.gap": "Écart parallèle",
   "cad.measure.pointA": "Point le plus proche A",
-  "cad.measure.pointB": "Point le plus proche B"
+  "cad.measure.pointB": "Point le plus proche B",
+  "cad.analysis.draft": "Dépouille",
+  "cad.analysis.draftHint": "Colore les faces selon l'angle de dépouille par rapport à la direction de démoulage : vert a la dépouille, jaune est vertical, rouge est une contre-dépouille.",
+  "cad.analysis.zebra": "Zébra",
+  "cad.analysis.zebraHint": "Bandes réfléchies : un coude révèle une rupture de tangence, un saut un écart.",
+  "cad.analysis.controls": "Réglages d'analyse",
+  "cad.analysis.pull": "Direction de démoulage",
+  "cad.analysis.minimum": "Dépouille minimale",
+  "cad.analysis.stripes": "Bandes",
+  "cad.analysis.legend": "Légende de dépouille",
+  "cad.analysis.positive": "Positive",
+  "cad.analysis.vertical": "Verticale",
+  "cad.analysis.negative": "Contre-dépouille"
 }

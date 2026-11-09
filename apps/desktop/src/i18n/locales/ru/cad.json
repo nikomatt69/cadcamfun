@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "Угол",
   "cad.measure.gap": "Зазор между параллельными",
   "cad.measure.pointA": "Ближайшая точка A",
-  "cad.measure.pointB": "Ближайшая точка B"
+  "cad.measure.pointB": "Ближайшая точка B",
+  "cad.analysis.draft": "Уклон",
+  "cad.analysis.draftHint": "Окрашивает грани по углу уклона относительно направления извлечения: зелёный — уклон есть, жёлтый — вертикаль, красный — поднутрение.",
+  "cad.analysis.zebra": "Зебра",
+  "cad.analysis.zebraHint": "Отражённые полосы: излом показывает разрыв касательности, скачок — зазор.",
+  "cad.analysis.controls": "Параметры анализа",
+  "cad.analysis.pull": "Направление извлечения",
+  "cad.analysis.minimum": "Минимальный уклон",
+  "cad.analysis.stripes": "Полосы",
+  "cad.analysis.legend": "Легенда уклона",
+  "cad.analysis.positive": "Положительный",
+  "cad.analysis.vertical": "Вертикальный",
+  "cad.analysis.negative": "Поднутрение"
 }

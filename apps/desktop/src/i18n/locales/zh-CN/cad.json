@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "角度",
   "cad.measure.gap": "平行间距",
   "cad.measure.pointA": "最近点 A",
-  "cad.measure.pointB": "最近点 B"
+  "cad.measure.pointB": "最近点 B",
+  "cad.analysis.draft": "拔模",
+  "cad.analysis.draftHint": "按相对于拔模方向的拔模角为面着色：绿色有拔模，黄色为竖直，红色为倒扣。",
+  "cad.analysis.zebra": "斑马纹",
+  "cad.analysis.zebraHint": "反射条纹：折角表示相切不连续，错位表示间隙。",
+  "cad.analysis.controls": "分析设置",
+  "cad.analysis.pull": "拔模方向",
+  "cad.analysis.minimum": "最小拔模角",
+  "cad.analysis.stripes": "条纹数",
+  "cad.analysis.legend": "拔模图例",
+  "cad.analysis.positive": "正向",
+  "cad.analysis.vertical": "竖直",
+  "cad.analysis.negative": "倒扣"
 }

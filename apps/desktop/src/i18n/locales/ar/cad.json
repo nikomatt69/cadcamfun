@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "الزاوية",
   "cad.measure.gap": "المسافة بين المتوازيين",
   "cad.measure.pointA": "أقرب نقطة A",
-  "cad.measure.pointB": "أقرب نقطة B"
+  "cad.measure.pointB": "أقرب نقطة B",
+  "cad.analysis.draft": "زاوية السحب",
+  "cad.analysis.draftHint": "تلوين الأوجه حسب زاوية السحب بالنسبة لاتجاه الإخراج: الأخضر فيه سحب، والأصفر رأسي، والأحمر قطع سفلي.",
+  "cad.analysis.zebra": "حمار وحشي",
+  "cad.analysis.zebraHint": "خطوط منعكسة: الانكسار يدل على انقطاع في التماس، والقفزة على فجوة.",
+  "cad.analysis.controls": "إعدادات التحليل",
+  "cad.analysis.pull": "اتجاه الإخراج",
+  "cad.analysis.minimum": "أدنى زاوية سحب",
+  "cad.analysis.stripes": "الخطوط",
+  "cad.analysis.legend": "مفتاح زاوية السحب",
+  "cad.analysis.positive": "موجب",
+  "cad.analysis.vertical": "رأسي",
+  "cad.analysis.negative": "قطع سفلي"
 }

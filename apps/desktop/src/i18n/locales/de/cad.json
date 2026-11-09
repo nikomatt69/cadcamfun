@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "Winkel",
   "cad.measure.gap": "Parallelabstand",
   "cad.measure.pointA": "Nächster Punkt A",
-  "cad.measure.pointB": "Nächster Punkt B"
+  "cad.measure.pointB": "Nächster Punkt B",
+  "cad.analysis.draft": "Formschräge",
+  "cad.analysis.draftHint": "Flächen nach Formschrägenwinkel zur Entformungsrichtung färben: grün hat Schräge, gelb ist senkrecht, rot ist Hinterschnitt.",
+  "cad.analysis.zebra": "Zebra",
+  "cad.analysis.zebraHint": "Gespiegelte Streifen: ein Knick zeigt einen Tangentenbruch, ein Sprung eine Lücke.",
+  "cad.analysis.controls": "Analyseeinstellungen",
+  "cad.analysis.pull": "Entformungsrichtung",
+  "cad.analysis.minimum": "Minimale Schräge",
+  "cad.analysis.stripes": "Streifen",
+  "cad.analysis.legend": "Legende Formschräge",
+  "cad.analysis.positive": "Positiv",
+  "cad.analysis.vertical": "Senkrecht",
+  "cad.analysis.negative": "Hinterschnitt"
 }

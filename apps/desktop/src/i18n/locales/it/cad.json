@@ -1305,5 +1305,17 @@
   "cad.measure.angle": "Angolo",
   "cad.measure.gap": "Distanza tra paralleli",
   "cad.measure.pointA": "Punto più vicino A",
-  "cad.measure.pointB": "Punto più vicino B"
+  "cad.measure.pointB": "Punto più vicino B",
+  "cad.analysis.draft": "Sformo",
+  "cad.analysis.draftHint": "Colora le facce in base all'angolo di sformo rispetto alla direzione di estrazione: verde ha sformo, giallo è verticale, rosso è sottosquadro.",
+  "cad.analysis.zebra": "Zebra",
+  "cad.analysis.zebraHint": "Strisce riflesse: un'angolatura indica una discontinuità di tangenza, un salto un'apertura.",
+  "cad.analysis.controls": "Impostazioni analisi",
+  "cad.analysis.pull": "Direzione di estrazione",
+  "cad.analysis.minimum": "Sformo minimo",
+  "cad.analysis.stripes": "Strisce",
+  "cad.analysis.legend": "Legenda sformo",
+  "cad.analysis.positive": "Positivo",
+  "cad.analysis.vertical": "Verticale",
+  "cad.analysis.negative": "Sottosquadro"
 }
