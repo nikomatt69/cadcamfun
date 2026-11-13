@@ -159,7 +159,8 @@ jobs:
           LISTED=""
           for _ in $(seq 1 20); do
             # Only a GET counts: the script's own POST to create the project logs the same URL.
-            if grep -B1 '"http.url": "/api/projects"' simulator-out/sidecar.err | grep -q '"http.method": "GET"'; then LISTED=yes; break; fi
+            # Effect's JSON logger is compact, so a spaced `"http.url": "/api/projects"` never matches.
+            if bun --no-env-file scripts/ios-companion-listed.ts simulator-out/sidecar.err; then LISTED=yes; break; fi
             sleep 2
           done
           echo "projects listed by the app: ${LISTED:-no}"
